@@ -7,7 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
+    "test:customers": "playwright test --grep customers",
+    "test:orders": "playwright test --grep orders",
+    "test:workflow": "playwright test --grep workflow"
   },
   "dependencies": {
     "react": "^19.2.0",
@@ -17,6 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4.1.17",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",

@@ -76,6 +76,13 @@ playwright-report/
 playwright/.cache/
 test-results/
 
+# Frontend E2E (Playwright)
+frontend/e2e/test-results/
+frontend/e2e/screenshots/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.auth/
+
 # Jest / Vitest (frontend testing)
 coverage/
 .nyc_output/
