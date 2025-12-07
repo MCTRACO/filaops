@@ -97,13 +97,13 @@ SECRET_KEY=your-secure-secret-key
 ```
 filaops/
 +-- backend/
-�   +-- app/
-�   �   +-- api/v1/endpoints/   # REST API routes
-�   �   +-- models/             # SQLAlchemy ORM models
-�   �   +-- schemas/            # Pydantic schemas
-�   �   +-- services/           # Business logic
-�   �   +-- core/               # Config, security
-�   +-- requirements.txt
+¦   +-- app/
+¦   ¦   +-- api/v1/endpoints/   # REST API routes
+¦   ¦   +-- models/             # SQLAlchemy ORM models
+¦   ¦   +-- schemas/            # Pydantic schemas
+¦   ¦   +-- services/           # Business logic
+¦   ¦   +-- core/               # Config, security
+¦   +-- requirements.txt
 +-- frontend/                   # React admin UI
 +-- mock-api/                   # Mock quote server (for contributors)
 +-- scripts/                    # Database setup scripts
@@ -172,23 +172,23 @@ Full API docs at `/docs` when running.
 
 | Feature | Open Source | Pro | Enterprise |
 |---------|:-----------:|:---:|:----------:|
-| Products, BOMs, Inventory | ? | ? | ? |
-| Sales & Production Orders | ? | ? | ? |
-| Work Centers & Routing | ? | ? | ? |
-| Serial/Lot Traceability | ? | ? | ? |
-| MRP | ? | ? | ? |
-| Admin Dashboard UI | ? | ? | ? |
-| REST API | ? | ? | ? |
-| Mock Quote API | ? | - | - |
-| Customer Quote Portal | - | ? | ? |
-| Multi-Material Quoting | - | ? | ? |
-| E-commerce Integrations | - | ? | ? |
-| Payment Processing | - | ? | ? |
-| Shipping Integrations | - | ? | ? |
-| Accounting Integrations | - | ? | ? |
-| Printer Fleet Management | - | - | ? |
-| Live Production Monitoring | - | - | ? |
-| ML Print Time Estimation | - | - | ? |
+| Products, BOMs, Inventory | ✅ | ✅ | ✅ |
+| Sales & Production Orders | ✅ | ✅ | ✅ |
+| Work Centers & Routing | ✅ | ✅ | ✅ |
+| Serial/Lot Traceability | ✅ | ✅ | ✅ |
+| MRP | ✅ | ✅ | ✅ |
+| Admin Dashboard UI | ✅ | ✅ | ✅ |
+| REST API | ✅ | ✅ | ✅ |
+| Mock Quote API | ✅ | - | - |
+| Customer Quote Portal | - | ✅ | ✅ |
+| Multi-Material Quoting | - | ✅ | ✅ |
+| E-commerce Integrations | - | ✅ | ✅ |
+| Payment Processing | - | ✅ | ✅ |
+| Shipping Integrations | - | ✅ | ✅ |
+| Accounting Integrations | - | ✅ | ✅ |
+| Printer Fleet Management | - | - | ✅ |
+| Live Production Monitoring | - | - | ✅ |
+| ML Print Time Estimation | - | - | ✅ |
 
 Questions? [Contact us](mailto:hello@blb3dprinting.com) or open a [Discussion](https://github.com/Blb3D/filaops/discussions).
 
