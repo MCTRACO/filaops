@@ -56,7 +56,6 @@ logs/
 
 # Uploads
 uploads/
-temp/
 
 # Testing
 .coverage
@@ -101,6 +100,7 @@ credentials.json
 config.local.py
 
 # Temporary/test files
+temp/
 _ul/
 nul
 *.3mf
@@ -132,9 +132,6 @@ cli_config_fixed.json
 # Temp HTML
 *.html
 !frontend/
-
-# Root-level node files
-/package-lock.json
 
 # ===========================================
 # SECURITY - Prevent accidental secret commits
