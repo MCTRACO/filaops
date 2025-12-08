@@ -53,10 +53,35 @@ async def create_sales_order(
 
     For custom quote-based orders, use POST /convert/{quote_id} instead.
 
+    Validations:
+    - Customer must exist and be active (if provided)
+    - All products must exist and be active
+    - Prices are taken from product catalog (frontend price ignored for security)
+    - Shipping address auto-copied from customer if not provided
+
     Returns:
         Sales order with status 'pending'
     """
-    # Validate all products exist and get their details
+    # ========================================================================
+    # VALIDATION: Customer (if provided)
+    # ========================================================================
+    customer = None
+    if request.customer_id:
+        customer = db.query(User).filter(User.id == request.customer_id).first()
+        if not customer:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Customer ID {request.customer_id} not found"
+            )
+        if customer.status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Customer '{customer.email}' is not active (status: {customer.status})"
+            )
+
+    # ========================================================================
+    # VALIDATION: Products - must exist, be active, have price
+    # ========================================================================
     line_products = []
     total_price = Decimal("0")
     total_quantity = 0
@@ -69,8 +94,21 @@ async def create_sales_order(
                 detail=f"Product ID {line.product_id} not found"
             )
 
-        # Use provided price or fall back to product's selling price
-        unit_price = line.unit_price if line.unit_price is not None else (product.selling_price or Decimal("0"))
+        # Check product is active
+        if not product.active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Product '{product.sku}' is discontinued and cannot be ordered"
+            )
+
+        # SECURITY: Always use product's catalog price, never trust frontend
+        unit_price = product.selling_price or Decimal("0")
+        if unit_price <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Product '{product.sku}' has no selling price configured"
+            )
+
         line_total = unit_price * line.quantity
 
         line_products.append({
@@ -84,12 +122,16 @@ async def create_sales_order(
         total_price += line_total
         total_quantity += line.quantity
 
-    # Generate order number
+    # ========================================================================
+    # GENERATE: Order number with row locking to prevent duplicates
+    # ========================================================================
     year = datetime.utcnow().year
+    # Use with_for_update() for row-level locking to prevent race conditions
     last_order = (
         db.query(SalesOrder)
         .filter(SalesOrder.order_number.like(f"SO-{year}-%"))
         .order_by(desc(SalesOrder.order_number))
+        .with_for_update()
         .first()
     )
 
@@ -118,6 +160,26 @@ async def create_sales_order(
     # Determine user_id: use customer_id if provided, otherwise current admin
     user_id = request.customer_id if request.customer_id else current_user.id
 
+    # ========================================================================
+    # AUTO-COPY: Customer shipping address if not provided
+    # ========================================================================
+    shipping_address_line1 = request.shipping_address_line1
+    shipping_address_line2 = request.shipping_address_line2
+    shipping_city = request.shipping_city
+    shipping_state = request.shipping_state
+    shipping_zip = request.shipping_zip
+    shipping_country = request.shipping_country or "USA"
+
+    if customer and not shipping_address_line1:
+        # Copy customer's shipping address if available
+        if customer.shipping_address_line1:
+            shipping_address_line1 = customer.shipping_address_line1
+            shipping_address_line2 = customer.shipping_address_line2
+            shipping_city = customer.shipping_city
+            shipping_state = customer.shipping_state
+            shipping_zip = customer.shipping_zip
+            shipping_country = customer.shipping_country or "USA"
+
     # Create sales order
     sales_order = SalesOrder(
         user_id=user_id,
@@ -137,12 +199,12 @@ async def create_sales_order(
         status="pending",
         payment_status="pending",
         rush_level="standard",
-        shipping_address_line1=request.shipping_address_line1,
-        shipping_address_line2=request.shipping_address_line2,
-        shipping_city=request.shipping_city,
-        shipping_state=request.shipping_state,
-        shipping_zip=request.shipping_zip,
-        shipping_country=request.shipping_country or "USA",
+        shipping_address_line1=shipping_address_line1,
+        shipping_address_line2=shipping_address_line2,
+        shipping_city=shipping_city,
+        shipping_state=shipping_state,
+        shipping_zip=shipping_zip,
+        shipping_country=shipping_country,
         customer_notes=request.customer_notes,
         internal_notes=request.internal_notes,
     )
@@ -247,12 +309,13 @@ async def convert_quote_to_sales_order(
             detail="Quote does not have an associated product. This should have been created during acceptance."
         )
 
-    # Generate sales order number
+    # Generate sales order number with row locking to prevent duplicates
     year = datetime.utcnow().year
     last_order = (
         db.query(SalesOrder)
         .filter(SalesOrder.order_number.like(f"SO-{year}-%"))
         .order_by(desc(SalesOrder.order_number))
+        .with_for_update()
         .first()
     )
 

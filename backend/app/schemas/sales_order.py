@@ -14,8 +14,8 @@ from decimal import Decimal
 class SalesOrderLineCreate(BaseModel):
     """Line item for manual order creation"""
     product_id: int = Field(..., description="Product ID")
-    quantity: int = Field(..., gt=0, description="Quantity")
-    unit_price: Optional[Decimal] = Field(None, description="Unit price (uses product price if not specified)")
+    quantity: int = Field(..., gt=0, le=10000, description="Quantity (1-10000)")
+    unit_price: Optional[Decimal] = Field(None, ge=0, description="Unit price (uses product price if not specified)")
     notes: Optional[str] = Field(None, max_length=500)
 
 
