@@ -231,6 +231,14 @@ Key areas:
 
 ## Support
 
+### Documentation
+- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Quick start guide (Docker & manual)
+- **[FAQ.md](FAQ.md)** - Frequently asked questions
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+- **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** - System overview and workflows
+- **[INSTALL.md](INSTALL.md)** - Detailed installation guide
+
+### Community
 - [GitHub Issues](https://github.com/blb3dprinting/filaops/issues) - Bug reports
 - [GitHub Discussions](https://github.com/blb3dprinting/filaops/discussions) - Questions & ideas
 - [Discord](https://discord.gg/filaops) - Community chat

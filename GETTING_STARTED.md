@@ -2,15 +2,193 @@
 
 This guide will walk you through setting up FilaOps step by step. No coding experience required.
 
-**Time needed:** About 30 minutes for first-time setup.
+**Time needed:** 
+- **Docker method:** 10-15 minutes (recommended)
+- **Manual method:** 30 minutes (for advanced users)
 
 ---
 
-## What You'll Need
+## 🚀 Quick Start (Docker - Recommended)
+
+**Perfect for print farm owners!** No Python, Node.js, or database setup required.
+
+### Step 1: Install Docker Desktop
+
+**Windows:**
+1. Download [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)
+2. Run the installer and follow the prompts
+3. **Restart your computer** when prompted
+4. After restart, Docker Desktop should start automatically (whale icon in system tray)
+
+**macOS:**
+1. Download [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/)
+2. Open the downloaded `.dmg` file
+3. Drag Docker to Applications folder
+4. Open Docker from Applications and grant permissions
+
+**Linux (Ubuntu/Debian):**
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+# Log out and back in, then verify
+docker --version
+```
+
+### Step 2: Download FilaOps
+
+**Option A: Download ZIP (Easiest)**
+1. Go to https://github.com/Blb3D/filaops
+2. Click the green "Code" button → "Download ZIP"
+3. Extract to a folder (e.g., `C:\FilaOps` or `~/filaops`)
+
+**Option B: Git Clone**
+```bash
+git clone https://github.com/Blb3D/filaops.git
+cd filaops
+```
+
+### Step 3: Start FilaOps
+
+Open a terminal/command prompt in the FilaOps folder:
+
+**Windows (PowerShell or Command Prompt):**
+```powershell
+cd C:\FilaOps
+docker-compose up -d
+```
+
+**Mac/Linux:**
+```bash
+cd ~/filaops
+docker-compose up -d
+```
+
+**First startup takes 3-5 minutes** as Docker downloads and builds everything.
+
+You'll see output like:
+```
+Creating filaops-db       ... done
+Creating filaops-redis    ... done
+Creating filaops-db-init  ... done
+Creating filaops-backend  ... done
+Creating filaops-frontend ... done
+```
+
+### Step 4: Access FilaOps
+
+1. Open your browser
+2. Go to: **http://localhost:5173**
+3. You should see the FilaOps login screen!
+
+**Default login:**
+- **Email:** `admin@filaops.local`
+- **Password:** `admin123`
+
+**⚠️ Change your password immediately after first login!**
+
+---
+
+## Common Docker Commands
+
+### Start FilaOps
+```bash
+docker-compose up -d
+```
+
+### Stop FilaOps
+```bash
+docker-compose down
+```
+
+### View Logs (troubleshooting)
+```bash
+docker-compose logs -f
+```
+
+### Update to Latest Version
+```bash
+git pull
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+---
+
+## What's Next?
+
+### Quick Tour of FilaOps
+
+| Menu Item | What It Does |
+|-----------|--------------|
+| **Dashboard** | Overview of your operation |
+| **Products** | Your catalog (filaments, finished goods, supplies) |
+| **BOMs** | Bills of Materials - what goes into each product |
+| **Orders** | Customer orders |
+| **Production** | Manufacturing queue |
+| **Inventory** | Stock levels |
+| **Manufacturing** | Printers, work stations, routings |
+| **Purchasing** | Vendor management, purchase orders |
+
+### Recommended First Steps
+
+1. **Complete onboarding** - Import your products, customers, and materials via CSV
+2. **Add a filament** - Go to Products → Add Product (if not imported)
+3. **Create a BOM** - Link your finished good to the filament it uses
+4. **Create a test order** - See how the workflow works
+
+For a detailed explanation of how everything connects, see **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)**.
+
+---
+
+## Troubleshooting
+
+### "Cannot connect to Docker daemon"
+- Make sure Docker Desktop is running (whale icon in system tray)
+- On Windows, try running PowerShell as Administrator
+
+### "Port 5173 already in use"
+Another application is using that port. Either:
+- Stop the other application, or
+- Edit `docker-compose.yml` and change `"5173:80"` to `"8080:80"`, then access at http://localhost:8080
+
+### "Database connection failed"
+- Wait 30 seconds and try again (database may still be starting)
+- Check logs: `docker-compose logs db`
+
+### "Container keeps restarting"
+Check what's wrong:
+```bash
+docker-compose logs backend
+```
+
+### Still stuck?
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Detailed troubleshooting guide
+- **[FAQ.md](FAQ.md)** - Common questions and answers
+- [GitHub Issues](https://github.com/Blb3D/filaops/issues) - Report bugs
+- [GitHub Discussions](https://github.com/Blb3D/filaops/discussions) - Ask questions
+
+---
+
+## 📖 Need More Details?
+
+- **[INSTALL.md](INSTALL.md)** - Complete Docker installation guide with advanced options
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Detailed troubleshooting for common issues
+- **[FAQ.md](FAQ.md)** - Frequently asked questions
+
+---
+
+## 🔧 Advanced Setup (Manual Installation)
+
+If you prefer to install Python, Node.js, and SQL Server manually (or Docker isn't available), see the manual setup guide below.
+
+<details>
+<summary><strong>Click to expand manual setup instructions</strong></summary>
+
+### What You'll Need
 
 Before starting, you need to install these programs. Click each link to download.
 
-### 1. Python (the programming language)
+#### 1. Python (the programming language)
 
 **Download:** https://www.python.org/downloads/
 
@@ -24,7 +202,7 @@ python --version
 ```
 You should see something like `Python 3.11.x` or `Python 3.12.x`
 
-### 2. Node.js (for the web interface)
+#### 2. Node.js (for the web interface)
 
 **Download:** https://nodejs.org/ (choose the LTS version)
 
@@ -36,7 +214,7 @@ node --version
 ```
 You should see something like `v18.x.x` or `v20.x.x`
 
-### 3. SQL Server Express (the database)
+#### 3. SQL Server Express (the database)
 
 **Download:** https://www.microsoft.com/en-us/sql-server/sql-server-downloads
 
@@ -47,7 +225,7 @@ When installing:
 - Accept the defaults
 - **Write down the server name** shown at the end (usually `localhost\SQLEXPRESS`)
 
-### 4. ODBC Driver (connects Python to SQL Server)
+#### 4. ODBC Driver (connects Python to SQL Server)
 
 **Download:** https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server
 
@@ -55,7 +233,7 @@ Choose "ODBC Driver 17 for SQL Server" for Windows.
 
 ---
 
-## Step 1: Download FilaOps
+### Step 1: Download FilaOps
 
 Open Command Prompt and run these commands one at a time:
 
@@ -71,7 +249,7 @@ cd filaops
 
 ---
 
-## Step 2: Install Python Packages
+### Step 2: Install Python Packages
 
 Still in Command Prompt, run:
 
@@ -86,7 +264,7 @@ This will take a few minutes. You'll see lots of text scrolling. **Wait until it
 
 ---
 
-## Step 3: Create the Database
+### Step 3: Create the Database
 
 Run this command:
 
@@ -122,7 +300,7 @@ Default data seeded successfully!
 
 ---
 
-## Step 4: Configure FilaOps
+### Step 4: Configure FilaOps
 
 Create a configuration file. Run:
 
@@ -149,7 +327,7 @@ Save and close Notepad.
 
 ---
 
-## Step 5: Start the Backend Server
+### Step 5: Start the Backend Server
 
 Run:
 
@@ -172,7 +350,7 @@ You should see "FilaOps API" with a list of endpoints.
 
 ---
 
-## Step 6: Start the Web Interface
+### Step 6: Start the Web Interface
 
 **Open a NEW Command Prompt window** (don't close the first one!)
 
@@ -194,7 +372,7 @@ The first command (`npm install`) will take a few minutes.
 
 ---
 
-## Step 7: Log In
+### Step 7: Log In
 
 Open your web browser and go to: **http://localhost:5173**
 
@@ -208,78 +386,7 @@ You should see a login page.
 
 ---
 
-## What's Next?
-
-### Quick Tour of FilaOps
-
-| Menu Item | What It Does |
-|-----------|--------------|
-| **Dashboard** | Overview of your operation |
-| **Products** | Your catalog (filaments, finished goods, supplies) |
-| **BOMs** | Bills of Materials - what goes into each product |
-| **Orders** | Customer orders |
-| **Production** | Manufacturing queue |
-| **Inventory** | Stock levels |
-| **Manufacturing** | Printers, work stations, routings |
-| **Purchasing** | Vendor management, purchase orders |
-
-### Recommended First Steps
-
-1. **Add a filament** - Go to Products → Add Product
-2. **Add a finished good** - Another product that you sell
-3. **Create a BOM** - Link your finished good to the filament it uses
-4. **Create a test order** - See how the workflow works
-
-For a detailed explanation of how everything connects, see **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)**.
-
----
-
-## Troubleshooting
-
-### "python is not recognized"
-
-Python wasn't added to your PATH during installation.
-1. Uninstall Python
-2. Download and reinstall from python.org
-3. **Check the box** "Add Python to PATH" during installation
-
-### "npm is not recognized"
-
-Node.js wasn't installed correctly.
-1. Download from https://nodejs.org/
-2. Run the installer again
-
-### Backend won't start / "Address already in use"
-
-Something else is using port 8000.
-1. Close any other programs that might be using it
-2. Or use a different port: `python -m uvicorn app.main:app --reload --port 8001`
-
-### Can't connect to database
-
-1. Open Windows Services (search "Services" in Start menu)
-2. Find "SQL Server (SQLEXPRESS)"
-3. Make sure it's "Running"
-4. If not, right-click → Start
-
-### Login doesn't work
-
-The admin user might not have been created correctly.
-
-1. Open SQL Server Management Studio
-2. Connect to `localhost\SQLEXPRESS`
-3. Open the file `scripts/create_admin.sql`
-4. Change `USE FilaOps;` to your database name if different
-5. Click Execute
-
-### Still stuck?
-
-- **GitHub Issues:** https://github.com/Blb3D/filaops/issues
-- **GitHub Discussions:** https://github.com/Blb3D/filaops/discussions
-
----
-
-## Starting FilaOps (After First Setup)
+### Starting FilaOps (After First Setup)
 
 Once everything is set up, here's how to start FilaOps each time:
 
@@ -299,6 +406,12 @@ Then open http://localhost:5173 in your browser.
 
 ---
 
-## Stopping FilaOps
+### Stopping FilaOps
 
 In each Command Prompt window, press `Ctrl+C` to stop the server.
+
+</details>
+
+---
+
+*FilaOps - ERP for 3D Print Farms*
