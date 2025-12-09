@@ -9,7 +9,7 @@
 
 FilaOps is an open source ERP system built for 3D print farms. Manage products, inventory, BOMs, orders, and production - designed by someone who actually runs a print farm.
 
-![FilaOps Dashboard](docs/images/dashboard-preview.png)
+![FilaOps Dashboard](docs/screenshots/dashboard.png)
 
 ---
 
