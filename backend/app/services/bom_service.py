@@ -3,7 +3,7 @@ BOM Auto-Creation Service
 
 Handles automatic creation of products and BOMs from accepted quotes.
 Creates three-line BOMs:
-1. Material line (filament) - looked up via MaterialInventory
+1. Material line (filament) - looked up via Product + Inventory (unified item master)
 2. Packaging line (shipping box)
 3. Machine time line (production cost @ $1.50/hr fully-burdened)
 """
@@ -292,12 +292,19 @@ def auto_create_product_and_bom(quote: Quote, db: Session) -> Tuple[Product, BOM
             slot_material = qm.material_type or quote.material_type
 
             try:
-                mat_product, mat_inventory = get_material_product_for_bom(
+                mat_product = get_material_product(
                     db,
                     material_type_code=slot_material,
-                    color_code=slot_color,
-                    require_in_stock=False
+                    color_code=slot_color
                 )
+                if not mat_product:
+                    mat_product = create_material_product(
+                        db,
+                        material_type_code=slot_material,
+                        color_code=slot_color,
+                        commit=False # Commit will be done at the end of the service
+                    )
+
                 material_entries.append({
                     "product": mat_product,
                     "grams": float(qm.material_grams),
@@ -305,7 +312,7 @@ def auto_create_product_and_bom(quote: Quote, db: Session) -> Tuple[Product, BOM
                     "is_primary": qm.is_primary,
                     "color_name": qm.color_name or slot_color,
                 })
-            except (MaterialNotFoundError, ColorNotFoundError, MaterialColorNotAvailableError) as e:
+            except (MaterialNotFoundError, ColorNotFoundError) as e:
                 raise RuntimeError(
                     f"Could not find material for slot {qm.slot_number}: {slot_material} + {slot_color}. "
                     f"Error: {str(e)}. "
@@ -314,12 +321,18 @@ def auto_create_product_and_bom(quote: Quote, db: Session) -> Tuple[Product, BOM
     else:
         # Single material quote - use quote.material_type and quote.color
         try:
-            material_product, material_inventory = get_material_product_for_bom(
+            material_product = get_material_product(
                 db,
                 material_type_code=quote.material_type,
-                color_code=quote.color,
-                require_in_stock=False  # Don't require stock for quote acceptance
+                color_code=quote.color
             )
+            if not material_product:
+                material_product = create_material_product(
+                    db,
+                    material_type_code=quote.material_type,
+                    color_code=quote.color,
+                    commit=False # Commit will be done at the end of the service
+                )
             material_entries.append({
                 "product": material_product,
                 "grams": float(quote.material_grams) if quote.material_grams else 0.0,
@@ -327,7 +340,7 @@ def auto_create_product_and_bom(quote: Quote, db: Session) -> Tuple[Product, BOM
                 "is_primary": True,
                 "color_name": quote.color,
             })
-        except (MaterialNotFoundError, ColorNotFoundError, MaterialColorNotAvailableError) as e:
+        except (MaterialNotFoundError, ColorNotFoundError) as e:
             raise RuntimeError(
                 f"Could not find material for quote: {quote.material_type} + {quote.color}. "
                 f"Error: {str(e)}. "
@@ -460,12 +473,20 @@ def validate_quote_for_bom(quote: Quote, db: Session) -> Tuple[bool, str]:
     # Check if material-color combo exists
     if quote.material_type and quote.color:
         try:
-            get_material_product_for_bom(
+            product = get_material_product(
                 db,
                 material_type_code=quote.material_type,
-                color_code=quote.color,
-                require_in_stock=False
+                color_code=quote.color
             )
+            if not product:
+                # Try to create it to see if it's a valid combination
+                create_material_product(
+                    db,
+                    material_type_code=quote.material_type,
+                    color_code=quote.color,
+                    commit=False
+                )
+                db.rollback() # Rollback the creation, we are only validating
         except Exception as e:
             errors.append(f"Material not available: {str(e)}")
     

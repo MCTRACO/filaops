@@ -85,8 +85,12 @@ class CustomerListResponse(BaseModel):
 
     # Derived fields
     full_name: Optional[str] = None
+
+    # Shipping address for order creation
+    shipping_address_line1: Optional[str] = None
     shipping_city: Optional[str] = None
     shipping_state: Optional[str] = None
+    shipping_zip: Optional[str] = None
 
     # Stats
     order_count: int = 0

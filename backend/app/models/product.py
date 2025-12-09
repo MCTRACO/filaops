@@ -28,7 +28,13 @@ class Product(Base):
 
     # Item classification
     item_type = Column(String(20), default='finished_good', nullable=False)  # finished_good, component, supply, service
+    procurement_type = Column(String(20), default='buy', nullable=False)  # 'make', 'buy', 'make_or_buy'
     category_id = Column(Integer, ForeignKey("item_categories.id"), nullable=True)
+
+    # Material link (for supply items that are materials/filament)
+    # When set, this product represents a specific material+color combo
+    material_type_id = Column(Integer, ForeignKey("material_types.id"), nullable=True)
+    color_id = Column(Integer, ForeignKey("colors.id"), nullable=True)
 
     # Cost tracking
     cost_method = Column(String(20), default='average')  # fifo, average, standard
@@ -89,6 +95,10 @@ class Product(Base):
     production_orders = relationship("ProductionOrder", back_populates="product")
     quotes = relationship("Quote", back_populates="product")  # For auto-created custom products
     item_category = relationship("ItemCategory", back_populates="products")
+
+    # Material relationships (for supply items that are materials)
+    material_type = relationship("MaterialType", foreign_keys=[material_type_id])
+    color = relationship("Color", foreign_keys=[color_id])
 
     def __repr__(self):
         return f"<Product {self.sku}: {self.name}>"

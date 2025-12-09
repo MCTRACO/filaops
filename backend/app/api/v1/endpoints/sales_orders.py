@@ -212,18 +212,18 @@ async def create_sales_order(
     db.add(sales_order)
     db.flush()  # Get sales_order.id
 
-    # Create order lines
+    # Create order lines (using actual database schema)
     for idx, line_data in enumerate(line_products, start=1):
         order_line = SalesOrderLine(
             sales_order_id=sales_order.id,
             product_id=line_data["product"].id,
-            line_number=idx,
             quantity=line_data["quantity"],
             unit_price=line_data["unit_price"],
-            total_price=line_data["line_total"],
-            product_sku=line_data["product"].sku,
-            product_name=line_data["product"].name,
+            total=line_data["line_total"],  # Use 'total' not 'total_price'
+            discount=Decimal("0"),
+            tax_rate=Decimal("0"),
             notes=line_data["notes"],
+            created_by=current_user.id,
         )
         db.add(order_line)
 
@@ -492,14 +492,17 @@ async def get_sales_order_details(
             detail="Sales order not found"
         )
 
-    # Verify user owns this order
-    if order.user_id != current_user.id:
+    # Verify user owns this order OR is an admin
+    # Use same check as list endpoint
+    is_admin = getattr(current_user, "account_type", None) == "admin" or getattr(current_user, "is_admin", False)
+    if order.user_id != current_user.id and not is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to view this order"
         )
 
-    return order
+    # Use helper function to build response with proper line handling
+    return build_sales_order_response(order, db)
 
 
 # ============================================================================
@@ -528,8 +531,13 @@ async def update_order_status(
     Returns:
         Updated sales order
     """
-    # TODO: Add admin role check
-    # For now, any authenticated user can update
+    # Admin-only endpoint
+    is_admin = getattr(current_user, "account_type", None) == "admin" or getattr(current_user, "is_admin", False)
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can update order status"
+        )
 
     order = db.query(SalesOrder).filter(SalesOrder.id == order_id).first()
 
@@ -581,11 +589,19 @@ async def update_payment_info(
     db: Session = Depends(get_db),
 ):
     """
-    Update payment information for an order
+    Update payment information for an order (admin only)
 
     Returns:
         Updated sales order
     """
+    # Admin-only endpoint
+    is_admin = getattr(current_user, "account_type", None) == "admin" or getattr(current_user, "is_admin", False)
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can update payment information"
+        )
+
     order = db.query(SalesOrder).filter(SalesOrder.id == order_id).first()
 
     if not order:
@@ -624,11 +640,19 @@ async def update_shipping_info(
     db: Session = Depends(get_db),
 ):
     """
-    Update shipping information for an order
+    Update shipping information for an order (admin only)
 
     Returns:
         Updated sales order
     """
+    # Admin-only endpoint
+    is_admin = getattr(current_user, "account_type", None) == "admin" or getattr(current_user, "is_admin", False)
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can update shipping information"
+        )
+
     order = db.query(SalesOrder).filter(SalesOrder.id == order_id).first()
 
     if not order:
@@ -719,7 +743,7 @@ async def generate_production_orders(
     db: Session = Depends(get_db),
 ):
     """
-    Generate production orders from a sales order.
+    Generate production orders from a sales order (admin only).
 
     For line_item orders: Creates one production order per line item.
     For quote_based orders: Creates a single production order.
@@ -733,6 +757,14 @@ async def generate_production_orders(
     Returns:
         List of created production order codes
     """
+    # Admin-only endpoint
+    is_admin = getattr(current_user, "account_type", None) == "admin" or getattr(current_user, "is_admin", False)
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can generate production orders"
+        )
+
     order = db.query(SalesOrder).filter(SalesOrder.id == order_id).first()
 
     if not order:
@@ -901,29 +933,80 @@ async def generate_production_orders(
 # Helper: Build response with lines
 # ============================================================================
 
-def build_sales_order_response(order: SalesOrder, db: Session) -> dict:
+def build_sales_order_response(order: SalesOrder, db: Session) -> SalesOrderResponse:
     """Build sales order response with line items"""
     lines = []
     if order.order_type == "line_item":
         order_lines = db.query(SalesOrderLine).filter(
             SalesOrderLine.sales_order_id == order.id
-        ).order_by(SalesOrderLine.line_number).all()
+        ).order_by(SalesOrderLine.id).all()  # Order by ID since line_number doesn't exist
 
-        for line in order_lines:
+        for idx, line in enumerate(order_lines, start=1):
             product = db.query(Product).filter(Product.id == line.product_id).first()
+            # Use actual database columns: total (not total_price)
+            total_price = float(line.total) if line.total else (float(line.unit_price) * float(line.quantity))
             lines.append(SalesOrderLineResponse(
                 id=line.id,
-                line_number=line.line_number,
+                line_number=idx,  # Calculate from position
                 product_id=line.product_id,
-                product_sku=product.sku if product else line.product_sku,
-                product_name=product.name if product else line.product_name,
-                quantity=line.quantity,
+                product_sku=product.sku if product else "",
+                product_name=product.name if product else "",
+                quantity=int(line.quantity) if line.quantity else 0,
                 unit_price=line.unit_price,
-                total_price=line.total_price,
+                total_price=Decimal(str(total_price)),
                 notes=line.notes,
             ))
 
-    return {
-        **order.__dict__,
-        "lines": lines,
+    # Build response from order dict, manually constructing to avoid SQLAlchemy relationship validation
+    # The issue is that model_validate(order) tries to validate order.lines which are SQLAlchemy
+    # objects without the computed properties (line_number, total_price)
+    order_data = {
+        "id": order.id,
+        "user_id": order.user_id,
+        "quote_id": order.quote_id,
+        "order_number": order.order_number,
+        "order_type": order.order_type,
+        "source": order.source,
+        "source_order_id": order.source_order_id,
+        "product_name": order.product_name,
+        "quantity": int(order.quantity) if order.quantity else 0,
+        "material_type": order.material_type,
+        "finish": order.finish,
+        "unit_price": order.unit_price,
+        "total_price": order.total_price,
+        "tax_amount": order.tax_amount if order.tax_amount is not None else Decimal("0"),
+        "shipping_cost": order.shipping_cost if order.shipping_cost is not None else Decimal("0"),
+        "grand_total": order.grand_total,
+        "status": order.status,
+        "payment_status": order.payment_status,
+        "payment_method": order.payment_method,
+        "payment_transaction_id": order.payment_transaction_id,
+        "paid_at": getattr(order, "paid_at", None),
+        "estimated_completion_date": getattr(order, "estimated_completion_date", None),
+        "actual_completion_date": getattr(order, "actual_completion_date", None),
+        "shipping_name": None,  # Not in SalesOrder model
+        "shipping_address_line1": order.shipping_address_line1,
+        "shipping_address_line2": order.shipping_address_line2,
+        "shipping_city": order.shipping_city,
+        "shipping_state": order.shipping_state,
+        "shipping_zip": order.shipping_zip,
+        "shipping_country": order.shipping_country,
+        "shipping_phone": None,  # Not in SalesOrder model
+        "tracking_number": order.tracking_number,
+        "carrier": order.carrier,
+        "shipped_at": order.shipped_at,
+        "delivered_at": order.delivered_at,
+        "rush_level": order.rush_level,
+        "customer_notes": order.customer_notes,
+        "internal_notes": order.internal_notes,
+        "production_notes": order.production_notes,
+        "cancelled_at": getattr(order, "cancelled_at", None),
+        "cancellation_reason": order.cancellation_reason,
+        "created_at": order.created_at,
+        "updated_at": order.updated_at,
+        "confirmed_at": getattr(order, "confirmed_at", None),
+        "lines": lines,  # Use the properly formatted lines we built above
     }
+    
+    response = SalesOrderResponse.model_validate(order_data)
+    return response

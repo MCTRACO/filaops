@@ -17,6 +17,7 @@ from app.models.mrp import MRPRun, PlannedOrder
 from app.models.traceability import (
     SerialNumber, MaterialLot, ProductionLotConsumption, CustomerTraceabilityProfile
 )
+# from app.models.license import License  # Disabled until ready for production
 
 __all__ = [
     # Item management
@@ -66,4 +67,6 @@ __all__ = [
     "MaterialLot",
     "ProductionLotConsumption",
     "CustomerTraceabilityProfile",
+    # License (disabled until ready)
+    # "License",
 ]

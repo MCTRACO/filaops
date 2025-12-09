@@ -138,25 +138,28 @@ class SalesOrderLine(Base):
     sales_order_id = Column(Integer, ForeignKey("sales_orders.id", ondelete="CASCADE"), nullable=False, index=True)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
 
-    # Line Details
-    line_number = Column(Integer, nullable=False)  # Order within the sales order
-    quantity = Column(Integer, nullable=False)
+    # Line Details (matching actual database schema)
+    quantity = Column(Numeric(10, 2), nullable=False)
     unit_price = Column(Numeric(10, 2), nullable=False)
-    total_price = Column(Numeric(10, 2), nullable=False)  # quantity * unit_price
-
-    # Product snapshot (in case product changes later)
-    product_sku = Column(String(50), nullable=True)
-    product_name = Column(String(255), nullable=True)
+    discount = Column(Numeric(10, 2), nullable=True, default=0)
+    tax_rate = Column(Numeric(5, 2), nullable=True, default=0)
+    total = Column(Numeric(10, 2), nullable=False)  # quantity * unit_price - discount + tax
+    allocated_quantity = Column(Numeric(10, 2), nullable=True, default=0)
+    shipped_quantity = Column(Numeric(10, 2), nullable=True, default=0)
 
     # Notes
     notes = Column(Text, nullable=True)
 
-    # Timestamps
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    # Audit
+    created_by = Column(Integer, nullable=True)
 
     # Relationships
     sales_order = relationship("SalesOrder", back_populates="lines")
     product = relationship("Product")
 
+    # Note: The database schema uses 'total' not 'total_price', and doesn't have
+    # line_number, product_sku, product_name, or created_at columns.
+    # These are computed in the API layer when building responses.
+
     def __repr__(self):
-        return f"<SalesOrderLine {self.sales_order.order_number if self.sales_order else 'N/A'}-L{self.line_number}>"
+        return f"<SalesOrderLine SO-{self.sales_order_id if self.sales_order_id else 'N/A'}-{self.id}>"

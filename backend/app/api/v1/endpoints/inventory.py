@@ -13,7 +13,7 @@ from sqlalchemy import func
 import logging
 
 from app.db.session import get_db
-from app.models.inventory import Inventory, InventoryTransaction
+from app.models.inventory import Inventory, InventoryTransaction, InventoryLocation
 from app.models.product import Product
 
 router = APIRouter()
@@ -149,11 +149,52 @@ async def create_inventory_transaction(
         db.add(transaction)
 
         # Update inventory quantities based on transaction type
-        # Find inventory for this product at this location (using location_id = 1 for now)
+        # Find or get default location
+        location = None
+        if transaction_req.location:
+            # Try to find location by code or name
+            location = db.query(InventoryLocation).filter(
+                (InventoryLocation.code == transaction_req.location) |
+                (InventoryLocation.name == transaction_req.location)
+            ).first()
+        
+        # Fallback to default location (MAIN or first available)
+        if not location:
+            location = db.query(InventoryLocation).filter(
+                InventoryLocation.code == 'MAIN'
+            ).first()
+            if not location:
+                location = db.query(InventoryLocation).filter(
+                    InventoryLocation.active == True
+                ).first()
+        
+        # If still no location, create a default one
+        if not location:
+            location = InventoryLocation(
+                code="MAIN",
+                name="Main Warehouse",
+                type="warehouse",
+                active=True
+            )
+            db.add(location)
+            db.flush()
+        
+        # Find or create inventory for this product at this location
         inventory = db.query(Inventory).filter(
             Inventory.product_id == product.id,
-            Inventory.location_id == 1  # Default location
+            Inventory.location_id == location.id
         ).first()
+
+        # Create inventory record if it doesn't exist
+        if not inventory:
+            inventory = Inventory(
+                product_id=product.id,
+                location_id=location.id,
+                on_hand_quantity=0.0,
+                allocated_quantity=0.0,
+            )
+            db.add(inventory)
+            db.flush()
 
         if inventory:
             if transaction_req.transaction_type == 'consumption':

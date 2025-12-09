@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react";
+import ItemForm from "../../components/ItemForm";
+import MaterialForm from "../../components/MaterialForm";
+import BOMEditor from "../../components/BOMEditor";
+import RoutingEditor from "../../components/RoutingEditor";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -8,13 +12,6 @@ const ITEM_TYPES = [
   { value: "component", label: "Component", color: "purple" },
   { value: "supply", label: "Supply", color: "orange" },
   { value: "service", label: "Service", color: "green" },
-];
-
-// Cost method options
-const COST_METHODS = [
-  { value: "average", label: "Average Cost" },
-  { value: "standard", label: "Standard Cost" },
-  { value: "fifo", label: "FIFO" },
 ];
 
 export default function AdminItems() {
@@ -33,13 +30,22 @@ export default function AdminItems() {
 
   // Modal states
   const [showItemModal, setShowItemModal] = useState(false);
+  const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showBOMEditor, setShowBOMEditor] = useState(false);
+  const [showRoutingEditor, setShowRoutingEditor] = useState(false);
+  const [selectedItemForBOM, setSelectedItemForBOM] = useState(null);
+  const [selectedItemForRouting, setSelectedItemForRouting] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
 
   // Recost states
   const [recosting, setRecosting] = useState(false);
   const [recostResult, setRecostResult] = useState(null);
+
+  // Bulk selection states
+  const [selectedItems, setSelectedItems] = useState(new Set());
+  const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
 
   const token = localStorage.getItem("adminToken");
 
@@ -52,9 +58,12 @@ export default function AdminItems() {
     if (!token) return;
     try {
       // Fetch flat list
-      const res = await fetch(`${API_URL}/api/v1/items/categories?include_inactive=true`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/items/categories?include_inactive=true`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (!res.ok) throw new Error("Failed to fetch categories");
       const data = await res.json();
       setCategories(data);
@@ -79,7 +88,8 @@ export default function AdminItems() {
       const params = new URLSearchParams();
       params.set("limit", "200");
       params.set("active_only", filters.activeOnly.toString());
-      if (selectedCategory) params.set("category_id", selectedCategory.toString());
+      if (selectedCategory)
+        params.set("category_id", selectedCategory.toString());
       if (filters.itemType !== "all") params.set("item_type", filters.itemType);
 
       const res = await fetch(`${API_URL}/api/v1/items?${params}`, {
@@ -175,7 +185,10 @@ export default function AdminItems() {
     total: items.length,
     finishedGoods: items.filter((i) => i.item_type === "finished_good").length,
     components: items.filter((i) => i.item_type === "component").length,
-    supplies: items.filter((i) => i.item_type === "supply").length,
+    supplies: items.filter(
+      (i) => i.item_type === "supply" && !i.material_type_id
+    ).length,
+    filaments: items.filter((i) => i.material_type_id).length,
     needsReorder: items.filter((i) => i.needs_reorder).length,
   };
 
@@ -188,36 +201,6 @@ export default function AdminItems() {
       orange: "bg-orange-500/20 text-orange-400",
       green: "bg-green-500/20 text-green-400",
     }[found.color];
-  };
-
-  // Save item
-  const handleSaveItem = async (itemData) => {
-    try {
-      const url = editingItem
-        ? `${API_URL}/api/v1/items/${editingItem.id}`
-        : `${API_URL}/api/v1/items`;
-      const method = editingItem ? "PATCH" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(itemData),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Failed to save item");
-      }
-
-      setShowItemModal(false);
-      setEditingItem(null);
-      fetchItems();
-    } catch (err) {
-      alert(err.message);
-    }
   };
 
   // Save category
@@ -250,16 +233,80 @@ export default function AdminItems() {
     }
   };
 
+  // Bulk selection handlers
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedItems(new Set(filteredItems.map((item) => item.id)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleSelectItem = (itemId) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(itemId)) {
+      newSelected.delete(itemId);
+    } else {
+      newSelected.add(itemId);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const isAllSelected =
+    filteredItems.length > 0 && selectedItems.size === filteredItems.length;
+  const isIndeterminate =
+    selectedItems.size > 0 && selectedItems.size < filteredItems.length;
+
+  // Bulk update handler
+  const handleBulkUpdate = async (updateData) => {
+    if (selectedItems.size === 0) {
+      alert("Please select at least one item");
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/v1/items/bulk-update`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          item_ids: Array.from(selectedItems),
+          ...updateData,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to update items");
+      }
+
+      const data = await res.json();
+      alert(`Successfully updated ${data.message}`);
+      setSelectedItems(new Set());
+      setShowBulkUpdateModal(false);
+      fetchItems(); // Refresh list
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   // Recost all items
   const handleRecostAll = async () => {
-    if (!confirm("Recost all items? This will update standard costs from BOM/Routing (manufactured) or average cost (purchased).")) {
+    if (
+      !confirm(
+        "Recost all items? This will update standard costs from BOM/Routing (manufactured) or average cost (purchased)."
+      )
+    ) {
       return;
     }
     setRecosting(true);
     setRecostResult(null);
     try {
       const params = new URLSearchParams();
-      if (selectedCategory) params.set("category_id", selectedCategory.toString());
+      if (selectedCategory)
+        params.set("category_id", selectedCategory.toString());
       if (filters.itemType !== "all") params.set("item_type", filters.itemType);
 
       const res = await fetch(`${API_URL}/api/v1/items/recost-all?${params}`, {
@@ -339,12 +386,20 @@ export default function AdminItems() {
             </button>
             <button
               onClick={() => {
+                setShowMaterialModal(true);
+              }}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+            >
+              + New Material
+            </button>
+            <button
+              onClick={() => {
                 setEditingItem(null);
                 setShowItemModal(true);
               }}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-500 hover:to-purple-500"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
             >
-              + Add Item
+              + New Item
             </button>
           </div>
         </div>
@@ -355,17 +410,21 @@ export default function AdminItems() {
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-green-400 font-medium">
-                  Recost complete: {recostResult.updated} items updated, {recostResult.skipped} skipped
+                  Recost complete: {recostResult.updated} items updated,{" "}
+                  {recostResult.skipped} skipped
                 </p>
                 {recostResult.items?.length > 0 && (
                   <div className="mt-2 text-sm text-gray-400 max-h-32 overflow-auto">
                     {recostResult.items.slice(0, 10).map((item, i) => (
                       <div key={i}>
-                        {item.sku}: ${item.old_cost.toFixed(2)} → ${item.new_cost.toFixed(2)} ({item.cost_source})
+                        {item.sku}: ${item.old_cost.toFixed(2)} → $
+                        {item.new_cost.toFixed(2)} ({item.cost_source})
                       </div>
                     ))}
                     {recostResult.items.length > 10 && (
-                      <div className="text-gray-500">...and {recostResult.items.length - 10} more</div>
+                      <div className="text-gray-500">
+                        ...and {recostResult.items.length - 10} more
+                      </div>
                     )}
                   </div>
                 )}
@@ -387,13 +446,17 @@ export default function AdminItems() {
               type="text"
               placeholder="Search by SKU, name, or UPC..."
               value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, search: e.target.value })
+              }
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-500"
             />
           </div>
           <select
             value={filters.itemType}
-            onChange={(e) => setFilters({ ...filters, itemType: e.target.value })}
+            onChange={(e) =>
+              setFilters({ ...filters, itemType: e.target.value })
+            }
             className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
           >
             <option value="all">All Types</option>
@@ -407,7 +470,9 @@ export default function AdminItems() {
             <input
               type="checkbox"
               checked={filters.activeOnly}
-              onChange={(e) => setFilters({ ...filters, activeOnly: e.target.checked })}
+              onChange={(e) =>
+                setFilters({ ...filters, activeOnly: e.target.checked })
+              }
               className="rounded"
             />
             Active only
@@ -415,26 +480,40 @@ export default function AdminItems() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-6 gap-4">
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <p className="text-gray-400 text-sm">Total Items</p>
             <p className="text-2xl font-bold text-white">{stats.total}</p>
           </div>
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <p className="text-gray-400 text-sm">Finished Goods</p>
-            <p className="text-2xl font-bold text-blue-400">{stats.finishedGoods}</p>
+            <p className="text-2xl font-bold text-blue-400">
+              {stats.finishedGoods}
+            </p>
           </div>
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <p className="text-gray-400 text-sm">Components</p>
-            <p className="text-2xl font-bold text-purple-400">{stats.components}</p>
+            <p className="text-2xl font-bold text-purple-400">
+              {stats.components}
+            </p>
+          </div>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <p className="text-gray-400 text-sm">Filaments</p>
+            <p className="text-2xl font-bold text-orange-400">
+              {stats.filaments}
+            </p>
           </div>
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <p className="text-gray-400 text-sm">Supplies</p>
-            <p className="text-2xl font-bold text-orange-400">{stats.supplies}</p>
+            <p className="text-2xl font-bold text-yellow-400">
+              {stats.supplies}
+            </p>
           </div>
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
             <p className="text-gray-400 text-sm">Needs Reorder</p>
-            <p className="text-2xl font-bold text-red-400">{stats.needsReorder}</p>
+            <p className="text-2xl font-bold text-red-400">
+              {stats.needsReorder}
+            </p>
           </div>
         </div>
 
@@ -452,12 +531,47 @@ export default function AdminItems() {
           </div>
         )}
 
+        {/* Bulk Actions Toolbar */}
+        {selectedItems.size > 0 && (
+          <div className="bg-blue-600/20 border border-blue-500/30 rounded-xl p-4 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-white font-medium">
+                {selectedItems.size} item{selectedItems.size !== 1 ? "s" : ""}{" "}
+                selected
+              </span>
+              <button
+                onClick={() => setShowBulkUpdateModal(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium"
+              >
+                Bulk Update
+              </button>
+              <button
+                onClick={() => setSelectedItems(new Set())}
+                className="px-4 py-2 text-gray-400 hover:text-white text-sm"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Items Table */}
         {!loading && (
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-800/50">
                 <tr>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase w-12">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      ref={(input) => {
+                        if (input) input.indeterminate = isIndeterminate;
+                      }}
+                      onChange={handleSelectAll}
+                      className="rounded"
+                    />
+                  </th>
                   <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
                     SKU
                   </th>
@@ -496,6 +610,14 @@ export default function AdminItems() {
                     key={item.id}
                     className="border-b border-gray-800 hover:bg-gray-800/50"
                   >
+                    <td className="py-3 px-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.has(item.id)}
+                        onChange={() => handleSelectItem(item.id)}
+                        className="rounded"
+                      />
+                    </td>
                     <td className="py-3 px-4 text-white font-mono text-sm">
                       {item.sku}
                     </td>
@@ -506,8 +628,10 @@ export default function AdminItems() {
                           item.item_type
                         )}`}
                       >
-                        {ITEM_TYPES.find((t) => t.value === item.item_type)?.label ||
-                          item.item_type}
+                        {item.material_type_id
+                          ? "Filament"
+                          : ITEM_TYPES.find((t) => t.value === item.item_type)
+                              ?.label || item.item_type}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-gray-400">
@@ -551,21 +675,51 @@ export default function AdminItems() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => {
-                          setEditingItem(item);
-                          setShowItemModal(true);
-                        }}
-                        className="text-blue-400 hover:text-blue-300 text-sm"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => {
+                            setEditingItem(item);
+                            setShowItemModal(true);
+                          }}
+                          className="text-blue-400 hover:text-blue-300 text-sm"
+                        >
+                          Edit
+                        </button>
+                        {(item.procurement_type === "make" ||
+                          item.procurement_type === "make_or_buy") && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setSelectedItemForBOM(item);
+                                setShowBOMEditor(true);
+                              }}
+                              className="text-purple-400 hover:text-purple-300 text-sm"
+                              title="Edit BOM"
+                            >
+                              BOM
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedItemForRouting(item);
+                                setShowRoutingEditor(true);
+                              }}
+                              className="text-green-400 hover:text-green-300 text-sm"
+                              title="Edit Routing"
+                            >
+                              Route
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {filteredItems.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center text-gray-500">
+                    <td
+                      colSpan={11}
+                      className="py-12 text-center text-gray-500"
+                    >
                       No items found
                     </td>
                   </tr>
@@ -576,18 +730,62 @@ export default function AdminItems() {
         )}
       </div>
 
-      {/* Item Modal */}
-      {showItemModal && (
-        <ItemModal
-          item={editingItem}
-          categories={categories}
-          onSave={handleSaveItem}
-          onClose={() => {
-            setShowItemModal(false);
-            setEditingItem(null);
-          }}
-        />
-      )}
+      {/* Item Form */}
+      <ItemForm
+        isOpen={showItemModal}
+        onClose={() => {
+          setShowItemModal(false);
+          setEditingItem(null);
+        }}
+        onSuccess={() => {
+          setShowItemModal(false);
+          setEditingItem(null);
+          fetchItems();
+        }}
+        editingItem={editingItem}
+      />
+
+      {/* Material Form */}
+      <MaterialForm
+        isOpen={showMaterialModal}
+        onClose={() => {
+          setShowMaterialModal(false);
+        }}
+        onSuccess={() => {
+          setShowMaterialModal(false);
+          fetchItems();
+        }}
+      />
+
+      {/* BOM Editor */}
+      <BOMEditor
+        isOpen={showBOMEditor}
+        onClose={() => {
+          setShowBOMEditor(false);
+          setSelectedItemForBOM(null);
+        }}
+        productId={selectedItemForBOM?.id}
+        onSuccess={() => {
+          setShowBOMEditor(false);
+          setSelectedItemForBOM(null);
+          fetchItems(); // Refresh to show updated BOM status
+        }}
+      />
+
+      {/* Routing Editor */}
+      <RoutingEditor
+        isOpen={showRoutingEditor}
+        onClose={() => {
+          setShowRoutingEditor(false);
+          setSelectedItemForRouting(null);
+        }}
+        productId={selectedItemForRouting?.id}
+        onSuccess={() => {
+          setShowRoutingEditor(false);
+          setSelectedItemForRouting(null);
+          fetchItems(); // Refresh to show updated routing status
+        }}
+      />
 
       {/* Category Modal */}
       {showCategoryModal && (
@@ -601,238 +799,166 @@ export default function AdminItems() {
           }}
         />
       )}
+
+      {/* Bulk Update Modal */}
+      {showBulkUpdateModal && (
+        <BulkUpdateModal
+          categories={categories}
+          selectedCount={selectedItems.size}
+          onSave={handleBulkUpdate}
+          onClose={() => {
+            setShowBulkUpdateModal(false);
+            // Clear selection after update to prevent accidental updates
+            setSelectedItems(new Set());
+          }}
+        />
+      )}
     </div>
   );
 }
 
-// Item Create/Edit Modal
-function ItemModal({ item, categories, onSave, onClose }) {
+// Bulk Update Modal
+function BulkUpdateModal({ categories, selectedCount, onSave, onClose }) {
   const [form, setForm] = useState({
-    sku: item?.sku || "",
-    name: item?.name || "",
-    description: item?.description || "",
-    item_type: item?.item_type || "finished_good",
-    category_id: item?.category_id || "",
-    unit: item?.unit || "EA",
-    cost_method: item?.cost_method || "average",
-    standard_cost: item?.standard_cost || "",
-    selling_price: item?.selling_price || "",
-    reorder_point: item?.reorder_point || "",
-    lead_time_days: item?.lead_time_days || "",
-    min_order_qty: item?.min_order_qty || "",
-    upc: item?.upc || "",
-    weight_oz: item?.weight_oz || "",
-    active: item?.active ?? true,
+    category_id: "",
+    item_type: "",
+    procurement_type: "",
+    is_active: "",
   });
+
+  // Reset form when modal closes
+  useEffect(() => {
+    return () => {
+      setForm({
+        category_id: "",
+        item_type: "",
+        procurement_type: "",
+        is_active: "",
+      });
+    };
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const data = { ...form };
-    // Convert empty strings to null for optional numeric fields
-    ["standard_cost", "selling_price", "reorder_point", "lead_time_days", "min_order_qty", "weight_oz"].forEach((f) => {
-      if (data[f] === "") data[f] = null;
-      else if (data[f]) data[f] = parseFloat(data[f]);
+
+    // Build update data with only non-empty fields
+    const updateData = {};
+    // Handle category_id - must explicitly check for empty string
+    // "0" means clear category, empty string means don't update
+    if (form.category_id !== "") {
+      const categoryId = parseInt(form.category_id);
+      if (!isNaN(categoryId)) {
+        updateData.category_id = categoryId;
+      }
+    }
+    if (form.item_type) updateData.item_type = form.item_type;
+    if (form.procurement_type)
+      updateData.procurement_type = form.procurement_type;
+    if (form.is_active !== "") updateData.is_active = form.is_active === "true";
+
+    // Check if at least one field is being updated
+    if (Object.keys(updateData).length === 0) {
+      alert("Please select at least one field to update");
+      return;
+    }
+
+    onSave(updateData);
+    // Reset form after submit
+    setForm({
+      category_id: "",
+      item_type: "",
+      procurement_type: "",
+      is_active: "",
     });
-    if (data.category_id === "") data.category_id = null;
-    else if (data.category_id) data.category_id = parseInt(data.category_id);
-    onSave(data);
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-auto">
-        <div className="p-6 border-b border-gray-800">
-          <h2 className="text-xl font-bold text-white">
-            {item ? "Edit Item" : "Add New Item"}
-          </h2>
-        </div>
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold text-white mb-4">
+          Bulk Update {selectedCount} Item{selectedCount !== 1 ? "s" : ""}
+        </h2>
+        <p className="text-gray-400 text-sm mb-6">
+          Update the selected items. Leave fields empty to keep current values.
+        </p>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Basic Info */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">SKU *</label>
-              <input
-                type="text"
-                value={form.sku}
-                onChange={(e) => setForm({ ...form, sku: e.target.value.toUpperCase() })}
-                required
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Name *</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Description</label>
-            <textarea
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              rows={2}
+        <form onSubmit={handleSubmit}>
+          {/* Category */}
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-2">Category</label>
+            <select
+              value={form.category_id}
+              onChange={(e) =>
+                setForm({ ...form, category_id: e.target.value })
+              }
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-            />
-          </div>
-
-          {/* Classification */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Item Type</label>
-              <select
-                value={form.item_type}
-                onChange={(e) => setForm({ ...form, item_type: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              >
-                {ITEM_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
+            >
+              <option value="">-- Keep Current --</option>
+              <option value="0">-- No Category --</option>
+              {categories
+                .filter((cat) => cat.is_active)
+                .map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
                   </option>
                 ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Category</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => setForm({ ...form, category_id: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              >
-                <option value="">-- None --</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.full_path || c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Unit</label>
-              <input
-                type="text"
-                value={form.unit}
-                onChange={(e) => setForm({ ...form, unit: e.target.value.toUpperCase() })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
+            </select>
           </div>
 
-          {/* Costing */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Cost Method</label>
-              <select
-                value={form.cost_method}
-                onChange={(e) => setForm({ ...form, cost_method: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              >
-                {COST_METHODS.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Standard Cost</label>
-              <input
-                type="number"
-                step="0.01"
-                value={form.standard_cost}
-                onChange={(e) => setForm({ ...form, standard_cost: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Selling Price</label>
-              <input
-                type="number"
-                step="0.01"
-                value={form.selling_price}
-                onChange={(e) => setForm({ ...form, selling_price: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-          </div>
-
-          {/* Purchasing */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Lead Time (days)</label>
-              <input
-                type="number"
-                value={form.lead_time_days}
-                onChange={(e) => setForm({ ...form, lead_time_days: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Min Order Qty</label>
-              <input
-                type="number"
-                step="0.01"
-                value={form.min_order_qty}
-                onChange={(e) => setForm({ ...form, min_order_qty: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Reorder Point</label>
-              <input
-                type="number"
-                step="0.01"
-                value={form.reorder_point}
-                onChange={(e) => setForm({ ...form, reorder_point: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-          </div>
-
-          {/* Additional */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">UPC/Barcode</label>
-              <input
-                type="text"
-                value={form.upc}
-                onChange={(e) => setForm({ ...form, upc: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Weight (oz)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={form.weight_oz}
-                onChange={(e) => setForm({ ...form, weight_oz: e.target.value })}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="active"
-              checked={form.active}
-              onChange={(e) => setForm({ ...form, active: e.target.checked })}
-              className="rounded"
-            />
-            <label htmlFor="active" className="text-gray-400">
-              Active
+          {/* Item Type */}
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-2">
+              Item Type
             </label>
+            <select
+              value={form.item_type}
+              onChange={(e) => setForm({ ...form, item_type: e.target.value })}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="">-- Keep Current --</option>
+              {ITEM_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Procurement Type */}
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-2">
+              Procurement Type
+            </label>
+            <select
+              value={form.procurement_type}
+              onChange={(e) =>
+                setForm({ ...form, procurement_type: e.target.value })
+              }
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="">-- Keep Current --</option>
+              <option value="make">Make</option>
+              <option value="buy">Buy</option>
+              <option value="make_or_buy">Make or Buy</option>
+            </select>
+          </div>
+
+          {/* Active Status */}
+          <div className="mb-6">
+            <label className="block text-gray-400 text-sm mb-2">Status</label>
+            <select
+              value={form.is_active}
+              onChange={(e) => setForm({ ...form, is_active: e.target.value })}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="">-- Keep Current --</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-4 pt-4 border-t border-gray-800">
+          <div className="flex justify-end gap-4">
             <button
               type="button"
               onClick={onClose}
@@ -844,7 +970,7 @@ function ItemModal({ item, categories, onSave, onClose }) {
               type="submit"
               className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-500 hover:to-purple-500"
             >
-              {item ? "Save Changes" : "Create Item"}
+              Update {selectedCount} Item{selectedCount !== 1 ? "s" : ""}
             </button>
           </div>
         </form>
@@ -891,7 +1017,9 @@ function CategoryModal({ category, categories, onSave, onClose }) {
             <input
               type="text"
               value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+              onChange={(e) =>
+                setForm({ ...form, code: e.target.value.toUpperCase() })
+              }
               required
               placeholder="e.g. FILAMENT"
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
@@ -910,7 +1038,9 @@ function CategoryModal({ category, categories, onSave, onClose }) {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Parent Category</label>
+            <label className="block text-sm text-gray-400 mb-1">
+              Parent Category
+            </label>
             <select
               value={form.parent_id}
               onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
@@ -926,10 +1056,14 @@ function CategoryModal({ category, categories, onSave, onClose }) {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Description</label>
+            <label className="block text-sm text-gray-400 mb-1">
+              Description
+            </label>
             <textarea
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
               rows={2}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
             />
@@ -937,11 +1071,15 @@ function CategoryModal({ category, categories, onSave, onClose }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Sort Order</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Sort Order
+              </label>
               <input
                 type="number"
                 value={form.sort_order}
-                onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, sort_order: e.target.value })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
               />
             </div>
@@ -950,7 +1088,9 @@ function CategoryModal({ category, categories, onSave, onClose }) {
                 type="checkbox"
                 id="cat_active"
                 checked={form.is_active}
-                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                onChange={(e) =>
+                  setForm({ ...form, is_active: e.target.checked })
+                }
                 className="rounded"
               />
               <label htmlFor="cat_active" className="text-gray-400 ml-2">

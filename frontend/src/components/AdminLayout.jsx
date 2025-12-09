@@ -1,5 +1,6 @@
 import { Outlet, Link, NavLink, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import ProFeaturesAnnouncement from "./ProFeaturesAnnouncement";
 
 const DashboardIcon = () => (
   <svg
@@ -151,6 +152,22 @@ const CustomersIcon = () => (
   </svg>
 );
 
+const MaterialImportIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+    />
+  </svg>
+);
+
 const LogoutIcon = () => (
   <svg
     className="w-5 h-5"
@@ -183,12 +200,54 @@ const MenuIcon = () => (
   </svg>
 );
 
+const InventoryIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+    />
+  </svg>
+);
+
+const AnalyticsIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+    />
+  </svg>
+);
+
 const navItems = [
   { path: "/admin", label: "Dashboard", icon: DashboardIcon, end: true },
   { path: "/admin/orders", label: "Orders", icon: OrdersIcon },
+  {
+    path: "/admin/orders/import",
+    label: "Import Orders",
+    icon: MaterialImportIcon,
+  },
   { path: "/admin/customers", label: "Customers", icon: CustomersIcon },
   { path: "/admin/production", label: "Production", icon: ProductionIcon },
   { path: "/admin/items", label: "Items", icon: ItemsIcon },
+  {
+    path: "/admin/materials/import",
+    label: "Import Materials",
+    icon: MaterialImportIcon,
+  },
   { path: "/admin/bom", label: "Bill of Materials", icon: BOMIcon },
   { path: "/admin/purchasing", label: "Purchasing", icon: PurchasingIcon },
   {
@@ -196,12 +255,20 @@ const navItems = [
     label: "Manufacturing",
     icon: ManufacturingIcon,
   },
+  {
+    path: "/admin/inventory/transactions",
+    label: "Inventory Transactions",
+    icon: InventoryIcon,
+  },
   { path: "/admin/shipping", label: "Shipping", icon: ShippingIcon },
+  { path: "/admin/analytics", label: "Analytics", icon: AnalyticsIcon },
+  // { path: "/admin/license", label: "License", icon: LicenseIcon },  // Disabled until ready
 ];
 
 export default function AdminLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user] = useState(() => {
     const userData = localStorage.getItem("adminUser");
     return userData ? JSON.parse(userData) : null;
@@ -221,74 +288,146 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-950">
-      <aside
-        className={`${
-          sidebarOpen ? "w-64" : "w-20"
-        } bg-gray-900 border-r border-gray-800 transition-all duration-300 flex flex-col`}
-      >
-        <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-          {sidebarOpen && (
-            <Link
-              to="/admin"
-              className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent"
-            >
-              FilaOps
-            </Link>
-          )}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+    <>
+      <ProFeaturesAnnouncement />
+      <div className="min-h-screen flex bg-gray-950">
+        {/* Mobile menu button */}
+        <button
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden fixed top-4 left-4 z-50 bg-gray-800 p-2 rounded-lg text-white hover:bg-gray-700"
+        >
+          <MenuIcon />
+        </button>
+
+        {/* Mobile sidebar overlay */}
+        {mobileMenuOpen && (
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black bg-opacity-50"
+            onClick={() => setMobileMenuOpen(false)}
           >
-            <MenuIcon />
-          </button>
-        </div>
-        <nav className="flex-1 p-4 space-y-2">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.end}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
-                  isActive
-                    ? "bg-gradient-to-r from-emerald-600/20 to-cyan-600/20 text-white border border-emerald-500/30"
-                    : "text-gray-400 hover:bg-gray-800 hover:text-white"
-                }`
-              }
+            <aside
+              className="w-64 h-full bg-gray-900 border-r border-gray-800"
+              onClick={(e) => e.stopPropagation()}
             >
-              <item.icon />
-              {sidebarOpen && <span>{item.label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-      <div className="flex-1 flex flex-col">
-        <header className="bg-gray-900/50 backdrop-blur-md border-b border-gray-800 px-6 py-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-lg font-semibold text-white">FilaOps ERP</h1>
-            <div className="flex items-center gap-4">
-              {user && (
-                <span className="text-sm text-gray-400">
-                  <span className="text-white">
-                    {user.first_name} {user.last_name}
-                  </span>
-                </span>
-              )}
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 text-sm text-gray-400 hover:text-red-400 transition-colors"
-              >
-                <LogoutIcon />
-                <span>Logout</span>
-              </button>
-            </div>
+              <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+                <Link
+                  to="/admin"
+                  className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent"
+                >
+                  FilaOps
+                </Link>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white"
+                >
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                {navItems.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    end={item.end}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                        isActive
+                          ? "bg-gradient-to-r from-emerald-600/20 to-cyan-600/20 text-white border border-emerald-500/30"
+                          : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                      }`
+                    }
+                  >
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </NavLink>
+                ))}
+              </nav>
+            </aside>
           </div>
-        </header>
-        <main className="flex-1 p-6 overflow-auto">
-          <Outlet />
-        </main>
+        )}
+
+        {/* Desktop sidebar */}
+        <aside
+          className={`hidden md:flex ${
+            sidebarOpen ? "w-64" : "w-20"
+          } bg-gray-900 border-r border-gray-800 transition-all duration-300 flex-col`}
+        >
+          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+            {sidebarOpen && (
+              <Link
+                to="/admin"
+                className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent"
+              >
+                FilaOps
+              </Link>
+            )}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+            >
+              <MenuIcon />
+            </button>
+          </div>
+          <nav className="flex-1 p-4 space-y-2">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.end}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                    isActive
+                      ? "bg-gradient-to-r from-emerald-600/20 to-cyan-600/20 text-white border border-emerald-500/30"
+                      : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                  }`
+                }
+              >
+                <item.icon />
+                {sidebarOpen && <span>{item.label}</span>}
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+        <div className="flex-1 flex flex-col">
+          <header className="bg-gray-900/50 backdrop-blur-md border-b border-gray-800 px-6 py-4">
+            <div className="flex justify-between items-center">
+              <h1 className="text-lg font-semibold text-white">FilaOps ERP</h1>
+              <div className="flex items-center gap-4">
+                {user && (
+                  <span className="text-sm text-gray-400">
+                    <span className="text-white">
+                      {user.first_name} {user.last_name}
+                    </span>
+                  </span>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-red-400 transition-colors"
+                >
+                  <LogoutIcon />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          </header>
+          <main className="flex-1 p-6 overflow-auto">
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

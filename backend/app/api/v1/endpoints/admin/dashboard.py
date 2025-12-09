@@ -19,6 +19,7 @@ from app.models.sales_order import SalesOrder
 from app.models.production_order import ProductionOrder
 from app.models.bom import BOM
 from app.models.product import Product
+from app.models.inventory import Inventory
 from app.api.v1.endpoints.auth import get_current_admin_user
 
 router = APIRouter(prefix="/dashboard", tags=["Admin - Dashboard"])
@@ -202,9 +203,9 @@ async def get_dashboard(
             icon="archive",
         ),
         ModuleInfo(
-            name="Products",
+            name="Items",
             description="Manage products and materials",
-            route="/admin/products",
+            route="/admin/items",
             icon="cube",
         ),
         ModuleInfo(
@@ -286,10 +287,16 @@ async def get_dashboard_summary(
     """
     Get dashboard summary stats organized by module.
 
-    Returns counts for quotes, orders, production, and BOMs.
+    Returns counts for quotes, orders, production, BOMs, and actionable alerts.
     """
+    from app.models.inventory import Inventory
+    from app.models.product import Product
+    from sqlalchemy import func, or_
+    from decimal import Decimal
+    
     now = datetime.utcnow()
     week_ago = now - timedelta(days=7)
+    thirty_days_ago = now - timedelta(days=30)
 
     # Quotes
     pending_quotes = db.query(Quote).filter(Quote.status == "pending").count()
@@ -299,6 +306,13 @@ async def get_dashboard_summary(
     confirmed_orders = db.query(SalesOrder).filter(SalesOrder.status == "confirmed").count()
     in_production_orders = db.query(SalesOrder).filter(SalesOrder.status == "in_production").count()
     ready_to_ship_orders = db.query(SalesOrder).filter(SalesOrder.status == "ready_to_ship").count()
+    
+    # Overdue orders (orders past their estimated completion date)
+    overdue_orders = db.query(SalesOrder).filter(
+        SalesOrder.status.in_(["confirmed", "in_production"]),
+        SalesOrder.estimated_completion_date.isnot(None),
+        SalesOrder.estimated_completion_date < now
+    ).count()
 
     # Production
     production_in_progress = db.query(ProductionOrder).filter(
@@ -312,10 +326,131 @@ async def get_dashboard_summary(
     boms_needing_review = (
         db.query(BOM)
         .join(Product)
-        .filter(Product.type == "custom", BOM.active == True)
+        .filter(BOM.active == True)
         .count()
     )
     active_boms = db.query(BOM).filter(BOM.active == True).count()
+
+    # Low Stock Items (below reorder point + MRP shortages)
+    # Use the same logic as /items/low-stock endpoint - just get the count
+    from sqlalchemy import or_, func
+    from collections import defaultdict
+    from app.models.sales_order import SalesOrderLine
+    from app.services.mrp import MRPService, ComponentRequirement
+    
+    # 1. Get items below reorder point (count unique products)
+    # Need to aggregate inventory across locations first
+    low_stock_products = set()
+    
+    # Get all products with reorder points
+    products_with_reorder = db.query(Product).filter(
+        Product.active == True,
+        Product.reorder_point.isnot(None),
+        Product.reorder_point > 0
+    ).all()
+    
+    for product in products_with_reorder:
+        # Get total available quantity across all locations
+        inv_totals = db.query(
+            func.coalesce(func.sum(Inventory.available_quantity), 0).label("available")
+        ).filter(Inventory.product_id == product.id).first()
+        
+        available = float(inv_totals.available) if inv_totals else 0
+        reorder_point = float(product.reorder_point) if product.reorder_point else 0
+        
+        if available <= reorder_point:
+            low_stock_products.add(product.id)
+    
+    # 2. Get MRP shortages from active sales orders
+    active_orders = db.query(SalesOrder).filter(
+        SalesOrder.status.notin_(["cancelled", "completed", "delivered"])
+    ).all()
+    
+    mrp_shortage_products = set()
+    if active_orders:
+        mrp_service = MRPService(db)
+        all_requirements = []
+        
+        for order in active_orders:
+            if order.order_type == "line_item":
+                lines = db.query(SalesOrderLine).filter(
+                    SalesOrderLine.sales_order_id == order.id
+                ).all()
+                for line in lines:
+                    if line.product_id:
+                        try:
+                            requirements = mrp_service.explode_bom(
+                                product_id=int(line.product_id),
+                                quantity=Decimal(str(float(line.quantity))),
+                                source_demand_type="sales_order",
+                                source_demand_id=int(order.id)
+                            )
+                            all_requirements.extend(requirements)
+                        except Exception:
+                            continue
+            elif order.order_type == "quote_based" and hasattr(order, 'product_id') and order.product_id:
+                try:
+                    order_qty = float(order.quantity) if order.quantity else 1.0
+                    requirements = mrp_service.explode_bom(
+                        product_id=int(order.product_id),
+                        quantity=Decimal(str(order_qty)),
+                        source_demand_type="sales_order",
+                        source_demand_id=int(order.id)
+                    )
+                    all_requirements.extend(requirements)
+                except Exception:
+                    continue
+        
+        if all_requirements:
+            # Aggregate by product_id
+            aggregated = defaultdict(lambda: {"product_id": None, "gross_quantity": Decimal("0"), "bom_level": 0, "product_sku": "", "product_name": ""})
+            for req in all_requirements:
+                key = int(req.product_id)
+                if aggregated[key]["product_id"] is None:
+                    aggregated[key] = {
+                        "product_id": int(req.product_id),
+                        "product_sku": str(req.product_sku),
+                        "product_name": str(req.product_name),
+                        "gross_quantity": Decimal(str(req.gross_quantity)),
+                        "bom_level": int(req.bom_level),
+                    }
+                else:
+                    aggregated[key]["gross_quantity"] += Decimal(str(req.gross_quantity))
+            
+            # Calculate net requirements
+            component_reqs = [
+                ComponentRequirement(
+                    product_id=int(data["product_id"]),
+                    product_sku=str(data["product_sku"]),
+                    product_name=str(data["product_name"]),
+                    bom_level=int(data["bom_level"]),
+                    gross_quantity=Decimal(str(data["gross_quantity"])),
+                )
+                for data in aggregated.values()
+            ]
+            
+            net_requirements = mrp_service.calculate_net_requirements(component_reqs)
+            for net_req in net_requirements:
+                if float(net_req.net_shortage) > 0:
+                    mrp_shortage_products.add(int(net_req.product_id))
+    
+    # Combine both sets (items below reorder point OR with MRP shortages)
+    low_stock_count = len(low_stock_products | mrp_shortage_products)
+
+    # Active orders count (for reference)
+    active_orders_count = db.query(SalesOrder).filter(
+        SalesOrder.status.in_(["confirmed", "in_production"])
+    ).count()
+    
+    # Revenue metrics
+    revenue_30_days = db.query(func.sum(SalesOrder.grand_total)).filter(
+        SalesOrder.payment_status == "paid",
+        SalesOrder.paid_at >= thirty_days_ago
+    ).scalar() or Decimal("0")
+    
+    orders_30_days = db.query(SalesOrder).filter(
+        SalesOrder.created_at >= thirty_days_ago
+    ).count()
 
     return {
         "quotes": {
@@ -326,6 +461,7 @@ async def get_dashboard_summary(
             "confirmed": confirmed_orders,
             "in_production": in_production_orders,
             "ready_to_ship": ready_to_ship_orders,
+            "overdue": overdue_orders,
         },
         "production": {
             "in_progress": production_in_progress,
@@ -334,6 +470,14 @@ async def get_dashboard_summary(
         "boms": {
             "needs_review": boms_needing_review,
             "active": active_boms,
+        },
+        "inventory": {
+            "low_stock_count": low_stock_count,
+            "active_orders": active_orders_count,
+        },
+        "revenue": {
+            "last_30_days": float(revenue_30_days),
+            "orders_last_30_days": orders_30_days,
         },
     }
 

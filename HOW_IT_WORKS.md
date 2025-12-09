@@ -1,3 +1,27 @@
+```diff
+--- a/c:\Users\brand\OneDrive\Documents\filaops\ARCHITECTURE.md
++++ b/c:\Users\brand\OneDrive\Documents\filaops\ARCHITECTURE.md
+@@ -201,6 +201,19 @@
+ │       └── ... (scheduling, timestamps)
+ │
+ │-- Print Jobs (linked to Bambu Suite)
++│
++│-- Inventory Transactions (Source of Truth)
++inventory_transactions
++├── id (PK)
++├── product_id (FK → products)
++├── transaction_type -- 'RECEIPT', 'ISSUE', 'ADJUST'
++├── quantity
++├── source_document_type -- 'PO', 'WO', 'SO'
++├── source_document_id
++├── created_by
++└── material_lot_id (FK)
++
++-- Print Jobs (linked to Bambu Suite)
+ print_jobs
+ ├── id (PK)
+ ├── production_order_id (FK → production_orders)
+
 # How FilaOps Works
 
 A practical guide to understanding FilaOps for 3D print farm operators.

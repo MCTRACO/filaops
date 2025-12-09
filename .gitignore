@@ -220,3 +220,12 @@ CURRENT_SESSION.md
 *_REFERENCE*.md
 !API_REFERENCE.md
 create-github-issues.ps1
+
+# Strategic planning docs (Pro/Enterprise) - move to private repo later
+ROADMAP.md
+ACCOUNTING_ARCHITECTURE.md
+IMMEDIATE_ACTION_PLAN.md
+IMMEDIATE_ACTION_ITEMS_COMPLETE.md
+PHASE4_PLAN.md
+PHASE5B_MRP_PLAN.md
+docs/SAAS_TIERING_PLAN.md

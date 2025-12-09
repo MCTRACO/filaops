@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # ===================
     # Application Settings
     # ===================
-    PROJECT_NAME: str = "BLB3D ERP"
+    PROJECT_NAME: str = "FilaOps"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = Field(default=False, description="Enable debug mode")
@@ -81,7 +81,12 @@ class Settings(BaseSettings):
     # CORS Settings
     # ===================
     ALLOWED_ORIGINS: List[str] = Field(
-        default=["http://localhost:5173", "http://localhost:3000"],
+        default=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ],
         description="Allowed CORS origins"
     )
 
@@ -213,6 +218,18 @@ class Settings(BaseSettings):
     QUICKBOOKS_REDIRECT_URI: Optional[str] = Field(default=None)
     QUICKBOOKS_ENVIRONMENT: str = Field(default="sandbox")
 
+    # ===================
+    # Product Tier Settings
+    # ===================
+    TIER: str = Field(
+        default="open",
+        description="Product tier: open, pro, or enterprise"
+    )
+    LICENSE_KEY: Optional[str] = Field(
+        default=None,
+        description="License key for Pro/Enterprise features"
+    )
+
     @property
     def is_production(self) -> bool:
         """Check if running in production."""
@@ -222,6 +239,16 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         """Check if running in development."""
         return self.ENVIRONMENT.lower() == "development"
+
+    @property
+    def is_pro_tier(self) -> bool:
+        """Check if Pro tier or higher"""
+        return self.TIER.lower() in ("pro", "enterprise")
+
+    @property
+    def is_enterprise_tier(self) -> bool:
+        """Check if Enterprise tier"""
+        return self.TIER.lower() == "enterprise"
 
 
 @lru_cache

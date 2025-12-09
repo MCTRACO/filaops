@@ -16,6 +16,9 @@ from app.api.v1.endpoints import (
     work_centers,
     routings,
     mrp,
+    features,
+    setup,
+    # license,  # Disabled until ready for production
 )
 from app.api.v1.endpoints.admin import router as admin_router
 
@@ -23,6 +26,9 @@ router = APIRouter()
 
 # Authentication
 router.include_router(auth.router)
+
+# First-run setup (creates initial admin)
+router.include_router(setup.router)
 
 # Sales Orders
 router.include_router(sales_orders.router)
@@ -106,3 +112,9 @@ router.include_router(
 
 # MRP (Material Requirements Planning)
 router.include_router(mrp.router)
+
+# Features (tier information)
+router.include_router(features.router)
+
+# License activation (disabled until ready for production)
+# router.include_router(license.router)

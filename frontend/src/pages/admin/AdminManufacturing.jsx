@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import RoutingEditor from "../../components/RoutingEditor";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -47,9 +48,12 @@ export default function AdminManufacturing() {
   const fetchWorkCenters = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/v1/work-centers/?active_only=false`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/work-centers/?active_only=false`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (!res.ok) throw new Error("Failed to fetch work centers");
       const data = await res.json();
       setWorkCenters(data);
@@ -135,13 +139,17 @@ export default function AdminManufacturing() {
   };
 
   const handleDeleteResource = async (resource) => {
-    if (!confirm(`Delete resource "${resource.name}"? This cannot be undone.`)) return;
+    if (!confirm(`Delete resource "${resource.name}"? This cannot be undone.`))
+      return;
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/work-centers/resources/${resource.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/work-centers/resources/${resource.id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (!res.ok) throw new Error("Failed to delete resource");
       fetchWorkCenters(); // Refresh to update resource counts
@@ -151,7 +159,12 @@ export default function AdminManufacturing() {
   };
 
   const handleSyncBambu = async () => {
-    if (!confirm("Sync all 4 Bambu printers to FDM-POOL?\n\nThis will create/update:\n- Leonardo (P1S)\n- Michelangelo (A1)\n- Donatello (A1)\n- Raphael (A1)")) return;
+    if (
+      !confirm(
+        "Sync all 4 Bambu printers to FDM-POOL?\n\nThis will create/update:\n- Leonardo (P1S)\n- Michelangelo (A1)\n- Donatello (A1)\n- Raphael (A1)"
+      )
+    )
+      return;
 
     try {
       const res = await fetch(`${API_URL}/api/v1/work-centers/sync-bambu`, {
@@ -165,7 +178,13 @@ export default function AdminManufacturing() {
       }
 
       const data = await res.json();
-      alert(`Sync complete!\n\nCreated: ${data.created.join(", ") || "none"}\nUpdated: ${data.updated.join(", ") || "none"}\nSkipped: ${data.skipped.join(", ") || "none"}\n\nFDM-POOL capacity: ${data.pool_capacity_hours} hrs/day`);
+      alert(
+        `Sync complete!\n\nCreated: ${
+          data.created.join(", ") || "none"
+        }\nUpdated: ${data.updated.join(", ") || "none"}\nSkipped: ${
+          data.skipped.join(", ") || "none"
+        }\n\nFDM-POOL capacity: ${data.pool_capacity_hours} hrs/day`
+      );
       fetchWorkCenters();
     } catch (err) {
       alert(err.message);
@@ -201,17 +220,22 @@ export default function AdminManufacturing() {
   };
 
   const getTypeColor = (type) => {
-    const t = CENTER_TYPES.find(ct => ct.value === type);
+    const t = CENTER_TYPES.find((ct) => ct.value === type);
     return t?.color || "gray";
   };
 
   const getStatusColor = (status) => {
-    const s = RESOURCE_STATUSES.find(rs => rs.value === status);
+    const s = RESOURCE_STATUSES.find((rs) => rs.value === status);
     return s?.color || "gray";
   };
 
   const handleSeedTemplates = async () => {
-    if (!confirm("Seed routing templates?\n\nThis will create:\n- Standard Flow (Print → QC → Pack → Ship)\n- Assembly Flow (Print → QC → Assemble → Pack → Ship)")) return;
+    if (
+      !confirm(
+        "Seed routing templates?\n\nThis will create:\n- Standard Flow (Print → QC → Pack → Ship)\n- Assembly Flow (Print → QC → Assemble → Pack → Ship)"
+      )
+    )
+      return;
 
     try {
       const res = await fetch(`${API_URL}/api/v1/routings/seed-templates`, {
@@ -225,7 +249,11 @@ export default function AdminManufacturing() {
       }
 
       const data = await res.json();
-      alert(`Templates seeded!\n\nCreated: ${data.created.join(", ") || "none"}\nSkipped: ${data.skipped.join(", ") || "none"}`);
+      alert(
+        `Templates seeded!\n\nCreated: ${
+          data.created.join(", ") || "none"
+        }\nSkipped: ${data.skipped.join(", ") || "none"}`
+      );
       fetchRoutings();
     } catch (err) {
       alert(err.message);
@@ -290,8 +318,18 @@ export default function AdminManufacturing() {
               onClick={handleSyncBambu}
               className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
               </svg>
               Sync Bambu Printers
             </button>
@@ -347,13 +385,27 @@ export default function AdminManufacturing() {
               onClick={handleSeedTemplates}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
               </svg>
               Seed Templates
             </button>
             <button
-              onClick={() => setShowRoutingModal(true)}
+              onClick={() => {
+                setEditingRouting(null);
+                setRoutingProductId(null);
+                setShowRoutingModal(true);
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
             >
               <span>+</span> Create Routing
@@ -366,7 +418,8 @@ export default function AdminManufacturing() {
             <div className="text-center py-12">
               <div className="text-gray-400 mb-2">No routings defined yet</div>
               <p className="text-sm text-gray-500">
-                Routings define HOW to make a product - the sequence of operations at each work center.
+                Routings define HOW to make a product - the sequence of
+                operations at each work center.
               </p>
             </div>
           ) : (
@@ -388,7 +441,9 @@ export default function AdminManufacturing() {
                   {routings.map((routing) => (
                     <tr
                       key={routing.id}
-                      className={`border-b border-gray-800 hover:bg-gray-800/50 ${routing.is_template ? "bg-green-900/10" : ""}`}
+                      className={`border-b border-gray-800 hover:bg-gray-800/50 ${
+                        routing.is_template ? "bg-green-900/10" : ""
+                      }`}
                     >
                       <td className="px-4 py-3 font-mono text-blue-400">
                         {routing.code}
@@ -399,9 +454,13 @@ export default function AdminManufacturing() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-white">
-                        {routing.is_template
-                          ? <span className="text-green-300">{routing.name}</span>
-                          : (routing.product_name || routing.product_sku || `Product #${routing.product_id}`)}
+                        {routing.is_template ? (
+                          <span className="text-green-300">{routing.name}</span>
+                        ) : (
+                          routing.product_name ||
+                          routing.product_sku ||
+                          `Product #${routing.product_id}`
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-400">
                         v{routing.version} ({routing.revision})
@@ -411,7 +470,9 @@ export default function AdminManufacturing() {
                       </td>
                       <td className="px-4 py-3 text-gray-400">
                         {routing.total_run_time_minutes
-                          ? `${parseFloat(routing.total_run_time_minutes).toFixed(0)} min`
+                          ? `${parseFloat(
+                              routing.total_run_time_minutes
+                            ).toFixed(0)} min`
                           : "-"}
                       </td>
                       <td className="px-4 py-3 text-green-400">
@@ -431,7 +492,14 @@ export default function AdminManufacturing() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <button className="text-blue-400 hover:text-blue-300 text-sm">
+                        <button
+                          onClick={() => {
+                            setEditingRouting(routing);
+                            setRoutingProductId(routing.product_id);
+                            setShowRoutingModal(true);
+                          }}
+                          className="text-blue-400 hover:text-blue-300 text-sm"
+                        >
                           Edit
                         </button>
                       </td>
@@ -469,15 +537,22 @@ export default function AdminManufacturing() {
         />
       )}
 
-      {/* Routing Modal */}
+      {/* Routing Editor Modal */}
       {showRoutingModal && (
-        <RoutingModal
+        <RoutingEditor
+          isOpen={showRoutingModal}
+          onClose={() => {
+            setShowRoutingModal(false);
+            setEditingRouting(null);
+            setRoutingProductId(null);
+          }}
+          productId={routingProductId || editingRouting?.product_id || null}
+          routingId={editingRouting?.id || null}
           products={products}
-          workCenters={workCenters}
-          onClose={() => setShowRoutingModal(false)}
-          token={token}
           onSuccess={() => {
             setShowRoutingModal(false);
+            setEditingRouting(null);
+            setRoutingProductId(null);
             fetchRoutings();
           }}
         />
@@ -487,7 +562,16 @@ export default function AdminManufacturing() {
 }
 
 // Work Center Card Component
-function WorkCenterCard({ workCenter, onEdit, onDelete, onAddResource, onEditResource, onDeleteResource, getTypeColor, getStatusColor }) {
+function WorkCenterCard({
+  workCenter,
+  onEdit,
+  onDelete,
+  onAddResource,
+  onEditResource,
+  onDeleteResource,
+  getTypeColor,
+  getStatusColor,
+}) {
   const [expanded, setExpanded] = useState(false);
   const [resources, setResources] = useState([]);
   const [loadingResources, setLoadingResources] = useState(false);
@@ -561,11 +645,10 @@ function WorkCenterCard({ workCenter, onEdit, onDelete, onAddResource, onEditRes
                 Capacity: {workCenter.capacity_hours_per_day || "-"} hrs/day
               </span>
               <span>
-                Rate: ${parseFloat(workCenter.total_rate_per_hour || 0).toFixed(2)}/hr
+                Rate: $
+                {parseFloat(workCenter.total_rate_per_hour || 0).toFixed(2)}/hr
               </span>
-              <span>
-                Resources: {workCenter.resource_count || 0}
-              </span>
+              <span>Resources: {workCenter.resource_count || 0}</span>
             </div>
           </div>
         </div>
@@ -616,7 +699,9 @@ function WorkCenterCard({ workCenter, onEdit, onDelete, onAddResource, onEditRes
                 >
                   <div className="flex items-center gap-3">
                     <span
-                      className={`w-2 h-2 rounded-full bg-${getStatusColor(r.status)}-500`}
+                      className={`w-2 h-2 rounded-full bg-${getStatusColor(
+                        r.status
+                      )}-500`}
                     />
                     <span className="font-mono text-sm text-gray-300">
                       {r.code}
@@ -635,7 +720,9 @@ function WorkCenterCard({ workCenter, onEdit, onDelete, onAddResource, onEditRes
                   </div>
                   <div className="flex items-center gap-3">
                     <span
-                      className={`px-2 py-0.5 rounded text-xs bg-${getStatusColor(r.status)}-900/30 text-${getStatusColor(r.status)}-400`}
+                      className={`px-2 py-0.5 rounded text-xs bg-${getStatusColor(
+                        r.status
+                      )}-900/30 text-${getStatusColor(r.status)}-400`}
                     >
                       {r.status}
                     </span>
@@ -695,7 +782,7 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
   const calculatedOverhead = (() => {
     const annualHours = calc.hoursPerDay * calc.daysPerYear;
     if (annualHours === 0) return 0;
-    const depreciation = (calc.printerCost / calc.lifespanYears) / annualHours;
+    const depreciation = calc.printerCost / calc.lifespanYears / annualHours;
     const electricity = calc.electricityRate * (calc.wattage / 1000);
     const maintenance = calc.annualMaintenance / annualHours;
     return depreciation + electricity + maintenance;
@@ -738,7 +825,9 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
               <input
                 type="text"
                 value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                onChange={(e) =>
+                  setForm({ ...form, code: e.target.value.toUpperCase() })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                 placeholder="FDM-POOL"
                 required
@@ -748,7 +837,9 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
               <label className="block text-sm text-gray-400 mb-1">Type</label>
               <select
                 value={form.center_type}
-                onChange={(e) => setForm({ ...form, center_type: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, center_type: e.target.value })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
               >
                 {CENTER_TYPES.map((t) => (
@@ -773,10 +864,14 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Description</label>
+            <label className="block text-sm text-gray-400 mb-1">
+              Description
+            </label>
             <textarea
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
               className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
               rows={2}
             />
@@ -793,7 +888,9 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
                   type="number"
                   step="0.5"
                   value={form.capacity_hours_per_day}
-                  onChange={(e) => setForm({ ...form, capacity_hours_per_day: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, capacity_hours_per_day: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                   placeholder="8"
                 />
@@ -806,7 +903,12 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
                   type="number"
                   step="0.1"
                   value={form.capacity_units_per_hour}
-                  onChange={(e) => setForm({ ...form, capacity_units_per_hour: e.target.value })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      capacity_units_per_hour: e.target.value,
+                    })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                   placeholder="10"
                 />
@@ -815,26 +917,36 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
           </div>
 
           <div className="border-t border-gray-800 pt-4">
-            <h3 className="text-sm font-medium text-gray-300 mb-3">Hourly Rates ($)</h3>
+            <h3 className="text-sm font-medium text-gray-300 mb-3">
+              Hourly Rates ($)
+            </h3>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Machine</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Machine
+                </label>
                 <input
                   type="number"
                   step="0.01"
                   value={form.machine_rate_per_hour}
-                  onChange={(e) => setForm({ ...form, machine_rate_per_hour: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, machine_rate_per_hour: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                   placeholder="2.00"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Labor</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Labor
+                </label>
                 <input
                   type="number"
                   step="0.01"
                   value={form.labor_rate_per_hour}
-                  onChange={(e) => setForm({ ...form, labor_rate_per_hour: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, labor_rate_per_hour: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                   placeholder="25.00"
                 />
@@ -854,7 +966,9 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
                   type="number"
                   step="0.001"
                   value={form.overhead_rate_per_hour}
-                  onChange={(e) => setForm({ ...form, overhead_rate_per_hour: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, overhead_rate_per_hour: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                   placeholder="0.09"
                 />
@@ -868,71 +982,121 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
                   Overhead Rate Calculator
                 </h4>
                 <p className="text-xs text-gray-500 mb-3">
-                  Calculate machine overhead from depreciation + electricity + maintenance
+                  Calculate machine overhead from depreciation + electricity +
+                  maintenance
                 </p>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Printer Cost ($)</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Printer Cost ($)
+                    </label>
                     <input
                       type="number"
                       value={calc.printerCost}
-                      onChange={(e) => setCalc({ ...calc, printerCost: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setCalc({
+                          ...calc,
+                          printerCost: parseFloat(e.target.value) || 0,
+                        })
+                      }
                       className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-white text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Lifespan (years)</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Lifespan (years)
+                    </label>
                     <input
                       type="number"
                       value={calc.lifespanYears}
-                      onChange={(e) => setCalc({ ...calc, lifespanYears: parseFloat(e.target.value) || 1 })}
+                      onChange={(e) =>
+                        setCalc({
+                          ...calc,
+                          lifespanYears: parseFloat(e.target.value) || 1,
+                        })
+                      }
                       className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-white text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Hours/Day</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Hours/Day
+                    </label>
                     <input
                       type="number"
                       value={calc.hoursPerDay}
-                      onChange={(e) => setCalc({ ...calc, hoursPerDay: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setCalc({
+                          ...calc,
+                          hoursPerDay: parseFloat(e.target.value) || 0,
+                        })
+                      }
                       className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-white text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Days/Year</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Days/Year
+                    </label>
                     <input
                       type="number"
                       value={calc.daysPerYear}
-                      onChange={(e) => setCalc({ ...calc, daysPerYear: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setCalc({
+                          ...calc,
+                          daysPerYear: parseFloat(e.target.value) || 0,
+                        })
+                      }
                       className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-white text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Electricity ($/kWh)</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Electricity ($/kWh)
+                    </label>
                     <input
                       type="number"
                       step="0.01"
                       value={calc.electricityRate}
-                      onChange={(e) => setCalc({ ...calc, electricityRate: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setCalc({
+                          ...calc,
+                          electricityRate: parseFloat(e.target.value) || 0,
+                        })
+                      }
                       className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-white text-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Wattage (W)</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Wattage (W)
+                    </label>
                     <input
                       type="number"
                       value={calc.wattage}
-                      onChange={(e) => setCalc({ ...calc, wattage: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setCalc({
+                          ...calc,
+                          wattage: parseFloat(e.target.value) || 0,
+                        })
+                      }
                       className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-white text-sm"
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs text-gray-400 mb-1">Annual Maintenance ($)</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Annual Maintenance ($)
+                    </label>
                     <input
                       type="number"
                       value={calc.annualMaintenance}
-                      onChange={(e) => setCalc({ ...calc, annualMaintenance: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        setCalc({
+                          ...calc,
+                          annualMaintenance: parseFloat(e.target.value) || 0,
+                        })
+                      }
                       className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-white text-sm"
                     />
                   </div>
@@ -958,7 +1122,9 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
           </div>
 
           <div className="border-t border-gray-800 pt-4">
-            <h3 className="text-sm font-medium text-gray-300 mb-3">Scheduling</h3>
+            <h3 className="text-sm font-medium text-gray-300 mb-3">
+              Scheduling
+            </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">
@@ -969,7 +1135,12 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
                   min="0"
                   max="100"
                   value={form.scheduling_priority}
-                  onChange={(e) => setForm({ ...form, scheduling_priority: parseInt(e.target.value) })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      scheduling_priority: parseInt(e.target.value),
+                    })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                 />
               </div>
@@ -978,7 +1149,9 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
                   <input
                     type="checkbox"
                     checked={form.is_bottleneck}
-                    onChange={(e) => setForm({ ...form, is_bottleneck: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_bottleneck: e.target.checked })
+                    }
                     className="rounded bg-gray-800 border-gray-700"
                   />
                   Bottleneck
@@ -987,7 +1160,9 @@ function WorkCenterModal({ workCenter, onClose, onSave }) {
                   <input
                     type="checkbox"
                     checked={form.is_active}
-                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_active: e.target.checked })
+                    }
                     className="rounded bg-gray-800 border-gray-700"
                   />
                   Active
@@ -1058,7 +1233,9 @@ function ResourceModal({ resource, workCenter, onClose, onSave }) {
               <input
                 type="text"
                 value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                onChange={(e) =>
+                  setForm({ ...form, code: e.target.value.toUpperCase() })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                 placeholder="PRINTER-01"
                 required
@@ -1094,21 +1271,29 @@ function ResourceModal({ resource, workCenter, onClose, onSave }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Machine Type</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Machine Type
+              </label>
               <input
                 type="text"
                 value={form.machine_type}
-                onChange={(e) => setForm({ ...form, machine_type: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, machine_type: e.target.value })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                 placeholder="X1C, P1S, A1..."
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Serial Number</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Serial Number
+              </label>
               <input
                 type="text"
                 value={form.serial_number}
-                onChange={(e) => setForm({ ...form, serial_number: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, serial_number: e.target.value })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
               />
             </div>
@@ -1120,21 +1305,29 @@ function ResourceModal({ resource, workCenter, onClose, onSave }) {
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Device ID</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Device ID
+                </label>
                 <input
                   type="text"
                   value={form.bambu_device_id}
-                  onChange={(e) => setForm({ ...form, bambu_device_id: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, bambu_device_id: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                   placeholder="From Bambu Studio"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">IP Address</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  IP Address
+                </label>
                 <input
                   type="text"
                   value={form.bambu_ip_address}
-                  onChange={(e) => setForm({ ...form, bambu_ip_address: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, bambu_ip_address: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                   placeholder="192.168.1.100"
                 />
@@ -1151,7 +1344,9 @@ function ResourceModal({ resource, workCenter, onClose, onSave }) {
                 type="number"
                 step="0.5"
                 value={form.capacity_hours_per_day}
-                onChange={(e) => setForm({ ...form, capacity_hours_per_day: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, capacity_hours_per_day: e.target.value })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                 placeholder="Inherit from work center"
               />
@@ -1160,7 +1355,9 @@ function ResourceModal({ resource, workCenter, onClose, onSave }) {
               <input
                 type="checkbox"
                 checked={form.is_active}
-                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                onChange={(e) =>
+                  setForm({ ...form, is_active: e.target.checked })
+                }
                 className="rounded bg-gray-800 border-gray-700"
               />
               Active
@@ -1283,10 +1480,14 @@ function RoutingModal({ products, workCenters, onClose, token, onSuccess }) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Product *</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Product *
+              </label>
               <select
                 value={form.product_id}
-                onChange={(e) => setForm({ ...form, product_id: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, product_id: e.target.value })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                 required
               >
@@ -1299,11 +1500,15 @@ function RoutingModal({ products, workCenters, onClose, token, onSuccess }) {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Routing Code</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Routing Code
+              </label>
               <input
                 type="text"
                 value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+                onChange={(e) =>
+                  setForm({ ...form, code: e.target.value.toUpperCase() })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white"
                 placeholder="Auto-generated if empty"
               />
@@ -1349,7 +1554,9 @@ function RoutingModal({ products, workCenters, onClose, token, onSuccess }) {
                     </span>
                     <select
                       value={op.work_center_id}
-                      onChange={(e) => updateOperation(idx, "work_center_id", e.target.value)}
+                      onChange={(e) =>
+                        updateOperation(idx, "work_center_id", e.target.value)
+                      }
                       className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm text-white"
                     >
                       {workCenters.map((wc) => (
@@ -1361,7 +1568,9 @@ function RoutingModal({ products, workCenters, onClose, token, onSuccess }) {
                     <input
                       type="text"
                       value={op.operation_name}
-                      onChange={(e) => updateOperation(idx, "operation_name", e.target.value)}
+                      onChange={(e) =>
+                        updateOperation(idx, "operation_name", e.target.value)
+                      }
                       className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm text-white"
                       placeholder="Operation name"
                     />
@@ -1369,7 +1578,13 @@ function RoutingModal({ products, workCenters, onClose, token, onSuccess }) {
                       <input
                         type="number"
                         value={op.run_time_minutes}
-                        onChange={(e) => updateOperation(idx, "run_time_minutes", e.target.value)}
+                        onChange={(e) =>
+                          updateOperation(
+                            idx,
+                            "run_time_minutes",
+                            e.target.value
+                          )
+                        }
                         className="w-20 bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm text-white"
                         placeholder="0"
                       />

@@ -33,6 +33,13 @@ class CostMethod(str, Enum):
     STANDARD = "standard"
 
 
+class ProcurementType(str, Enum):
+    """How the item is obtained"""
+    MAKE = "make"       # Manufactured in-house (has BOM/routing)
+    BUY = "buy"         # Purchased from suppliers
+    MAKE_OR_BUY = "make_or_buy"  # Can be either (flexible sourcing)
+
+
 # ============================================================================
 # Item Category Schemas
 # ============================================================================
@@ -97,13 +104,14 @@ ItemCategoryTreeNode.model_rebuild()
 
 class ItemBase(BaseModel):
     """Base item fields"""
-    sku: str = Field(..., min_length=1, max_length=50, description="Unique SKU")
+    sku: Optional[str] = Field(None, max_length=50, description="Unique SKU (auto-generated if not provided)")
     name: str = Field(..., min_length=1, max_length=255, description="Item name")
     description: Optional[str] = None
     unit: Optional[str] = Field("EA", max_length=20)
 
     # Classification
     item_type: ItemType = Field(ItemType.FINISHED_GOOD, description="Type of item")
+    procurement_type: ProcurementType = Field(ProcurementType.BUY, description="How the item is procured")
     category_id: Optional[int] = Field(None, description="Category ID")
 
     # Costing
@@ -132,10 +140,27 @@ class ItemBase(BaseModel):
     track_lots: Optional[bool] = Field(False)
     track_serials: Optional[bool] = Field(False)
 
+    # Material link (for supply items that are filament/materials)
+    material_type_id: Optional[int] = Field(None, description="Material type ID for material items")
+    color_id: Optional[int] = Field(None, description="Color ID for material items")
+
 
 class ItemCreate(ItemBase):
     """Create a new item"""
     pass
+
+
+class MaterialItemCreate(BaseModel):
+    """
+    Shortcut for creating material items (filament).
+    Automatically sets item_type=supply, procurement_type=buy, unit=kg.
+    """
+    material_type_code: str = Field(..., description="Material type code (e.g., PLA_BASIC)")
+    color_code: str = Field(..., description="Color code (e.g., BLK)")
+    cost_per_kg: Optional[Decimal] = Field(None, ge=0, description="Cost per kg (defaults to material base price)")
+    selling_price: Optional[Decimal] = Field(None, ge=0, description="Selling price per kg")
+    initial_qty_kg: Optional[Decimal] = Field(0, ge=0, description="Initial inventory quantity in kg")
+    category_id: Optional[int] = Field(None, description="Category ID (defaults to Materials category)")
 
 
 class ItemUpdate(BaseModel):
@@ -147,6 +172,7 @@ class ItemUpdate(BaseModel):
 
     # Classification
     item_type: Optional[ItemType] = None
+    procurement_type: Optional[ProcurementType] = None
     category_id: Optional[int] = None
 
     # Costing
@@ -175,6 +201,10 @@ class ItemUpdate(BaseModel):
     track_lots: Optional[bool] = None
     track_serials: Optional[bool] = None
 
+    # Material link
+    material_type_id: Optional[int] = None
+    color_id: Optional[int] = None
+
 
 class ItemListResponse(BaseModel):
     """Item list summary"""
@@ -182,6 +212,7 @@ class ItemListResponse(BaseModel):
     sku: str
     name: str
     item_type: str
+    procurement_type: str = "buy"
     category_id: Optional[int] = None
     category_name: Optional[str] = None
     unit: Optional[str] = None
@@ -194,6 +225,12 @@ class ItemListResponse(BaseModel):
     available_qty: Optional[Decimal] = None  # On hand - allocated
     reorder_point: Optional[Decimal] = None
     needs_reorder: bool = False
+
+    # Material info (for filament items)
+    material_type_id: Optional[int] = None
+    color_id: Optional[int] = None
+    material_type_code: Optional[str] = None
+    color_code: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -218,6 +255,13 @@ class ItemResponse(ItemBase):
     # BOM info
     has_bom: bool = False
     bom_count: int = 0
+
+    # Material info (for filament items)
+    material_type_code: Optional[str] = None
+    material_type_name: Optional[str] = None
+    color_code: Optional[str] = None
+    color_name: Optional[str] = None
+    color_hex: Optional[str] = None
 
     # Timestamps
     created_at: datetime
@@ -250,6 +294,7 @@ class ItemCSVImportResult(BaseModel):
 class ItemBulkUpdateRequest(BaseModel):
     """Bulk update multiple items"""
     item_ids: List[int]
-    category_id: Optional[int] = None
-    item_type: Optional[ItemType] = None
+    category_id: Optional[int] = Field(None, description="Category ID (use 0 to clear category)")
+    item_type: Optional[str] = Field(None, description="Item type: finished_good, component, supply, service")
+    procurement_type: Optional[str] = Field(None, description="Procurement type: make, buy, make_or_buy")
     is_active: Optional[bool] = None

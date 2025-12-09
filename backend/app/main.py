@@ -18,27 +18,84 @@ from app.logging_config import setup_logging, get_logger
 setup_logging()
 logger = get_logger(__name__)
 
+
+def init_database():
+    """Initialize database tables on startup.
+    
+    Creates all tables from SQLAlchemy models if they don't exist.
+    Safe to run multiple times - only creates missing tables.
+    """
+    try:
+        from app.db.session import engine
+        from app.db.base import Base
+        
+        # Import all models so they're registered with Base.metadata
+        # The models/__init__.py imports everything we need
+        import app.models  # noqa: F401
+        
+        logger.info("Checking database tables...")
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables ready")
+        
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        # Don't raise - let the app start and show errors on first request
+        # This allows health checks to pass while DB issues are debugged
+
+
+def seed_default_data():
+    """Check if setup is needed (no users exist).
+    
+    NOTE: We no longer auto-create admin users for security.
+    Users create their own admin account via /setup on first run.
+    """
+    try:
+        from app.db.session import SessionLocal
+        from app.models.user import User
+        
+        db = SessionLocal()
+        try:
+            user_count = db.query(User).count()
+            if user_count == 0:
+                logger.info("No users found - first-run setup required at /setup")
+            else:
+                logger.info(f"Found {user_count} existing users")
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.warning(f"Could not check user data: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     # Startup
     logger.info(
-        "Starting BLB3D ERP API",
+        "Starting FilaOps ERP API",
         extra={
             "version": settings.VERSION,
             "environment": getattr(settings, "ENVIRONMENT", "development"),
             "debug": getattr(settings, "DEBUG", False),
         }
     )
+    
+    # Initialize database tables
+    init_database()
+    
+    # Seed default data (admin user)
+    seed_default_data()
+    
     yield
+    
     # Shutdown
-    logger.info("Shutting down BLB3D ERP API")
+    logger.info("Shutting down FilaOps ERP API")
 
 
 # Create FastAPI app
 app = FastAPI(
-    title="BLB3D ERP API",
-    description="Enterprise Resource Planning system for BLB3D Printing",
+    title="FilaOps ERP API",
+    description="Open-source ERP for 3D print farms",
     version=settings.VERSION,
     lifespan=lifespan,
 )

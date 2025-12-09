@@ -59,11 +59,16 @@ class BOMLine(Base):
     # Line details
     sequence = Column(Integer, nullable=True)  # 'sequence' not 'line_number'
     quantity = Column(Numeric(18, 4), nullable=False)
+    unit = Column(String(20), default='EA', nullable=False)  # Explicit UOM: EA, kg, HR, m, etc.
 
     # Consumption stage - when should this item be consumed?
     # 'production' = consume at complete_print (filament, raw materials)
     # 'shipping' = consume at buy_label (boxes, packaging)
     consume_stage = Column(String(20), default='production', nullable=False)
+
+    # Cost-only flag: if True, this line is for costing only and won't allocate inventory
+    # Use for overhead, machine time, labor items
+    is_cost_only = Column(Boolean, default=False, nullable=False)
 
     # Scrap/waste
     scrap_factor = Column(Numeric(5, 2), default=0, nullable=True)  # 'scrap_factor' not 'scrap_percentage'

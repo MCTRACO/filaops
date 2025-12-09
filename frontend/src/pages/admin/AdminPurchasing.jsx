@@ -42,7 +42,11 @@ export default function AdminPurchasing() {
   // Create New Item Modal
   const [showCreateItemModal, setShowCreateItemModal] = useState(false);
   const [createItemForAsin, setCreateItemForAsin] = useState(null);
-  const [newItemForm, setNewItemForm] = useState({ sku: "", name: "", item_type: "raw_material" });
+  const [newItemForm, setNewItemForm] = useState({
+    sku: "",
+    name: "",
+    item_type: "raw_material",
+  });
   const [creatingItem, setCreatingItem] = useState(false);
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
   const [productSearches, setProductSearches] = useState({}); // Per-ASIN search filters
@@ -204,7 +208,10 @@ export default function AdminPurchasing() {
     setNewItemForm({
       sku: suggestedSku,
       name: amazonProduct.title,
-      item_type: amazonProduct.suggested_category === "filament" ? "raw_material" : "supply",
+      item_type:
+        amazonProduct.suggested_category === "filament"
+          ? "raw_material"
+          : "supply",
     });
     setShowCreateItemModal(true);
   };
@@ -239,7 +246,10 @@ export default function AdminPurchasing() {
       const newItem = await res.json();
 
       // Add to products list and map ASIN to it
-      setProducts((prev) => [...prev, { id: newItem.id, sku: newItem.sku, name: newItem.name }]);
+      setProducts((prev) => [
+        ...prev,
+        { id: newItem.id, sku: newItem.sku, name: newItem.name },
+      ]);
       handleMappingChange(createItemForAsin, "product_id", newItem.id);
 
       setShowCreateItemModal(false);
@@ -291,14 +301,17 @@ export default function AdminPurchasing() {
 
   const handleStatusChange = async (poId, newStatus, extraData = {}) => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/purchase-orders/${poId}/status`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: newStatus, ...extraData }),
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/purchase-orders/${poId}/status`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: newStatus, ...extraData }),
+        }
+      );
 
       if (!res.ok) {
         const err = await res.json();
@@ -316,14 +329,17 @@ export default function AdminPurchasing() {
 
   const handleReceive = async (receiveData) => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/purchase-orders/${selectedPO.id}/receive`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(receiveData),
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/purchase-orders/${selectedPO.id}/receive`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(receiveData),
+        }
+      );
 
       if (!res.ok) {
         const err = await res.json();
@@ -331,7 +347,9 @@ export default function AdminPurchasing() {
       }
 
       const result = await res.json();
-      alert(`Received ${result.total_quantity} items. ${result.transactions_created.length} inventory transactions created.`);
+      alert(
+        `Received ${result.total_quantity} items. ${result.transactions_created.length} inventory transactions created.`
+      );
       setShowReceiveModal(false);
       fetchOrders();
       fetchPODetails(selectedPO.id);
@@ -345,13 +363,16 @@ export default function AdminPurchasing() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(`${API_URL}/api/v1/purchase-orders/${poId}/upload`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/purchase-orders/${poId}/upload`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
 
       if (!res.ok) {
         const err = await res.json();
@@ -359,7 +380,11 @@ export default function AdminPurchasing() {
       }
 
       const result = await res.json();
-      alert(`File uploaded to ${result.storage === "google_drive" ? "Google Drive" : "local storage"}`);
+      alert(
+        `File uploaded to ${
+          result.storage === "google_drive" ? "Google Drive" : "local storage"
+        }`
+      );
       fetchPODetails(poId);
       return result;
     } catch (err) {
@@ -392,17 +417,21 @@ export default function AdminPurchasing() {
   };
 
   const handleCancelPO = async (poId, poNumber) => {
-    if (!confirm(`Cancel PO ${poNumber}? This will mark it as cancelled.`)) return;
+    if (!confirm(`Cancel PO ${poNumber}? This will mark it as cancelled.`))
+      return;
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/purchase-orders/${poId}/status`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "cancelled" }),
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/purchase-orders/${poId}/status`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: "cancelled" }),
+        }
+      );
 
       if (!res.ok) {
         const err = await res.json();
@@ -455,7 +484,10 @@ export default function AdminPurchasing() {
         mappings[p.asin] = {
           asin: p.asin,
           product_id: null,
-          category: p.suggested_category === "subscription" ? "skip" : p.suggested_category,
+          category:
+            p.suggested_category === "subscription"
+              ? "skip"
+              : p.suggested_category,
         };
       });
       setImportMappings(mappings);
@@ -495,7 +527,9 @@ export default function AdminPurchasing() {
 
       const result = await res.json();
       setImportResult(result);
-      alert(`Import complete! ${result.pos_created} POs created with ${result.lines_created} line items.`);
+      alert(
+        `Import complete! ${result.pos_created} POs created with ${result.lines_created} line items.`
+      );
       fetchOrders();
     } catch (err) {
       alert(err.message);
@@ -537,12 +571,17 @@ export default function AdminPurchasing() {
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-white">Purchasing</h1>
-          <p className="text-gray-400 mt-1">Manage vendors and purchase orders</p>
+          <p className="text-gray-400 mt-1">
+            Manage vendors and purchase orders
+          </p>
         </div>
         <div className="flex gap-2">
           {activeTab === "vendors" && (
             <button
-              onClick={() => { setSelectedVendor(null); setShowVendorModal(true); }}
+              onClick={() => {
+                setSelectedVendor(null);
+                setShowVendorModal(true);
+              }}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium"
             >
               + New Vendor
@@ -550,7 +589,10 @@ export default function AdminPurchasing() {
           )}
           {activeTab === "orders" && (
             <button
-              onClick={() => { setSelectedPO(null); setShowPOModal(true); }}
+              onClick={() => {
+                setSelectedPO(null);
+                setShowPOModal(true);
+              }}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium"
             >
               + New PO
@@ -614,16 +656,24 @@ export default function AdminPurchasing() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder={activeTab === "orders" ? "Search PO number or vendor..." : "Search vendor name or code..."}
+              placeholder={
+                activeTab === "orders"
+                  ? "Search PO number or vendor..."
+                  : "Search vendor name or code..."
+              }
               value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, search: e.target.value })
+              }
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-500"
             />
           </div>
           {activeTab === "orders" && (
             <select
               value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, status: e.target.value })
+              }
               className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
             >
               <option value="all">All Status</option>
@@ -658,39 +708,72 @@ export default function AdminPurchasing() {
           <table className="w-full">
             <thead className="bg-gray-800/50">
               <tr>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">PO #</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Vendor</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Status</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Order Date</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Expected</th>
-                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Total</th>
-                <th className="text-center py-3 px-4 text-xs font-medium text-gray-400 uppercase">Lines</th>
-                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Actions</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  PO #
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Vendor
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Status
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Order Date
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Expected
+                </th>
+                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Total
+                </th>
+                <th className="text-center py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Lines
+                </th>
+                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {filteredOrders.map((po) => (
-                <tr key={po.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                  <td className="py-3 px-4 text-white font-medium">{po.po_number}</td>
+                <tr
+                  key={po.id}
+                  className="border-b border-gray-800 hover:bg-gray-800/50"
+                >
+                  <td className="py-3 px-4 text-white font-medium">
+                    {po.po_number}
+                  </td>
                   <td className="py-3 px-4 text-gray-300">{po.vendor_name}</td>
                   <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs ${statusColors[po.status]}`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        statusColors[po.status]
+                      }`}
+                    >
                       {po.status}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-gray-400">
-                    {po.order_date ? new Date(po.order_date).toLocaleDateString() : "-"}
+                    {po.order_date
+                      ? new Date(po.order_date).toLocaleDateString()
+                      : "-"}
                   </td>
                   <td className="py-3 px-4 text-gray-400">
-                    {po.expected_date ? new Date(po.expected_date).toLocaleDateString() : "-"}
+                    {po.expected_date
+                      ? new Date(po.expected_date).toLocaleDateString()
+                      : "-"}
                   </td>
                   <td className="py-3 px-4 text-right text-green-400 font-medium">
                     ${parseFloat(po.total_amount || 0).toFixed(2)}
                   </td>
-                  <td className="py-3 px-4 text-center text-gray-400">{po.line_count}</td>
+                  <td className="py-3 px-4 text-center text-gray-400">
+                    {po.line_count}
+                  </td>
                   <td className="py-3 px-4 text-right space-x-2">
                     <button
-                      onClick={async () => { await fetchPODetails(po.id); }}
+                      onClick={async () => {
+                        await fetchPODetails(po.id);
+                      }}
                       className="text-blue-400 hover:text-blue-300 text-sm"
                     >
                       View
@@ -751,37 +834,79 @@ export default function AdminPurchasing() {
           <table className="w-full">
             <thead className="bg-gray-800/50">
               <tr>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Code</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Name</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Contact</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Email</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Phone</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Location</th>
-                <th className="text-center py-3 px-4 text-xs font-medium text-gray-400 uppercase">POs</th>
-                <th className="text-center py-3 px-4 text-xs font-medium text-gray-400 uppercase">Active</th>
-                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Actions</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Code
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Name
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Contact
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Email
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Phone
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Location
+                </th>
+                <th className="text-center py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  POs
+                </th>
+                <th className="text-center py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Active
+                </th>
+                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {filteredVendors.map((vendor) => (
-                <tr key={vendor.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                  <td className="py-3 px-4 text-white font-medium">{vendor.code}</td>
-                  <td className="py-3 px-4 text-gray-300">{vendor.name}</td>
-                  <td className="py-3 px-4 text-gray-400">{vendor.contact_name || "-"}</td>
-                  <td className="py-3 px-4 text-gray-400">{vendor.email || "-"}</td>
-                  <td className="py-3 px-4 text-gray-400">{vendor.phone || "-"}</td>
-                  <td className="py-3 px-4 text-gray-400">
-                    {vendor.city && vendor.state ? `${vendor.city}, ${vendor.state}` : "-"}
+                <tr
+                  key={vendor.id}
+                  className="border-b border-gray-800 hover:bg-gray-800/50"
+                >
+                  <td className="py-3 px-4 text-white font-medium">
+                    {vendor.code}
                   </td>
-                  <td className="py-3 px-4 text-center text-gray-400">{vendor.po_count}</td>
+                  <td className="py-3 px-4 text-gray-300">{vendor.name}</td>
+                  <td className="py-3 px-4 text-gray-400">
+                    {vendor.contact_name || "-"}
+                  </td>
+                  <td className="py-3 px-4 text-gray-400">
+                    {vendor.email || "-"}
+                  </td>
+                  <td className="py-3 px-4 text-gray-400">
+                    {vendor.phone || "-"}
+                  </td>
+                  <td className="py-3 px-4 text-gray-400">
+                    {vendor.city && vendor.state
+                      ? `${vendor.city}, ${vendor.state}`
+                      : "-"}
+                  </td>
+                  <td className="py-3 px-4 text-center text-gray-400">
+                    {vendor.po_count}
+                  </td>
                   <td className="py-3 px-4 text-center">
-                    <span className={`px-2 py-1 rounded-full text-xs ${vendor.is_active ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"}`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${
+                        vendor.is_active
+                          ? "bg-green-500/20 text-green-400"
+                          : "bg-red-500/20 text-red-400"
+                      }`}
+                    >
                       {vendor.is_active ? "Yes" : "No"}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right space-x-2">
                     <button
-                      onClick={() => { setSelectedVendor(vendor); setShowVendorModal(true); }}
+                      onClick={() => {
+                        setSelectedVendor(vendor);
+                        setShowVendorModal(true);
+                      }}
                       className="text-blue-400 hover:text-blue-300 text-sm"
                     >
                       Edit
@@ -812,14 +937,27 @@ export default function AdminPurchasing() {
         <div className="space-y-6">
           {/* Upload Section */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Import Amazon Business Orders</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">
+              Import Amazon Business Orders
+            </h3>
             <p className="text-gray-400 text-sm mb-4">
-              Upload your Amazon Business CSV export to import orders as Purchase Orders.
+              Upload your Amazon Business CSV export to import orders as
+              Purchase Orders.
             </p>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-white font-medium cursor-pointer">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                  />
                 </svg>
                 Select CSV File
                 <input
@@ -838,38 +976,63 @@ export default function AdminPurchasing() {
           {/* Summary */}
           {importData && (
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Import Summary</h3>
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Import Summary
+              </h3>
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-white">{importData.order_count}</div>
+                  <div className="text-2xl font-bold text-white">
+                    {importData.order_count}
+                  </div>
                   <div className="text-sm text-gray-400">Orders</div>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-white">{importData.product_count}</div>
+                  <div className="text-2xl font-bold text-white">
+                    {importData.product_count}
+                  </div>
                   <div className="text-sm text-gray-400">Unique Products</div>
                 </div>
                 <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-400">${importData.total_spend.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-green-400">
+                    ${importData.total_spend.toFixed(2)}
+                  </div>
                   <div className="text-sm text-gray-400">Total Spend</div>
                 </div>
               </div>
 
               {/* Product Mapping Table */}
-              <h4 className="text-md font-medium text-white mb-3">Product Mapping</h4>
+              <h4 className="text-md font-medium text-white mb-3">
+                Product Mapping
+              </h4>
               <p className="text-gray-400 text-sm mb-4">
-                Assign each Amazon product to an existing item or mark as MISC. Skip subscriptions/services.
+                Assign each Amazon product to an existing item or mark as MISC.
+                Skip subscriptions/services.
               </p>
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full">
                   <thead className="bg-gray-800/50 sticky top-0">
                     <tr>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-400">Product</th>
-                      <th className="text-center py-2 px-3 text-xs font-medium text-gray-400">Ordered</th>
-                      <th className="text-center py-2 px-3 text-xs font-medium text-gray-400">Recv Qty</th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-gray-400">Spent</th>
-                      <th className="text-right py-2 px-3 text-xs font-medium text-gray-400">CPU</th>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-400">Category</th>
-                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-400">Map To</th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-400">
+                        Product
+                      </th>
+                      <th className="text-center py-2 px-3 text-xs font-medium text-gray-400">
+                        Ordered
+                      </th>
+                      <th className="text-center py-2 px-3 text-xs font-medium text-gray-400">
+                        Recv Qty
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-gray-400">
+                        Spent
+                      </th>
+                      <th className="text-right py-2 px-3 text-xs font-medium text-gray-400">
+                        CPU
+                      </th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-400">
+                        Category
+                      </th>
+                      <th className="text-left py-2 px-3 text-xs font-medium text-gray-400">
+                        Map To
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -877,41 +1040,76 @@ export default function AdminPurchasing() {
                       const mapping = importMappings[product.asin] || {};
                       const isExpanded = expandedDescriptions[product.asin];
                       return (
-                        <tr key={product.asin} className="border-b border-gray-800">
+                        <tr
+                          key={product.asin}
+                          className="border-b border-gray-800"
+                        >
                           <td className="py-2 px-3 max-w-md">
-                            <div className="text-white text-sm font-medium">{product.brand}</div>
+                            <div className="text-white text-sm font-medium">
+                              {product.brand}
+                            </div>
                             <div
-                              className={`text-gray-400 text-xs cursor-pointer hover:text-gray-300 ${isExpanded ? '' : 'line-clamp-2'}`}
+                              className={`text-gray-400 text-xs cursor-pointer hover:text-gray-300 ${
+                                isExpanded ? "" : "line-clamp-2"
+                              }`}
                               onClick={() => toggleDescription(product.asin)}
                               title="Click to expand/collapse"
                             >
                               {product.title}
                             </div>
-                            <div className="text-gray-500 text-xs mt-1">ASIN: {product.asin}</div>
+                            <div className="text-gray-500 text-xs mt-1">
+                              ASIN: {product.asin}
+                            </div>
                           </td>
-                          <td className="py-2 px-3 text-center text-gray-400 text-sm">{product.total_qty}</td>
+                          <td className="py-2 px-3 text-center text-gray-400 text-sm">
+                            {product.total_qty}
+                          </td>
                           <td className="py-2 px-3 text-center">
                             <input
                               type="number"
                               min="1"
                               value={mapping.qty_override || product.total_qty}
-                              onChange={(e) => handleMappingChange(product.asin, "qty_override", parseInt(e.target.value) || product.total_qty)}
+                              onChange={(e) =>
+                                handleMappingChange(
+                                  product.asin,
+                                  "qty_override",
+                                  parseInt(e.target.value) || product.total_qty
+                                )
+                              }
                               className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white w-16 text-center"
                               title="Adjust if pack contains multiple units (e.g., 240 magnets in 1 pack)"
                             />
                           </td>
-                          <td className="py-2 px-3 text-right text-green-400">${product.total_spent.toFixed(2)}</td>
+                          <td className="py-2 px-3 text-right text-green-400">
+                            ${product.total_spent.toFixed(2)}
+                          </td>
                           <td className="py-2 px-3 text-right text-blue-400 text-sm">
-                            ${((product.total_spent / (mapping.qty_override || product.total_qty))).toFixed(4)}
+                            $
+                            {(
+                              product.total_spent /
+                              (mapping.qty_override || product.total_qty)
+                            ).toFixed(4)}
                           </td>
                           <td className="py-2 px-3">
                             <select
-                              value={mapping.category || product.suggested_category || "misc"}
-                              onChange={(e) => handleMappingChange(product.asin, "category", e.target.value)}
+                              value={
+                                mapping.category ||
+                                product.suggested_category ||
+                                "misc"
+                              }
+                              onChange={(e) =>
+                                handleMappingChange(
+                                  product.asin,
+                                  "category",
+                                  e.target.value
+                                )
+                              }
                               className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white w-full"
                             >
                               <option value="filament">Filament</option>
-                              <option value="printer_parts">Printer Parts</option>
+                              <option value="printer_parts">
+                                Printer Parts
+                              </option>
                               <option value="misc">Misc</option>
                               <option value="subscription">Subscription</option>
                               <option value="skip">Skip (Don't Import)</option>
@@ -924,28 +1122,54 @@ export default function AdminPurchasing() {
                                   type="text"
                                   placeholder="Search items..."
                                   value={productSearches[product.asin] || ""}
-                                  onChange={(e) => setProductSearches({ ...productSearches, [product.asin]: e.target.value })}
+                                  onChange={(e) =>
+                                    setProductSearches({
+                                      ...productSearches,
+                                      [product.asin]: e.target.value,
+                                    })
+                                  }
                                   className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white w-full"
                                 />
                                 <select
                                   value={mapping.product_id || ""}
                                   onChange={(e) => {
                                     if (e.target.value === "CREATE_NEW") {
-                                      openCreateItemModal(product.asin, product);
+                                      openCreateItemModal(
+                                        product.asin,
+                                        product
+                                      );
                                     } else {
-                                      handleMappingChange(product.asin, "product_id", e.target.value ? parseInt(e.target.value) : null);
+                                      handleMappingChange(
+                                        product.asin,
+                                        "product_id",
+                                        e.target.value
+                                          ? parseInt(e.target.value)
+                                          : null
+                                      );
                                     }
                                   }}
                                   className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white w-full"
                                 >
                                   <option value="">MISC (Auto)</option>
-                                  <option value="CREATE_NEW" className="text-blue-400">+ Create New Item</option>
+                                  <option
+                                    value="CREATE_NEW"
+                                    className="text-blue-400"
+                                  >
+                                    + Create New Item
+                                  </option>
                                   <optgroup label="Matching Items">
                                     {products
                                       .filter((p) => {
-                                        const search = (productSearches[product.asin] || "").toLowerCase();
+                                        const search = (
+                                          productSearches[product.asin] || ""
+                                        ).toLowerCase();
                                         if (!search) return true;
-                                        return p.sku.toLowerCase().includes(search) || p.name.toLowerCase().includes(search);
+                                        return (
+                                          p.sku
+                                            .toLowerCase()
+                                            .includes(search) ||
+                                          p.name.toLowerCase().includes(search)
+                                        );
                                       })
                                       .slice(0, 50)
                                       .map((p) => (
@@ -958,7 +1182,9 @@ export default function AdminPurchasing() {
                               </div>
                             )}
                             {mapping.category === "skip" && (
-                              <span className="text-gray-500 text-sm">Will not import</span>
+                              <span className="text-gray-500 text-sm">
+                                Will not import
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -982,8 +1208,18 @@ export default function AdminPurchasing() {
                     </>
                   ) : (
                     <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                        />
                       </svg>
                       Import {importData.order_count} Orders
                     </>
@@ -996,13 +1232,17 @@ export default function AdminPurchasing() {
           {/* Import Result */}
           {importResult && (
             <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
-              <h4 className="text-green-400 font-medium mb-2">Import Complete!</h4>
+              <h4 className="text-green-400 font-medium mb-2">
+                Import Complete!
+              </h4>
               <ul className="text-sm text-gray-300 space-y-1">
                 <li>POs Created: {importResult.pos_created}</li>
                 <li>Line Items: {importResult.lines_created}</li>
                 <li>Skipped (duplicates): {importResult.skipped_orders}</li>
                 {importResult.errors.length > 0 && (
-                  <li className="text-red-400">Errors: {importResult.errors.length}</li>
+                  <li className="text-red-400">
+                    Errors: {importResult.errors.length}
+                  </li>
                 )}
               </ul>
             </div>
@@ -1017,14 +1257,20 @@ export default function AdminPurchasing() {
           {lowStockSummary && (
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
-                <div className="text-3xl font-bold text-orange-400">{lowStockSummary.total_items_low}</div>
-                <div className="text-sm text-gray-400">Items Below Reorder Point</div>
+                <div className="text-3xl font-bold text-orange-400">
+                  {lowStockSummary.total_items_low}
+                </div>
+                <div className="text-sm text-gray-400">
+                  Items Below Reorder Point
+                </div>
               </div>
               <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
                 <div className="text-3xl font-bold text-red-400">
                   ${lowStockSummary.total_shortfall_value?.toFixed(2) || "0.00"}
                 </div>
-                <div className="text-sm text-gray-400">Est. Shortfall Value</div>
+                <div className="text-sm text-gray-400">
+                  Est. Shortfall Value
+                </div>
               </div>
             </div>
           )}
@@ -1032,7 +1278,9 @@ export default function AdminPurchasing() {
           {/* Low Stock Table */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <div className="p-4 border-b border-gray-800 flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-white">Items Below Reorder Point</h3>
+              <h3 className="text-lg font-semibold text-white">
+                Items Below Reorder Point
+              </h3>
               <button
                 onClick={fetchLowStock}
                 disabled={lowStockLoading}
@@ -1043,10 +1291,14 @@ export default function AdminPurchasing() {
             </div>
 
             {lowStockLoading ? (
-              <div className="p-8 text-center text-gray-400">Loading low stock items...</div>
+              <div className="p-8 text-center text-gray-400">
+                Loading low stock items...
+              </div>
             ) : lowStockItems.length === 0 ? (
               <div className="p-8 text-center">
-                <div className="text-green-400 text-lg font-medium mb-2">All Stock Levels OK</div>
+                <div className="text-green-400 text-lg font-medium mb-2">
+                  All Stock Levels OK
+                </div>
                 <p className="text-gray-400 text-sm">
                   No items are currently below their reorder point.
                 </p>
@@ -1055,26 +1307,49 @@ export default function AdminPurchasing() {
               <table className="w-full">
                 <thead className="bg-gray-800/50">
                   <tr>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Item</th>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Category</th>
-                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Available</th>
-                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Reorder Pt</th>
-                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Shortfall</th>
-                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Actions</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                      Item
+                    </th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                      Category
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                      Available
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                      Reorder Pt
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                      Shortfall
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {lowStockItems.map((item) => (
-                    <tr key={item.id} className="border-b border-gray-800 hover:bg-gray-800/30">
+                    <tr
+                      key={item.id}
+                      className="border-b border-gray-800 hover:bg-gray-800/30"
+                    >
                       <td className="py-3 px-4">
-                        <div className="text-white font-medium">{item.name}</div>
+                        <div className="text-white font-medium">
+                          {item.name}
+                        </div>
                         <div className="text-gray-500 text-xs">{item.sku}</div>
                       </td>
                       <td className="py-3 px-4 text-gray-400 text-sm">
                         {item.category_name || "-"}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <span className={item.available_qty <= 0 ? "text-red-400" : "text-yellow-400"}>
+                        <span
+                          className={
+                            item.available_qty <= 0
+                              ? "text-red-400"
+                              : "text-yellow-400"
+                          }
+                        >
                           {item.available_qty?.toFixed(2)} {item.unit}
                         </span>
                       </td>
@@ -1085,6 +1360,18 @@ export default function AdminPurchasing() {
                         <span className="text-red-400 font-medium">
                           -{item.shortfall?.toFixed(2)} {item.unit}
                         </span>
+                        {item.mrp_shortage > 0 &&
+                          item.shortage_source === "mrp" && (
+                            <div className="text-xs text-blue-400 mt-1">
+                              (MRP: {item.mrp_shortage.toFixed(2)})
+                            </div>
+                          )}
+                        {item.mrp_shortage > 0 &&
+                          item.shortage_source === "both" && (
+                            <div className="text-xs text-yellow-400 mt-1">
+                              (MRP: {item.mrp_shortage.toFixed(2)})
+                            </div>
+                          )}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex gap-2 justify-end">
@@ -1098,7 +1385,9 @@ export default function AdminPurchasing() {
                             Create PO
                           </button>
                           <button
-                            onClick={() => window.location.href = `/admin?tab=items&edit=${item.id}`}
+                            onClick={() =>
+                              (window.location.href = `/admin?tab=items&edit=${item.id}`)
+                            }
                             className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-gray-300"
                           >
                             Edit Item
@@ -1118,7 +1407,10 @@ export default function AdminPurchasing() {
       {showVendorModal && (
         <VendorModal
           vendor={selectedVendor}
-          onClose={() => { setShowVendorModal(false); setSelectedVendor(null); }}
+          onClose={() => {
+            setShowVendorModal(false);
+            setSelectedVendor(null);
+          }}
           onSave={handleSaveVendor}
         />
       )}
@@ -1129,7 +1421,10 @@ export default function AdminPurchasing() {
           po={selectedPO}
           vendors={vendors}
           products={products}
-          onClose={() => { setShowPOModal(false); setSelectedPO(null); }}
+          onClose={() => {
+            setShowPOModal(false);
+            setSelectedPO(null);
+          }}
           onSave={handleSavePO}
         />
       )}
@@ -1159,25 +1454,35 @@ export default function AdminPurchasing() {
       {showCreateItemModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
           <div className="bg-gray-900 rounded-xl p-6 w-full max-w-lg border border-gray-800">
-            <h3 className="text-xl font-bold text-white mb-4">Create New Item</h3>
+            <h3 className="text-xl font-bold text-white mb-4">
+              Create New Item
+            </h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-gray-400 text-sm mb-1">SKU *</label>
+                <label className="block text-gray-400 text-sm mb-1">
+                  SKU *
+                </label>
                 <input
                   type="text"
                   value={newItemForm.sku}
-                  onChange={(e) => setNewItemForm({ ...newItemForm, sku: e.target.value })}
+                  onChange={(e) =>
+                    setNewItemForm({ ...newItemForm, sku: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   placeholder="e.g., FIL-PLA-BLK-1KG"
                 />
               </div>
 
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Name *</label>
+                <label className="block text-gray-400 text-sm mb-1">
+                  Name *
+                </label>
                 <textarea
                   value={newItemForm.name}
-                  onChange={(e) => setNewItemForm({ ...newItemForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setNewItemForm({ ...newItemForm, name: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   rows={3}
                   placeholder="Item name"
@@ -1185,10 +1490,17 @@ export default function AdminPurchasing() {
               </div>
 
               <div>
-                <label className="block text-gray-400 text-sm mb-1">Item Type</label>
+                <label className="block text-gray-400 text-sm mb-1">
+                  Item Type
+                </label>
                 <select
                   value={newItemForm.item_type}
-                  onChange={(e) => setNewItemForm({ ...newItemForm, item_type: e.target.value })}
+                  onChange={(e) =>
+                    setNewItemForm({
+                      ...newItemForm,
+                      item_type: e.target.value,
+                    })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 >
                   <option value="raw_material">Raw Material (Filament)</option>
@@ -1201,7 +1513,10 @@ export default function AdminPurchasing() {
 
             <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={() => { setShowCreateItemModal(false); setCreateItemForAsin(null); }}
+                onClick={() => {
+                  setShowCreateItemModal(false);
+                  setCreateItemForAsin(null);
+                }}
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white"
               >
                 Cancel
@@ -1270,9 +1585,22 @@ function VendorModal({ vendor, onClose, onSave }) {
             <h3 className="text-lg font-semibold text-white">
               {vendor ? "Edit Vendor" : "New Vendor"}
             </h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -1280,7 +1608,9 @@ function VendorModal({ vendor, onClose, onSave }) {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Name *</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Name *
+                </label>
                 <input
                   type="text"
                   value={form.name}
@@ -1290,7 +1620,9 @@ function VendorModal({ vendor, onClose, onSave }) {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Code (auto if empty)</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Code (auto if empty)
+                </label>
                 <input
                   type="text"
                   value={form.code}
@@ -1300,16 +1632,22 @@ function VendorModal({ vendor, onClose, onSave }) {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Contact Name</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Contact Name
+                </label>
                 <input
                   type="text"
                   value={form.contact_name}
-                  onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, contact_name: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Email</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Email
+                </label>
                 <input
                   type="email"
                   value={form.email}
@@ -1318,7 +1656,9 @@ function VendorModal({ vendor, onClose, onSave }) {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Phone</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Phone
+                </label>
                 <input
                   type="text"
                   value={form.phone}
@@ -1327,24 +1667,32 @@ function VendorModal({ vendor, onClose, onSave }) {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Website</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Website
+                </label>
                 <input
                   type="text"
                   value={form.website}
-                  onChange={(e) => setForm({ ...form, website: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, website: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
             </div>
 
             <div className="border-t border-gray-800 pt-4">
-              <h4 className="text-sm font-medium text-gray-300 mb-3">Address</h4>
+              <h4 className="text-sm font-medium text-gray-300 mb-3">
+                Address
+              </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <input
                     type="text"
                     value={form.address_line1}
-                    onChange={(e) => setForm({ ...form, address_line1: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, address_line1: e.target.value })
+                    }
                     placeholder="Address Line 1"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
@@ -1353,7 +1701,9 @@ function VendorModal({ vendor, onClose, onSave }) {
                   <input
                     type="text"
                     value={form.address_line2}
-                    onChange={(e) => setForm({ ...form, address_line2: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, address_line2: e.target.value })
+                    }
                     placeholder="Address Line 2"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
@@ -1371,7 +1721,9 @@ function VendorModal({ vendor, onClose, onSave }) {
                   <input
                     type="text"
                     value={form.state}
-                    onChange={(e) => setForm({ ...form, state: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, state: e.target.value })
+                    }
                     placeholder="State"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
@@ -1380,7 +1732,9 @@ function VendorModal({ vendor, onClose, onSave }) {
                   <input
                     type="text"
                     value={form.postal_code}
-                    onChange={(e) => setForm({ ...form, postal_code: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, postal_code: e.target.value })
+                    }
                     placeholder="Postal Code"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
@@ -1389,7 +1743,9 @@ function VendorModal({ vendor, onClose, onSave }) {
                   <input
                     type="text"
                     value={form.country}
-                    onChange={(e) => setForm({ ...form, country: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, country: e.target.value })
+                    }
                     placeholder="Country"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
@@ -1398,24 +1754,34 @@ function VendorModal({ vendor, onClose, onSave }) {
             </div>
 
             <div className="border-t border-gray-800 pt-4">
-              <h4 className="text-sm font-medium text-gray-300 mb-3">Business Info</h4>
+              <h4 className="text-sm font-medium text-gray-300 mb-3">
+                Business Info
+              </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Payment Terms</label>
+                  <label className="block text-sm text-gray-400 mb-1">
+                    Payment Terms
+                  </label>
                   <input
                     type="text"
                     value={form.payment_terms}
-                    onChange={(e) => setForm({ ...form, payment_terms: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, payment_terms: e.target.value })
+                    }
                     placeholder="Net 30, COD, etc."
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Account Number</label>
+                  <label className="block text-sm text-gray-400 mb-1">
+                    Account Number
+                  </label>
                   <input
                     type="text"
                     value={form.account_number}
-                    onChange={(e) => setForm({ ...form, account_number: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, account_number: e.target.value })
+                    }
                     placeholder="Our account with them"
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   />
@@ -1438,10 +1804,14 @@ function VendorModal({ vendor, onClose, onSave }) {
                 type="checkbox"
                 id="is_active"
                 checked={form.is_active}
-                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                onChange={(e) =>
+                  setForm({ ...form, is_active: e.target.checked })
+                }
                 className="rounded bg-gray-800 border-gray-700"
               />
-              <label htmlFor="is_active" className="text-sm text-gray-300">Active</label>
+              <label htmlFor="is_active" className="text-sm text-gray-300">
+                Active
+              </label>
             </div>
 
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-800">
@@ -1483,18 +1853,22 @@ function POModal({ po, vendors, products, onClose, onSave }) {
     payment_reference: po?.payment_reference || "",
     document_url: po?.document_url || "",
     notes: po?.notes || "",
-    lines: po?.lines?.map(l => ({
-      product_id: l.product_id,
-      quantity_ordered: l.quantity_ordered,
-      unit_cost: l.unit_cost,
-      notes: l.notes || "",
-    })) || [],
+    lines:
+      po?.lines?.map((l) => ({
+        product_id: l.product_id,
+        quantity_ordered: l.quantity_ordered,
+        unit_cost: l.unit_cost,
+        notes: l.notes || "",
+      })) || [],
   });
 
   const addLine = () => {
     setForm({
       ...form,
-      lines: [...form.lines, { product_id: "", quantity_ordered: 1, unit_cost: 0, notes: "" }],
+      lines: [
+        ...form.lines,
+        { product_id: "", quantity_ordered: 1, unit_cost: 0, notes: "" },
+      ],
     });
   };
 
@@ -1538,7 +1912,7 @@ function POModal({ po, vendors, products, onClose, onSave }) {
 
     if (!po) {
       // New PO - include lines
-      data.lines = form.lines.map(l => ({
+      data.lines = form.lines.map((l) => ({
         product_id: parseInt(l.product_id),
         quantity_ordered: parseFloat(l.quantity_ordered),
         unit_cost: parseFloat(l.unit_cost),
@@ -1549,8 +1923,16 @@ function POModal({ po, vendors, products, onClose, onSave }) {
     onSave(data);
   };
 
-  const lineTotal = form.lines.reduce((sum, l) => sum + (parseFloat(l.quantity_ordered) || 0) * (parseFloat(l.unit_cost) || 0), 0);
-  const grandTotal = lineTotal + (parseFloat(form.tax_amount) || 0) + (parseFloat(form.shipping_cost) || 0);
+  const lineTotal = form.lines.reduce(
+    (sum, l) =>
+      sum +
+      (parseFloat(l.quantity_ordered) || 0) * (parseFloat(l.unit_cost) || 0),
+    0
+  );
+  const grandTotal =
+    lineTotal +
+    (parseFloat(form.tax_amount) || 0) +
+    (parseFloat(form.shipping_cost) || 0);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -1561,9 +1943,22 @@ function POModal({ po, vendors, products, onClose, onSave }) {
             <h3 className="text-lg font-semibold text-white">
               {po ? `Edit PO ${po.po_number}` : "New Purchase Order"}
             </h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -1572,34 +1967,50 @@ function POModal({ po, vendors, products, onClose, onSave }) {
             {/* Header Info */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Vendor *</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Vendor *
+                </label>
                 <select
                   value={form.vendor_id}
-                  onChange={(e) => setForm({ ...form, vendor_id: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, vendor_id: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   required
                 >
                   <option value="">Select vendor...</option>
-                  {vendors.filter(v => v.is_active).map(v => (
-                    <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
-                  ))}
+                  {vendors
+                    .filter((v) => v.is_active)
+                    .map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.code})
+                      </option>
+                    ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Order Date</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Order Date
+                </label>
                 <input
                   type="date"
                   value={form.order_date}
-                  onChange={(e) => setForm({ ...form, order_date: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, order_date: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Expected Date</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Expected Date
+                </label>
                 <input
                   type="date"
                   value={form.expected_date}
-                  onChange={(e) => setForm({ ...form, expected_date: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, expected_date: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
@@ -1609,7 +2020,9 @@ function POModal({ po, vendors, products, onClose, onSave }) {
             {!po && (
               <div className="border-t border-gray-800 pt-4">
                 <div className="flex justify-between items-center mb-3">
-                  <h4 className="text-sm font-medium text-gray-300">Line Items</h4>
+                  <h4 className="text-sm font-medium text-gray-300">
+                    Line Items
+                  </h4>
                   <button
                     type="button"
                     onClick={addLine}
@@ -1620,17 +2033,24 @@ function POModal({ po, vendors, products, onClose, onSave }) {
                 </div>
                 <div className="space-y-2">
                   {form.lines.map((line, index) => (
-                    <div key={index} className="flex gap-2 items-start bg-gray-800/50 p-3 rounded-lg">
+                    <div
+                      key={index}
+                      className="flex gap-2 items-start bg-gray-800/50 p-3 rounded-lg"
+                    >
                       <div className="flex-1">
                         <select
                           value={line.product_id}
-                          onChange={(e) => updateLine(index, "product_id", e.target.value)}
+                          onChange={(e) =>
+                            updateLine(index, "product_id", e.target.value)
+                          }
                           className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white"
                           required
                         >
                           <option value="">Select item...</option>
-                          {products.map(p => (
-                            <option key={p.id} value={p.id}>{p.sku} - {p.name}</option>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.sku} - {p.name}
+                            </option>
                           ))}
                         </select>
                       </div>
@@ -1638,7 +2058,13 @@ function POModal({ po, vendors, products, onClose, onSave }) {
                         <input
                           type="number"
                           value={line.quantity_ordered}
-                          onChange={(e) => updateLine(index, "quantity_ordered", e.target.value)}
+                          onChange={(e) =>
+                            updateLine(
+                              index,
+                              "quantity_ordered",
+                              e.target.value
+                            )
+                          }
                           placeholder="Qty"
                           min="0.01"
                           step="0.01"
@@ -1650,7 +2076,9 @@ function POModal({ po, vendors, products, onClose, onSave }) {
                         <input
                           type="number"
                           value={line.unit_cost}
-                          onChange={(e) => updateLine(index, "unit_cost", e.target.value)}
+                          onChange={(e) =>
+                            updateLine(index, "unit_cost", e.target.value)
+                          }
                           placeholder="Unit Cost"
                           min="0"
                           step="0.01"
@@ -1659,21 +2087,37 @@ function POModal({ po, vendors, products, onClose, onSave }) {
                         />
                       </div>
                       <div className="w-24 text-right text-sm text-gray-400 py-1">
-                        ${((parseFloat(line.quantity_ordered) || 0) * (parseFloat(line.unit_cost) || 0)).toFixed(2)}
+                        $
+                        {(
+                          (parseFloat(line.quantity_ordered) || 0) *
+                          (parseFloat(line.unit_cost) || 0)
+                        ).toFixed(2)}
                       </div>
                       <button
                         type="button"
                         onClick={() => removeLine(index)}
                         className="text-red-400 hover:text-red-300 p-1"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         </svg>
                       </button>
                     </div>
                   ))}
                   {form.lines.length === 0 && (
-                    <p className="text-gray-500 text-sm text-center py-4">No line items. Click "Add Line" to add items.</p>
+                    <p className="text-gray-500 text-sm text-center py-4">
+                      No line items. Click "Add Line" to add items.
+                    </p>
                   )}
                 </div>
               </div>
@@ -1682,43 +2126,59 @@ function POModal({ po, vendors, products, onClose, onSave }) {
             {/* Financials */}
             <div className="grid grid-cols-4 gap-4 border-t border-gray-800 pt-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Tax Amount</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Tax Amount
+                </label>
                 <input
                   type="number"
                   value={form.tax_amount}
-                  onChange={(e) => setForm({ ...form, tax_amount: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, tax_amount: e.target.value })
+                  }
                   min="0"
                   step="0.01"
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Shipping Cost</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Shipping Cost
+                </label>
                 <input
                   type="number"
                   value={form.shipping_cost}
-                  onChange={(e) => setForm({ ...form, shipping_cost: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, shipping_cost: e.target.value })
+                  }
                   min="0"
                   step="0.01"
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Payment Method</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Payment Method
+                </label>
                 <input
                   type="text"
                   value={form.payment_method}
-                  onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, payment_method: e.target.value })
+                  }
                   placeholder="Card, Check, etc."
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Payment Ref</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Payment Ref
+                </label>
                 <input
                   type="text"
                   value={form.payment_reference}
-                  onChange={(e) => setForm({ ...form, payment_reference: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, payment_reference: e.target.value })
+                  }
                   placeholder="Last 4, Check #"
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
@@ -1728,30 +2188,42 @@ function POModal({ po, vendors, products, onClose, onSave }) {
             {/* Document & Tracking */}
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Document URL</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Document URL
+                </label>
                 <input
                   type="text"
                   value={form.document_url}
-                  onChange={(e) => setForm({ ...form, document_url: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, document_url: e.target.value })
+                  }
                   placeholder="Google Drive link, etc."
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Tracking Number</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Tracking Number
+                </label>
                 <input
                   type="text"
                   value={form.tracking_number}
-                  onChange={(e) => setForm({ ...form, tracking_number: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, tracking_number: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Carrier</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Carrier
+                </label>
                 <input
                   type="text"
                   value={form.carrier}
-                  onChange={(e) => setForm({ ...form, carrier: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, carrier: e.target.value })
+                  }
                   placeholder="UPS, FedEx, etc."
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
@@ -1772,8 +2244,12 @@ function POModal({ po, vendors, products, onClose, onSave }) {
             {/* Totals */}
             {!po && (
               <div className="bg-gray-800/50 p-4 rounded-lg text-right">
-                <div className="text-sm text-gray-400">Subtotal: ${lineTotal.toFixed(2)}</div>
-                <div className="text-lg font-semibold text-white mt-1">Total: ${grandTotal.toFixed(2)}</div>
+                <div className="text-sm text-gray-400">
+                  Subtotal: ${lineTotal.toFixed(2)}
+                </div>
+                <div className="text-lg font-semibold text-white mt-1">
+                  Total: ${grandTotal.toFixed(2)}
+                </div>
               </div>
             )}
 
@@ -1804,7 +2280,14 @@ function POModal({ po, vendors, products, onClose, onSave }) {
 // PO Detail Modal Component
 // ============================================================================
 
-function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUpload }) {
+function PODetailModal({
+  po,
+  onClose,
+  onStatusChange,
+  onEdit,
+  onReceive,
+  onUpload,
+}) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
 
@@ -1844,16 +2327,35 @@ function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUploa
         <div className="relative bg-gray-900 border border-gray-700 rounded-xl shadow-xl max-w-3xl w-full mx-auto p-6 max-h-[90vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-white">{po.po_number}</h3>
+              <h3 className="text-lg font-semibold text-white">
+                {po.po_number}
+              </h3>
               <p className="text-sm text-gray-400">{po.vendor_name}</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className={`px-3 py-1 rounded-full text-sm ${statusColors[po.status]}`}>
+              <span
+                className={`px-3 py-1 rounded-full text-sm ${
+                  statusColors[po.status]
+                }`}
+              >
                 {po.status}
               </span>
-              <button onClick={onClose} className="text-gray-400 hover:text-white">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <button
+                onClick={onClose}
+                className="text-gray-400 hover:text-white"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -1863,19 +2365,35 @@ function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUploa
           <div className="grid grid-cols-4 gap-4 mb-6 text-sm">
             <div>
               <span className="text-gray-400">Order Date</span>
-              <p className="text-white">{po.order_date ? new Date(po.order_date).toLocaleDateString() : "-"}</p>
+              <p className="text-white">
+                {po.order_date
+                  ? new Date(po.order_date).toLocaleDateString()
+                  : "-"}
+              </p>
             </div>
             <div>
               <span className="text-gray-400">Expected</span>
-              <p className="text-white">{po.expected_date ? new Date(po.expected_date).toLocaleDateString() : "-"}</p>
+              <p className="text-white">
+                {po.expected_date
+                  ? new Date(po.expected_date).toLocaleDateString()
+                  : "-"}
+              </p>
             </div>
             <div>
               <span className="text-gray-400">Shipped</span>
-              <p className="text-white">{po.shipped_date ? new Date(po.shipped_date).toLocaleDateString() : "-"}</p>
+              <p className="text-white">
+                {po.shipped_date
+                  ? new Date(po.shipped_date).toLocaleDateString()
+                  : "-"}
+              </p>
             </div>
             <div>
               <span className="text-gray-400">Received</span>
-              <p className="text-white">{po.received_date ? new Date(po.received_date).toLocaleDateString() : "-"}</p>
+              <p className="text-white">
+                {po.received_date
+                  ? new Date(po.received_date).toLocaleDateString()
+                  : "-"}
+              </p>
             </div>
           </div>
 
@@ -1883,41 +2401,74 @@ function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUploa
           {(po.tracking_number || po.carrier) && (
             <div className="bg-gray-800/50 p-3 rounded-lg mb-6 text-sm">
               <span className="text-gray-400">Tracking: </span>
-              <span className="text-white">{po.carrier} {po.tracking_number}</span>
+              <span className="text-white">
+                {po.carrier} {po.tracking_number}
+              </span>
             </div>
           )}
 
           {/* Lines */}
           <div className="mb-6">
-            <h4 className="text-sm font-medium text-gray-300 mb-3">Line Items</h4>
+            <h4 className="text-sm font-medium text-gray-300 mb-3">
+              Line Items
+            </h4>
             <div className="bg-gray-800/30 rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-800/50">
                   <tr>
-                    <th className="text-left py-2 px-3 text-xs text-gray-400">#</th>
-                    <th className="text-left py-2 px-3 text-xs text-gray-400">Item</th>
-                    <th className="text-right py-2 px-3 text-xs text-gray-400">Ordered</th>
-                    <th className="text-right py-2 px-3 text-xs text-gray-400">Received</th>
-                    <th className="text-right py-2 px-3 text-xs text-gray-400">Unit Cost</th>
-                    <th className="text-right py-2 px-3 text-xs text-gray-400">Total</th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-400">
+                      #
+                    </th>
+                    <th className="text-left py-2 px-3 text-xs text-gray-400">
+                      Item
+                    </th>
+                    <th className="text-right py-2 px-3 text-xs text-gray-400">
+                      Ordered
+                    </th>
+                    <th className="text-right py-2 px-3 text-xs text-gray-400">
+                      Received
+                    </th>
+                    <th className="text-right py-2 px-3 text-xs text-gray-400">
+                      Unit Cost
+                    </th>
+                    <th className="text-right py-2 px-3 text-xs text-gray-400">
+                      Total
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {po.lines?.map((line) => (
                     <tr key={line.id} className="border-t border-gray-800">
-                      <td className="py-2 px-3 text-gray-400">{line.line_number}</td>
+                      <td className="py-2 px-3 text-gray-400">
+                        {line.line_number}
+                      </td>
                       <td className="py-2 px-3">
                         <div className="text-white">{line.product_sku}</div>
-                        <div className="text-xs text-gray-400">{line.product_name}</div>
+                        <div className="text-xs text-gray-400">
+                          {line.product_name}
+                        </div>
                       </td>
-                      <td className="py-2 px-3 text-right text-white">{parseFloat(line.quantity_ordered).toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right text-white">
+                        {parseFloat(line.quantity_ordered).toFixed(2)}
+                      </td>
                       <td className="py-2 px-3 text-right">
-                        <span className={parseFloat(line.quantity_received) >= parseFloat(line.quantity_ordered) ? "text-green-400" : "text-yellow-400"}>
+                        <span
+                          className={
+                            parseFloat(line.quantity_received) >=
+                            parseFloat(line.quantity_ordered)
+                              ? "text-green-400"
+                              : "text-yellow-400"
+                          }
+                        >
                           {parseFloat(line.quantity_received).toFixed(2)}
                         </span>
                       </td>
-                      <td className="py-2 px-3 text-right text-gray-400">${parseFloat(line.unit_cost).toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right text-white">${parseFloat(line.line_total).toFixed(2)}</td>
+                      <td className="py-2 px-3 text-right text-gray-400">
+                        ${parseFloat(line.unit_cost).toFixed(2)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-white">
+                        ${parseFloat(line.line_total).toFixed(2)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1927,10 +2478,18 @@ function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUploa
 
           {/* Totals */}
           <div className="text-right text-sm mb-6">
-            <div className="text-gray-400">Subtotal: ${parseFloat(po.subtotal || 0).toFixed(2)}</div>
-            <div className="text-gray-400">Tax: ${parseFloat(po.tax_amount || 0).toFixed(2)}</div>
-            <div className="text-gray-400">Shipping: ${parseFloat(po.shipping_cost || 0).toFixed(2)}</div>
-            <div className="text-lg font-semibold text-white mt-1">Total: ${parseFloat(po.total_amount || 0).toFixed(2)}</div>
+            <div className="text-gray-400">
+              Subtotal: ${parseFloat(po.subtotal || 0).toFixed(2)}
+            </div>
+            <div className="text-gray-400">
+              Tax: ${parseFloat(po.tax_amount || 0).toFixed(2)}
+            </div>
+            <div className="text-gray-400">
+              Shipping: ${parseFloat(po.shipping_cost || 0).toFixed(2)}
+            </div>
+            <div className="text-lg font-semibold text-white mt-1">
+              Total: ${parseFloat(po.total_amount || 0).toFixed(2)}
+            </div>
           </div>
 
           {/* Document Upload / Link */}
@@ -1944,8 +2503,18 @@ function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUploa
                   rel="noopener noreferrer"
                   className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                   </svg>
                   View Document
                 </a>
@@ -1977,8 +2546,18 @@ function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUploa
                   </div>
                 ) : (
                   <>
-                    <svg className="w-8 h-8 mx-auto mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    <svg
+                      className="w-8 h-8 mx-auto mb-2 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
                     </svg>
                     <p className="text-sm text-gray-400 mb-2">
                       Drag & drop invoice/receipt here
@@ -1992,7 +2571,9 @@ function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUploa
                         className="hidden"
                       />
                     </label>
-                    <p className="text-xs text-gray-500 mt-2">PDF, Images, Excel, CSV</p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      PDF, Images, Excel, CSV
+                    </p>
                   </>
                 )}
               </div>
@@ -2012,41 +2593,65 @@ function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUploa
             <div className="flex gap-2">
               {po.status === "draft" && (
                 <>
-                  <button onClick={onEdit} className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-white">
+                  <button
+                    onClick={onEdit}
+                    className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-white"
+                  >
                     Edit
                   </button>
-                  <button onClick={() => onStatusChange(po.id, "ordered")} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm text-white">
+                  <button
+                    onClick={() => onStatusChange(po.id, "ordered")}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm text-white"
+                  >
                     Place Order
                   </button>
                 </>
               )}
               {po.status === "ordered" && (
                 <>
-                  <button onClick={() => onStatusChange(po.id, "shipped")} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm text-white">
+                  <button
+                    onClick={() => onStatusChange(po.id, "shipped")}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm text-white"
+                  >
                     Mark Shipped
                   </button>
-                  <button onClick={onReceive} className="px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded-lg text-sm text-white">
+                  <button
+                    onClick={onReceive}
+                    className="px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded-lg text-sm text-white"
+                  >
                     Receive Items
                   </button>
                 </>
               )}
               {po.status === "shipped" && (
-                <button onClick={onReceive} className="px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded-lg text-sm text-white">
+                <button
+                  onClick={onReceive}
+                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded-lg text-sm text-white"
+                >
                   Receive Items
                 </button>
               )}
               {po.status === "received" && (
-                <button onClick={() => onStatusChange(po.id, "closed")} className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 rounded-lg text-sm text-white">
+                <button
+                  onClick={() => onStatusChange(po.id, "closed")}
+                  className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 rounded-lg text-sm text-white"
+                >
                   Close PO
                 </button>
               )}
               {!["received", "closed", "cancelled"].includes(po.status) && (
-                <button onClick={() => onStatusChange(po.id, "cancelled")} className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 rounded-lg text-sm text-red-400">
+                <button
+                  onClick={() => onStatusChange(po.id, "cancelled")}
+                  className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 rounded-lg text-sm text-red-400"
+                >
                   Cancel
                 </button>
               )}
             </div>
-            <button onClick={onClose} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300"
+            >
               Close
             </button>
           </div>
@@ -2062,15 +2667,21 @@ function PODetailModal({ po, onClose, onStatusChange, onEdit, onReceive, onUploa
 
 function ReceiveModal({ po, onClose, onReceive }) {
   const [lines, setLines] = useState(
-    po.lines?.filter(l => parseFloat(l.quantity_received) < parseFloat(l.quantity_ordered)).map(l => ({
-      line_id: l.id,
-      quantity_received: parseFloat(l.quantity_ordered) - parseFloat(l.quantity_received),
-      remaining: parseFloat(l.quantity_ordered) - parseFloat(l.quantity_received),
-      product_sku: l.product_sku,
-      product_name: l.product_name,
-      lot_number: "",
-      notes: "",
-    })) || []
+    po.lines
+      ?.filter(
+        (l) => parseFloat(l.quantity_received) < parseFloat(l.quantity_ordered)
+      )
+      .map((l) => ({
+        line_id: l.id,
+        quantity_received:
+          parseFloat(l.quantity_ordered) - parseFloat(l.quantity_received),
+        remaining:
+          parseFloat(l.quantity_ordered) - parseFloat(l.quantity_received),
+        product_sku: l.product_sku,
+        product_name: l.product_name,
+        lot_number: "",
+        notes: "",
+      })) || []
   );
   const [notes, setNotes] = useState("");
 
@@ -2084,8 +2695,8 @@ function ReceiveModal({ po, onClose, onReceive }) {
     e.preventDefault();
     const receiveData = {
       lines: lines
-        .filter(l => parseFloat(l.quantity_received) > 0)
-        .map(l => ({
+        .filter((l) => parseFloat(l.quantity_received) > 0)
+        .map((l) => ({
           line_id: l.line_id,
           quantity_received: parseFloat(l.quantity_received),
           lot_number: l.lot_number || null,
@@ -2109,27 +2720,51 @@ function ReceiveModal({ po, onClose, onReceive }) {
         <div className="relative bg-gray-900 border border-gray-700 rounded-xl shadow-xl max-w-3xl w-full mx-auto p-6">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h3 className="text-lg font-semibold text-white">Receive Items - {po.po_number}</h3>
+              <h3 className="text-lg font-semibold text-white">
+                Receive Items - {po.po_number}
+              </h3>
               <p className="text-sm text-gray-400">Enter quantities received</p>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {lines.length === 0 ? (
-              <p className="text-gray-400 text-center py-8">All items have been received</p>
+              <p className="text-gray-400 text-center py-8">
+                All items have been received
+              </p>
             ) : (
               <div className="space-y-3">
                 {lines.map((line, index) => (
-                  <div key={line.line_id} className="bg-gray-800/50 p-4 rounded-lg">
+                  <div
+                    key={line.line_id}
+                    className="bg-gray-800/50 p-4 rounded-lg"
+                  >
                     <div className="flex justify-between items-start mb-2">
                       <div>
-                        <div className="text-white font-medium">{line.product_sku}</div>
-                        <div className="text-sm text-gray-400">{line.product_name}</div>
+                        <div className="text-white font-medium">
+                          {line.product_sku}
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          {line.product_name}
+                        </div>
                       </div>
                       <div className="text-sm text-gray-400">
                         Remaining: {line.remaining}
@@ -2137,11 +2772,19 @@ function ReceiveModal({ po, onClose, onReceive }) {
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Qty to Receive</label>
+                        <label className="block text-xs text-gray-400 mb-1">
+                          Qty to Receive
+                        </label>
                         <input
                           type="number"
                           value={line.quantity_received}
-                          onChange={(e) => updateLine(index, "quantity_received", e.target.value)}
+                          onChange={(e) =>
+                            updateLine(
+                              index,
+                              "quantity_received",
+                              e.target.value
+                            )
+                          }
                           min="0"
                           max={line.remaining}
                           step="0.01"
@@ -2149,21 +2792,29 @@ function ReceiveModal({ po, onClose, onReceive }) {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Lot Number</label>
+                        <label className="block text-xs text-gray-400 mb-1">
+                          Lot Number
+                        </label>
                         <input
                           type="text"
                           value={line.lot_number}
-                          onChange={(e) => updateLine(index, "lot_number", e.target.value)}
+                          onChange={(e) =>
+                            updateLine(index, "lot_number", e.target.value)
+                          }
                           placeholder="Optional"
                           className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-400 mb-1">Notes</label>
+                        <label className="block text-xs text-gray-400 mb-1">
+                          Notes
+                        </label>
                         <input
                           type="text"
                           value={line.notes}
-                          onChange={(e) => updateLine(index, "notes", e.target.value)}
+                          onChange={(e) =>
+                            updateLine(index, "notes", e.target.value)
+                          }
                           placeholder="Optional"
                           className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white"
                         />
@@ -2175,7 +2826,9 @@ function ReceiveModal({ po, onClose, onReceive }) {
             )}
 
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Receipt Notes</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Receipt Notes
+              </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}

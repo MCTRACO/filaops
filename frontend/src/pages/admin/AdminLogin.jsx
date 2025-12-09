@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -11,6 +11,30 @@ export default function AdminLogin() {
   });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [checkingSetup, setCheckingSetup] = useState(true);
+
+  // Check if first-run setup is needed
+  useEffect(() => {
+    checkSetupStatus();
+  }, []);
+
+  const checkSetupStatus = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/setup/status`);
+      const data = await res.json();
+      
+      if (data.needs_setup) {
+        // No users exist - redirect to onboarding
+        navigate("/onboarding");
+        return;
+      }
+    } catch (err) {
+      // If we can't check, just show login
+      console.error("Could not check setup status:", err);
+    } finally {
+      setCheckingSetup(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -67,6 +91,14 @@ export default function AdminLogin() {
       setLoading(false);
     }
   };
+
+  if (checkingSetup) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">

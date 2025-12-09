@@ -28,12 +28,38 @@ from app.models.print_job import PrintJob
 from app.models.product import Product
 from app.models.bom import BOM, BOMLine
 from app.models.printer import Printer
-from app.models.inventory import Inventory, InventoryTransaction
-from app.models.material import MaterialInventory
+from app.models.inventory import Inventory, InventoryTransaction, InventoryLocation
+# MaterialInventory removed - using unified Inventory table (Phase 1.4)
 from app.services.shipping_service import shipping_service
 # from app.api.v1.endpoints.auth import get_current_admin_user  # TODO: Enable when ready
 
 router = APIRouter(prefix="/fulfillment", tags=["Admin - Fulfillment"])
+
+
+def get_default_location(db: Session) -> InventoryLocation:
+    """Get or create the default inventory location (MAIN warehouse)."""
+    location = db.query(InventoryLocation).filter(
+        InventoryLocation.code == 'MAIN'
+    ).first()
+    
+    if not location:
+        # Try to get any active location
+        location = db.query(InventoryLocation).filter(
+            InventoryLocation.active == True
+        ).first()
+    
+    if not location:
+        # Create default location if none exists
+        location = InventoryLocation(
+            code="MAIN",
+            name="Main Warehouse",
+            type="warehouse",
+            active=True
+        )
+        db.add(location)
+        db.flush()
+    
+    return location
 
 
 # ============================================================================
@@ -491,49 +517,49 @@ async def start_production(
         production_qty = float(po.quantity)
 
         # =====================================================================
-        # BUG FIX #5: Sync MaterialInventory → Inventory before BOM explosion
+        # PHASE 1.4: Ensure Inventory records exist for all BOM components
         # 
-        # For raw materials, MaterialInventory is the source of truth.
-        # Ensure Inventory records exist and are synced before reserving.
+        # After MaterialInventory migration, Inventory is the source of truth.
+        # Ensure Inventory records exist for all materials before reserving.
         # =====================================================================
         for line in bom.lines:
             component = line.component
-            if component and component.is_raw_material:
-                # Find MaterialInventory for this product
-                mat_inv = db.query(MaterialInventory).filter(
-                    MaterialInventory.product_id == component.id
+            if component:
+                # Find or create Inventory record (for all components, not just materials)
+                inv = db.query(Inventory).filter(
+                    Inventory.product_id == component.id
                 ).first()
                 
-                if mat_inv:
-                    # Find or create Inventory record
-                    inv = db.query(Inventory).filter(
-                        Inventory.product_id == component.id
+                if not inv:
+                    # Get default location
+                    from app.models.inventory import InventoryLocation
+                    location = db.query(InventoryLocation).filter(
+                        InventoryLocation.code == 'MAIN'
                     ).first()
                     
-                    if not inv:
-                        # Create Inventory record from MaterialInventory
-                        inv = Inventory(
-                            product_id=component.id,
-                            location_id=1,  # Default location
-                            on_hand_quantity=mat_inv.quantity_kg or Decimal("0"),
-                            allocated_quantity=Decimal("0"),
+                    if not location:
+                        # Create default location if it doesn't exist
+                        location = InventoryLocation(
+                            name="Main Warehouse",
+                            code="MAIN",
+                            type="warehouse"
                         )
-                        db.add(inv)
-                        synced_materials.append({
-                            "sku": component.sku,
-                            "action": "created",
-                            "quantity": float(mat_inv.quantity_kg or 0),
-                        })
-                    elif float(inv.on_hand_quantity) != float(mat_inv.quantity_kg or 0):
-                        # Sync: MaterialInventory is master for raw materials
-                        old_qty = float(inv.on_hand_quantity)
-                        inv.on_hand_quantity = mat_inv.quantity_kg or Decimal("0")
-                        synced_materials.append({
-                            "sku": component.sku,
-                            "action": "synced",
-                            "old_quantity": old_qty,
-                            "new_quantity": float(mat_inv.quantity_kg or 0),
-                        })
+                        db.add(location)
+                        db.flush()
+                    
+                    # Create Inventory record with zero quantity
+                    inv = Inventory(
+                        product_id=component.id,
+                        location_id=location.id,
+                        on_hand_quantity=Decimal("0"),
+                        allocated_quantity=Decimal("0"),
+                    )
+                    db.add(inv)
+                    synced_materials.append({
+                        "sku": component.sku,
+                        "action": "created",
+                        "quantity": 0.0,
+                    })
         
         # Flush to ensure Inventory records are available for reservation
         db.flush()
@@ -720,7 +746,6 @@ async def complete_print(
                 "component_sku": component_sku,
                 "quantity_consumed": 0,
                 "skipped_reason": "shipping-stage item (consumed at ship time)",
-                "material_inventory_synced": False,
             })
             continue
         reserved_qty = abs(float(res_txn.quantity))
@@ -758,28 +783,13 @@ async def complete_print(
             db.add(consumption_txn)
 
             # =================================================================
-            # BUG FIX #4: Also decrement MaterialInventory for raw materials
-            # This keeps the quote engine's stock levels in sync
+            # PHASE 1.4: Inventory is now the source of truth
+            # Material consumption is tracked via Inventory table
             # =================================================================
-            mat_inv_updated = False
-            if component and component.is_raw_material:
-                mat_inv = db.query(MaterialInventory).filter(
-                    MaterialInventory.product_id == component.id
-                ).first()
-                
-                if mat_inv:
-                    # Decrement quantity_kg (materials are tracked in kg)
-                    mat_inv.quantity_kg = Decimal(str(
-                        max(0, float(mat_inv.quantity_kg) - reserved_qty)
-                    ))
-                    # Update in_stock flag
-                    mat_inv.in_stock = float(mat_inv.quantity_kg) > 0
-                    mat_inv_updated = True
-
+            # Note: Inventory decrement already handled above in reservation logic
             consumed_materials.append({
                 "component_sku": component_sku,
                 "quantity_consumed": round(reserved_qty, 4),
-                "material_inventory_synced": mat_inv_updated,
             })
 
     # =========================================================================
@@ -813,9 +823,10 @@ async def complete_print(
 
                 # Create machine time transaction
                 # This uses the machine time product_id for tracking
+                default_location = get_default_location(db)
                 machine_txn = InventoryTransaction(
                     product_id=component.id,
-                    location_id=1,  # Default location (machine time isn't location-specific)
+                    location_id=default_location.id,  # Default location (machine time isn't location-specific)
                     transaction_type="machine_time",
                     reference_type="production_order",
                     reference_id=po.id,
@@ -851,11 +862,12 @@ async def complete_print(
         # BUG FIX #3: For MTO (make-to-order) custom products, no Inventory
         # record exists. Create one at a default finished goods location.
         if not fg_inventory:
-            # Default to location 1 (TODO: make configurable FG location)
+            # Get default location (configurable via InventoryLocation table)
+            default_location = get_default_location(db)
             # For MTO, this is a transient record - product ships immediately
             fg_inventory = Inventory(
                 product_id=po.product_id,
-                location_id=1,  # Default FG location
+                location_id=default_location.id,  # Default FG location
                 on_hand_quantity=Decimal("0"),
                 allocated_quantity=Decimal("0"),
             )

@@ -6,12 +6,12 @@ This is the central service for mapping customer material/color selections to ac
 """
 from typing import Optional, List, Tuple
 from decimal import Decimal
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 
 from app.models.material import MaterialType, Color, MaterialColor, MaterialInventory
 from app.models.product import Product
-from app.models.inventory import Inventory
+from app.models.inventory import Inventory, InventoryLocation
 
 
 class MaterialNotFoundError(Exception):
@@ -203,160 +203,125 @@ def get_available_colors_for_material(
         )
     
     if in_stock_only:
-        # Join to inventory to check stock
+        # Join to Product and then Inventory to check for available stock
         query = query.join(
-            MaterialInventory,
+            Product,
             and_(
-                MaterialInventory.material_type_id == material.id,
-                MaterialInventory.color_id == Color.id,
-                MaterialInventory.in_stock == True,
-                MaterialInventory.active == True
+                Product.material_type_id == material.id,
+                Product.color_id == Color.id,
+                Product.item_type == 'supply',
+                Product.active == True
             )
+        ).join(
+            Inventory,
+            Inventory.product_id == Product.id
+        ).filter(
+            Inventory.available_quantity > 0
         )
     
     return query.order_by(Color.display_order, Color.name).all()
 
 
-def get_material_inventory(
-    db: Session,
-    material_type_code: str,
-    color_code: str
-) -> MaterialInventory:
-    """
-    Get the material inventory record for a material-color combination
-    
-    Args:
-        db: Database session
-        material_type_code: Material type code (e.g., 'PLA_BASIC')
-        color_code: Color code (e.g., 'BLK')
-    
-    Returns:
-        MaterialInventory object
-    
-    Raises:
-        MaterialColorNotAvailableError: If combination doesn't exist
-    """
-    material = get_material_type(db, material_type_code)
-    color = get_color(db, color_code)
-    
-    inventory = db.query(MaterialInventory).filter(
-        MaterialInventory.material_type_id == material.id,
-        MaterialInventory.color_id == color.id,
-        MaterialInventory.active == True
-    ).first()
-    
-    if not inventory:
-        raise MaterialColorNotAvailableError(
-            f"Material-color combination not available: {material_type_code} + {color_code}"
-        )
-    
-    return inventory
-
-
-def get_material_product_for_bom(
+def create_material_product(
     db: Session,
     material_type_code: str,
     color_code: str,
-    require_in_stock: bool = False
-) -> Tuple[Product, MaterialInventory]:
+    commit: bool = True
+) -> Product:
     """
-    Get the Product record for BOM creation based on material and color
-    
-    This is the main function used by the BOM service to find the right material product.
-    
-    IMPORTANT: This function also ensures an Inventory record exists for the product,
-    synced with MaterialInventory.quantity_kg. This is required for BOM explosion
-    to find available stock.
-    
+    Creates a 'supply' type Product for a given material and color.
+
+    This function is the single source for creating material products, ensuring
+    that a corresponding Inventory record is also created.
+
     Args:
         db: Database session
-        material_type_code: Material type code (e.g., 'PLA_BASIC')
-        color_code: Color code (e.g., 'BLK')
-        require_in_stock: If True, raises error if not in stock
-    
-    Returns:
-        Tuple of (Product, MaterialInventory)
-    
-    Raises:
-        MaterialColorNotAvailableError: If combination doesn't exist
-        MaterialNotInStockError: If require_in_stock and not in stock
-    """
-    inventory = get_material_inventory(db, material_type_code, color_code)
-    
-    if require_in_stock and not inventory.in_stock:
-        raise MaterialNotInStockError(
-            f"Material not in stock: {material_type_code} + {color_code}"
-        )
-    
-    # Get or create the product
-    product = None
-    if inventory.product_id:
-        product = db.query(Product).get(inventory.product_id)
-    
-    if not product:
-        # Try to find by SKU
-        product = db.query(Product).filter(
-            Product.sku == inventory.sku,
-            Product.active == True
-        ).first()
-    
-    if not product:
-        # Create the product if it doesn't exist
-        material = get_material_type(db, material_type_code)
-        color = get_color(db, color_code)
-        
-        product = Product(
-            sku=inventory.sku,
-            name=f"{material.name} - {color.name}",
-            description=f"{material.name} filament in {color.name}",
-            category="Raw Materials",
-            unit="kg",
-            cost=inventory.cost_per_kg or material.base_price_per_kg,
-            selling_price=material.base_price_per_kg,
-            weight=Decimal("1.0"),  # 1kg per unit
-            is_raw_material=True,
-            has_bom=False,
-            active=True
-        )
-        db.add(product)
-        db.flush()  # Get product.id
-    
-    # Link product to MaterialInventory if not already linked
-    if inventory.product_id != product.id:
-        inventory.product_id = product.id
-    
-    # =========================================================================
-    # BUG FIX #2: Ensure Inventory record exists for BOM explosion
-    # 
-    # The BOM explosion in start_production() queries the Inventory table,
-    # NOT MaterialInventory. Without an Inventory record, materials show as
-    # "insufficient" even when MaterialInventory has stock.
-    # =========================================================================
-    inv_record = db.query(Inventory).filter(
-        Inventory.product_id == product.id
-    ).first()
-    
-    if not inv_record:
-        # Create Inventory record, synced with MaterialInventory
-        inv_record = Inventory(
-            product_id=product.id,
-            location_id=1,  # Default raw materials location (TODO: make configurable)
-            on_hand_quantity=inventory.quantity_kg or Decimal("0"),
-            allocated_quantity=Decimal("0"),
-        )
-        db.add(inv_record)
-    else:
-        # Sync quantities: MaterialInventory is source of truth for raw materials
-        # Only sync if Inventory is lower (don't overwrite if production consumed)
-        # Actually, just ensure they match - MaterialInventory is the master
-        if inv_record.on_hand_quantity != inventory.quantity_kg:
-            # Log discrepancy but sync from MaterialInventory
-            inv_record.on_hand_quantity = inventory.quantity_kg or Decimal("0")
-    
-    db.commit()
-    
-    return product, inventory
+        material_type_code: The code of the material type (e.g., 'PLA_BASIC')
+        color_code: The code of the color (e.g., 'BLK')
+        commit: Whether to commit the transaction
 
+    Returns:
+        The newly created Product object.
+    """
+    material_type = get_material_type(db, material_type_code)
+    color = get_color(db, color_code)
+
+    # Generate SKU from material and color
+    sku = f"MAT-{material_type.code}-{color.code}"
+
+    # Check if product already exists
+    existing_product = db.query(Product).filter(Product.sku == sku).first()
+    if existing_product:
+        return existing_product
+
+    # Create the new product
+    new_product = Product(
+        sku=sku,
+        name=f"{material_type.name} - {color.name}",
+        description=f"Filament supply: {material_type.name} in {color.name}",
+        item_type='supply',
+        procurement_type='buy',
+        unit='kg',
+        standard_cost=material_type.base_price_per_kg,
+        material_type_id=material_type.id,
+        color_id=color.id,
+        active=True
+    )
+    db.add(new_product)
+    db.flush()  # To get the product ID
+
+    # Ensure an inventory record exists for the new product
+    # Get default location
+    location = db.query(InventoryLocation).filter(InventoryLocation.code == 'MAIN').first()
+    if not location:
+        # This should ideally not happen if migrations are run
+        location = InventoryLocation(name="Main Warehouse", code="MAIN", type="warehouse")
+        db.add(location)
+        db.flush()
+
+    inventory_record = Inventory(
+        product_id=new_product.id,
+        location_id=location.id,
+        on_hand_quantity=0,
+        allocated_quantity=0
+    )
+    db.add(inventory_record)
+
+    if commit:
+        db.commit()
+
+    return new_product
+
+
+def get_material_product(
+    db: Session,
+    material_type_code: str,
+    color_code: str
+) -> Optional[Product]:
+    """
+    Gets the Product record for a given material and color.
+
+    This is a simple query function. If the product doesn't exist, it returns None.
+    Creation is handled by `create_material_product`.
+
+    Args:
+        db: Database session
+        material_type_code: The code of the material type.
+        color_code: The code of the color.
+
+    Returns:
+        The Product object if found, otherwise None.
+    """
+    material_type = get_material_type(db, material_type_code)
+    color = get_color(db, color_code)
+    sku = f"MAT-{material_type.code}-{color.code}"
+
+    product = db.query(Product).filter(
+        Product.sku == sku,
+        Product.active == True
+    ).first()
+
+    return product
 
 def get_material_cost_per_kg(
     db: Session,
@@ -380,12 +345,9 @@ def get_material_cost_per_kg(
     material = get_material_type(db, material_type_code)
     
     if color_code:
-        try:
-            inventory = get_material_inventory(db, material_type_code, color_code)
-            if inventory.cost_per_kg:
-                return inventory.cost_per_kg
-        except MaterialColorNotAvailableError:
-            pass
+        product = get_material_product(db, material_type_code, color_code)
+        if product and product.standard_cost:
+            return product.standard_cost
     
     return material.base_price_per_kg
 
@@ -438,17 +400,22 @@ def check_material_availability(
     Returns:
         Tuple of (is_available: bool, message: str)
     """
-    try:
-        inventory = get_material_inventory(db, material_type_code, color_code)
-    except MaterialColorNotAvailableError:
-        return False, f"Material-color combination not available: {material_type_code} + {color_code}"
+    product = get_material_product(db, material_type_code, color_code)
     
-    if not inventory.in_stock:
-        return False, f"Material is out of stock: {material_type_code} + {color_code}"
-    
-    if inventory.quantity_kg < quantity_kg:
+    if not product:
+        return False, f"Material product not found for {material_type_code} + {color_code}"
+
+    # Query inventory for this product
+    inventory = db.query(Inventory).filter(
+        Inventory.product_id == product.id
+    ).first()
+
+    if not inventory:
+        return False, f"Inventory record not found for {product.sku}"
+
+    if inventory.available_quantity < quantity_kg:
         return False, (
-            f"Insufficient stock: have {inventory.quantity_kg}kg, "
+            f"Insufficient stock: have {inventory.available_quantity}kg, "
             f"need {quantity_kg}kg of {material_type_code} + {color_code}"
         )
     
@@ -482,30 +449,42 @@ def get_portal_material_options(db: Session) -> List[dict]:
 
     result = []
     for material in materials:
-        # Get ALL customer-visible colors (not just in-stock)
-        colors = get_available_colors_for_material(
-            db,
-            material.code,
-            in_stock_only=False,  # Show all colors
-            customer_visible_only=True
-        )
+        # Get ALL customer-visible colors for this material type
+        colors = db.query(Color).join(MaterialColor).filter(
+            MaterialColor.material_type_id == material.id,
+            Color.is_customer_visible == True,
+            MaterialColor.is_customer_visible == True,
+            Color.active == True
+        ).order_by(Color.display_order).all()
 
         if not colors:
-            continue  # Skip materials with no colors available
+            continue
 
-        # Build color list with stock info
+        # Get all relevant products and their inventory in one go
+        color_ids = [c.id for c in colors]
+        products_with_inventory = db.query(Product).options(
+            joinedload(Product.inventory_items)
+        ).filter(
+            Product.material_type_id == material.id,
+            Product.color_id.in_(color_ids)
+        ).all()
+
+        product_map = {p.color_id: p for p in products_with_inventory}
+
         color_list = []
         for c in colors:
-            # Check inventory for this color
-            inventory = db.query(MaterialInventory).filter(
-                MaterialInventory.material_type_id == material.id,
-                MaterialInventory.color_id == c.id,
-                MaterialInventory.active == True
-            ).first()
+            product = product_map.get(c.id)
+            
+            # Default to not in stock
+            is_in_stock = False
+            quantity_kg = 0.0
 
-            # Get stock status and quantity
-            is_in_stock = inventory.in_stock if inventory else False
-            quantity_kg = float(inventory.quantity_kg) if inventory and inventory.quantity_kg else 0.0
+            if product and product.inventory_items:
+                # Sum quantity across all locations
+                total_available = sum(inv.available_quantity for inv in product.inventory_items)
+                if total_available > 0:
+                    is_in_stock = True
+                    quantity_kg = float(total_available)
 
             color_list.append({
                 "code": c.code,
@@ -513,7 +492,7 @@ def get_portal_material_options(db: Session) -> List[dict]:
                 "hex": c.hex_code,
                 "hex_secondary": c.hex_code_secondary,
                 "in_stock": is_in_stock,
-                "quantity_kg": quantity_kg,  # Available stock in kg
+                "quantity_kg": quantity_kg,
             })
 
         result.append({
@@ -528,3 +507,71 @@ def get_portal_material_options(db: Session) -> List[dict]:
         })
 
     return result
+
+
+def get_material_product_for_bom(
+    db: Session,
+    material_type_code: str,
+    color_code: str,
+    require_in_stock: bool = False
+) -> Tuple[Product, Optional[MaterialInventory]]:
+    """
+    Get or create Product for BOM usage.
+    
+    This is a compatibility function during the MaterialInventory migration.
+    It ensures a Product exists for the given material+color combination and
+    returns both the Product and the MaterialInventory (if it exists) for
+    backward compatibility.
+    
+    Eventually, this should be replaced with direct get_material_product() calls
+    once MaterialInventory is fully migrated to Products + Inventory.
+    
+    Args:
+        db: Database session
+        material_type_code: Material type code (e.g., 'PLA_BASIC')
+        color_code: Color code (e.g., 'BLK')
+        require_in_stock: If True, raise error if material not in stock
+    
+    Returns:
+        Tuple of (Product, Optional[MaterialInventory])
+        - Product: The Product record (always returned)
+        - MaterialInventory: The MaterialInventory record if it exists (for backward compat)
+    
+    Raises:
+        MaterialNotFoundError: If material type not found
+        ColorNotFoundError: If color not found
+        MaterialNotInStockError: If require_in_stock=True and material not in stock
+    """
+    # Get or create the product
+    product = get_material_product(db, material_type_code, color_code)
+    
+    if not product:
+        # Create the product if it doesn't exist
+        product = create_material_product(
+            db,
+            material_type_code=material_type_code,
+            color_code=color_code,
+            commit=True
+        )
+    
+    # Check stock requirement if needed
+    if require_in_stock:
+        # Check inventory availability
+        inventory = db.query(Inventory).filter(
+            Inventory.product_id == product.id
+        ).first()
+        
+        if not inventory or inventory.available_quantity <= 0:
+            raise MaterialNotInStockError(
+                f"Material not in stock: {material_type_code} + {color_code}"
+            )
+    
+    # For backward compatibility, return MaterialInventory if it exists
+    # This allows existing code to continue working during migration
+    mat_inv = db.query(MaterialInventory).filter(
+        MaterialInventory.material_type_id == product.material_type_id,
+        MaterialInventory.color_id == product.color_id,
+        MaterialInventory.active == True
+    ).first()
+    
+    return product, mat_inv

@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useNavigate, Link } from "react-router-dom";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -18,8 +18,18 @@ function Modal({ isOpen, onClose, title, children }) {
               onClick={onClose}
               className="text-gray-400 hover:text-white p-1"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -47,7 +57,7 @@ function PurchaseRequestModal({ line, onClose, token, onSuccess }) {
     const fetchVendors = async () => {
       try {
         const res = await fetch(`${API_URL}/api/v1/vendors/?active_only=true`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
           const data = await res.json();
@@ -89,12 +99,14 @@ function PurchaseRequestModal({ line, onClose, token, onSuccess }) {
         body: JSON.stringify({
           vendor_id: parseInt(vendorId),
           notes: notes || `PO for ${line.component_name}`,
-          lines: [{
-            product_id: line.component_id,
-            quantity_ordered: quantity,
-            unit_cost: unitCost,
-            notes: `From BOM shortage`
-          }]
+          lines: [
+            {
+              product_id: line.component_id,
+              quantity_ordered: quantity,
+              unit_cost: unitCost,
+              notes: `From BOM shortage`,
+            },
+          ],
         }),
       });
 
@@ -118,25 +130,39 @@ function PurchaseRequestModal({ line, onClose, token, onSuccess }) {
     return (
       <div className="text-center py-4">
         <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          <svg
+            className="w-6 h-6 text-green-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
           </svg>
         </div>
         <h4 className="text-white font-medium mb-2">Purchase Order Created</h4>
         <p className="text-gray-400 text-sm mb-2">
-          {createdPO.po_number} for {quantity} {line.component_unit} of {line.component_name}
+          {createdPO.po_number} for {quantity} {line.component_unit} of{" "}
+          {line.component_name}
         </p>
         <p className="text-gray-500 text-xs mb-4">
           Total: ${(quantity * unitCost).toFixed(2)} • Status: Draft
         </p>
         <div className="flex gap-2 justify-center">
           <button
-            onClick={() => window.location.href = '/admin/purchasing'}
+            onClick={() => (window.location.href = "/admin/purchasing")}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             View in Purchasing
           </button>
-          <button onClick={onClose} className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+          >
             Close
           </button>
         </div>
@@ -161,11 +187,15 @@ function PurchaseRequestModal({ line, onClose, token, onSuccess }) {
       <div className="grid grid-cols-2 gap-4 text-sm">
         <div>
           <span className="text-gray-400">Current Stock:</span>
-          <span className="text-white ml-2">{(line.inventory_available || 0).toFixed(2)} {line.component_unit}</span>
+          <span className="text-white ml-2">
+            {(line.inventory_available || 0).toFixed(2)} {line.component_unit}
+          </span>
         </div>
         <div>
           <span className="text-gray-400">Shortage:</span>
-          <span className="text-red-400 ml-2">{(line.shortage || 0).toFixed(2)} {line.component_unit}</span>
+          <span className="text-red-400 ml-2">
+            {(line.shortage || 0).toFixed(2)} {line.component_unit}
+          </span>
         </div>
       </div>
 
@@ -177,16 +207,22 @@ function PurchaseRequestModal({ line, onClose, token, onSuccess }) {
           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
           disabled={loadingVendors}
         >
-          <option value="">{loadingVendors ? "Loading vendors..." : "Select vendor..."}</option>
-          {vendors.map(v => (
-            <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
+          <option value="">
+            {loadingVendors ? "Loading vendors..." : "Select vendor..."}
+          </option>
+          {vendors.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.name} ({v.code})
+            </option>
           ))}
         </select>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Quantity to Order *</label>
+          <label className="block text-sm text-gray-400 mb-1">
+            Quantity to Order *
+          </label>
           <input
             type="number"
             step="0.01"
@@ -196,7 +232,9 @@ function PurchaseRequestModal({ line, onClose, token, onSuccess }) {
           />
         </div>
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Unit Cost ($) *</label>
+          <label className="block text-sm text-gray-400 mb-1">
+            Unit Cost ($) *
+          </label>
           <input
             type="number"
             step="0.01"
@@ -209,11 +247,15 @@ function PurchaseRequestModal({ line, onClose, token, onSuccess }) {
 
       <div className="bg-gray-800 rounded-lg p-3 text-sm">
         <span className="text-gray-400">Line Total:</span>
-        <span className="text-white font-medium ml-2">${(quantity * unitCost).toFixed(2)}</span>
+        <span className="text-white font-medium ml-2">
+          ${(quantity * unitCost).toFixed(2)}
+        </span>
       </div>
 
       <div>
-        <label className="block text-sm text-gray-400 mb-1">Notes (optional)</label>
+        <label className="block text-sm text-gray-400 mb-1">
+          Notes (optional)
+        </label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -243,7 +285,13 @@ function PurchaseRequestModal({ line, onClose, token, onSuccess }) {
 }
 
 // BOM Detail View
-function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder }) {
+function BOMDetailView({
+  bom,
+  onClose,
+  onUpdate,
+  token,
+  onCreateProductionOrder,
+}) {
   const [lines, setLines] = useState(bom.lines || []);
   const [loading, setLoading] = useState(false);
   const [editingLine, setEditingLine] = useState(null);
@@ -281,9 +329,12 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
 
   const fetchCostRollup = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/admin/bom/${bom.id}/cost-rollup`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/admin/bom/${bom.id}/cost-rollup`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         setCostRollup(data);
@@ -295,9 +346,12 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
 
   const fetchRoutingTemplates = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/routings?templates_only=true`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/routings?templates_only=true`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         setRoutingTemplates(data.items || data);
@@ -310,25 +364,31 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
   const fetchProductRouting = async () => {
     if (!bom.product_id) return;
     try {
-      const res = await fetch(`${API_URL}/api/v1/routings?product_id=${bom.product_id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/routings?product_id=${bom.product_id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         const items = data.items || data;
         // Find the active routing for this product
-        const activeRouting = items.find(r => r.is_active && !r.is_template);
+        const activeRouting = items.find((r) => r.is_active && !r.is_template);
         if (activeRouting) {
           // Fetch full routing with operations
-          const detailRes = await fetch(`${API_URL}/api/v1/routings/${activeRouting.id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const detailRes = await fetch(
+            `${API_URL}/api/v1/routings/${activeRouting.id}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
           if (detailRes.ok) {
             const routingDetail = await detailRes.json();
             setProductRouting(routingDetail);
             // Initialize time overrides from existing routing
             const overrides = {};
-            routingDetail.operations?.forEach(op => {
+            routingDetail.operations?.forEach((op) => {
               if (op.operation_code) {
                 overrides[op.operation_code] = {
                   run_time_minutes: parseFloat(op.run_time_minutes || 0),
@@ -352,7 +412,11 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
     try {
       // Convert timeOverrides to the format expected by the API
       const overrides = Object.entries(timeOverrides)
-        .filter(([_, val]) => val.run_time_minutes !== undefined || val.setup_time_minutes !== undefined)
+        .filter(
+          ([_, val]) =>
+            val.run_time_minutes !== undefined ||
+            val.setup_time_minutes !== undefined
+        )
         .map(([code, val]) => ({
           operation_code: code,
           run_time_minutes: val.run_time_minutes,
@@ -377,7 +441,7 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
         setProductRouting(result);
         // Update time overrides from result
         const newOverrides = {};
-        result.operations?.forEach(op => {
+        result.operations?.forEach((op) => {
           if (op.operation_code) {
             newOverrides[op.operation_code] = {
               run_time_minutes: parseFloat(op.run_time_minutes || 0),
@@ -399,7 +463,7 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
   };
 
   const updateOperationTime = (opCode, field, value) => {
-    setTimeOverrides(prev => ({
+    setTimeOverrides((prev) => ({
       ...prev,
       [opCode]: {
         ...prev[opCode],
@@ -453,9 +517,12 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/products?limit=500&is_raw_material=true`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/products?limit=500&is_raw_material=true`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         setProducts(data.items || data);
@@ -508,14 +575,17 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
   const handleUpdateLine = async (lineId, updates) => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/v1/admin/bom/${bom.id}/lines/${lineId}`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updates),
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/admin/bom/${bom.id}/lines/${lineId}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updates),
+        }
+      );
 
       if (res.ok) {
         const updatedLine = await res.json();
@@ -535,10 +605,13 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/v1/admin/bom/${bom.id}/lines/${lineId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/admin/bom/${bom.id}/lines/${lineId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (res.ok) {
         setLines(lines.filter((l) => l.id !== lineId));
@@ -554,10 +627,13 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
   const handleRecalculate = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/v1/admin/bom/${bom.id}/recalculate`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/admin/bom/${bom.id}/recalculate`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (res.ok) {
         onUpdate();
@@ -579,21 +655,36 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
         </div>
         <div>
           <span className="text-gray-400">Version:</span>
-          <span className="text-white ml-2">{bom.version} ({bom.revision})</span>
+          <span className="text-white ml-2">
+            {bom.version} ({bom.revision})
+          </span>
         </div>
         <div>
           <span className="text-gray-400">Product:</span>
-          <span className="text-white ml-2">{bom.product?.name || bom.product_id}</span>
+          <span className="text-white ml-2">
+            {bom.product?.name || bom.product_id}
+          </span>
         </div>
         <div>
-          <span className="text-gray-400">{productRouting ? "Material Cost:" : "Total Cost:"}</span>
-          <span className="text-white ml-2">${parseFloat(bom.total_cost || 0).toFixed(2)}</span>
+          <span className="text-gray-400">
+            {productRouting ? "Material Cost:" : "Total Cost:"}
+          </span>
+          <span className="text-white ml-2">
+            ${parseFloat(bom.total_cost || 0).toFixed(2)}
+          </span>
           {productRouting && (
             <>
               <span className="text-gray-400 ml-4">+ Process:</span>
-              <span className="text-amber-400 ml-1">${calculateProcessCost().toFixed(2)}</span>
+              <span className="text-amber-400 ml-1">
+                ${calculateProcessCost().toFixed(2)}
+              </span>
               <span className="text-gray-400 ml-4">= Total:</span>
-              <span className="text-green-400 ml-1 font-semibold">${(parseFloat(bom.total_cost || 0) + calculateProcessCost()).toFixed(2)}</span>
+              <span className="text-green-400 ml-1 font-semibold">
+                $
+                {(
+                  parseFloat(bom.total_cost || 0) + calculateProcessCost()
+                ).toFixed(2)}
+              </span>
             </>
           )}
         </div>
@@ -604,10 +695,22 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
         <div className="bg-gradient-to-r from-purple-600/10 to-blue-600/10 border border-purple-500/30 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              <svg
+                className="w-5 h-5 text-purple-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                />
               </svg>
-              <span className="text-purple-300 font-medium">Multi-Level BOM</span>
+              <span className="text-purple-300 font-medium">
+                Multi-Level BOM
+              </span>
             </div>
             <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-1 rounded-full">
               {costRollup.sub_assembly_count} Sub-Assemblies
@@ -616,15 +719,21 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-gray-400">Direct Cost:</span>
-              <span className="text-white ml-2">${parseFloat(costRollup.direct_cost || 0).toFixed(2)}</span>
+              <span className="text-white ml-2">
+                ${parseFloat(costRollup.direct_cost || 0).toFixed(2)}
+              </span>
             </div>
             <div>
               <span className="text-gray-400">Sub-Assembly Cost:</span>
-              <span className="text-purple-400 ml-2">${parseFloat(costRollup.sub_assembly_cost || 0).toFixed(2)}</span>
+              <span className="text-purple-400 ml-2">
+                ${parseFloat(costRollup.sub_assembly_cost || 0).toFixed(2)}
+              </span>
             </div>
             <div>
               <span className="text-gray-400">Rolled-Up Total:</span>
-              <span className="text-green-400 ml-2 font-semibold">${parseFloat(costRollup.rolled_up_cost || 0).toFixed(2)}</span>
+              <span className="text-green-400 ml-2 font-semibold">
+                ${parseFloat(costRollup.rolled_up_cost || 0).toFixed(2)}
+              </span>
             </div>
           </div>
         </div>
@@ -651,8 +760,18 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
           disabled={loading}
           className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 6h16M4 10h16M4 14h16M4 18h16"
+            />
           </svg>
           Explode BOM
         </button>
@@ -660,8 +779,18 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
           onClick={() => onCreateProductionOrder(bom)}
           className="px-3 py-1.5 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg text-sm hover:from-orange-500 hover:to-amber-500 flex items-center gap-1"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+            />
           </svg>
           Create Production Order
         </button>
@@ -683,7 +812,12 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
           </thead>
           <tbody>
             {lines.map((line) => (
-              <tr key={line.id} className={`border-b border-gray-800 ${!line.is_available ? 'bg-red-500/5' : ''}`}>
+              <tr
+                key={line.id}
+                className={`border-b border-gray-800 ${
+                  !line.is_available ? "bg-red-500/5" : ""
+                }`}
+              >
                 <td className="py-2 px-3 text-gray-500">{line.sequence}</td>
                 <td className="py-2 px-3">
                   <div className="flex items-center gap-2">
@@ -691,15 +825,30 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                       <div className="text-white font-medium flex items-center gap-1.5">
                         {line.component_name || `Product #${line.component_id}`}
                         {line.has_bom && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs" title="Sub-assembly - has its own BOM">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                          <span
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs"
+                            title="Sub-assembly - has its own BOM"
+                          >
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                              />
                             </svg>
                             Sub
                           </span>
                         )}
                       </div>
-                      <div className="text-gray-500 text-xs">{line.component_sku}</div>
+                      <div className="text-gray-500 text-xs">
+                        {line.component_sku}
+                      </div>
                     </div>
                   </div>
                 </td>
@@ -710,14 +859,22 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                       defaultValue={line.quantity}
                       step="0.01"
                       className="w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white"
-                      onBlur={(e) => handleUpdateLine(line.id, { quantity: parseFloat(e.target.value) })}
+                      onBlur={(e) =>
+                        handleUpdateLine(line.id, {
+                          quantity: parseFloat(e.target.value),
+                        })
+                      }
                     />
                   ) : (
-                    <span>{parseFloat(line.quantity).toFixed(2)} {line.component_unit || ""}</span>
+                    <span>
+                      {parseFloat(line.quantity).toFixed(2)}{" "}
+                      {line.component_unit || ""}
+                    </span>
                   )}
                 </td>
                 <td className="py-2 px-3 text-gray-400">
-                  ${parseFloat(line.component_cost || 0).toFixed(2)}/{line.component_unit || "ea"}
+                  ${parseFloat(line.component_cost || 0).toFixed(2)}/
+                  {line.component_unit || "ea"}
                 </td>
                 <td className="py-2 px-3 text-green-400 font-medium">
                   ${parseFloat(line.line_cost || 0).toFixed(2)}
@@ -725,18 +882,38 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                 <td className="py-2 px-3">
                   {line.is_available ? (
                     <span className="inline-flex items-center gap-1 text-green-400">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
                       </svg>
-                      <span className="text-xs">In Stock ({line.inventory_available?.toFixed(1)})</span>
+                      <span className="text-xs">
+                        In Stock ({line.inventory_available?.toFixed(1)})
+                      </span>
                     </span>
                   ) : (
                     <div className="space-y-1">
                       <span className="inline-flex items-center gap-1 text-red-400">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                            clipRule="evenodd"
+                          />
                         </svg>
-                        <span className="text-xs">Need {line.shortage?.toFixed(2)}</span>
+                        <span className="text-xs">
+                          Need {line.shortage?.toFixed(2)}
+                        </span>
                       </span>
                       <button
                         onClick={() => setPurchaseLine(line)}
@@ -749,7 +926,9 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                 </td>
                 <td className="py-2 px-3 text-right">
                   <button
-                    onClick={() => setEditingLine(editingLine === line.id ? null : line.id)}
+                    onClick={() =>
+                      setEditingLine(editingLine === line.id ? null : line.id)
+                    }
                     className="text-blue-400 hover:text-blue-300 px-2"
                   >
                     {editingLine === line.id ? "Done" : "Edit"}
@@ -779,8 +958,18 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
         <div className="bg-gradient-to-r from-amber-600/10 to-orange-600/10 border border-amber-500/30 rounded-lg p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              <svg
+                className="w-5 h-5 text-amber-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                />
               </svg>
               <span className="text-amber-300 font-medium">Process Path</span>
             </div>
@@ -794,7 +983,9 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
           {/* No routing yet - show template selector */}
           {!productRouting && (
             <div className="space-y-3">
-              <p className="text-sm text-gray-400">No routing defined. Select a template to create one:</p>
+              <p className="text-sm text-gray-400">
+                No routing defined. Select a template to create one:
+              </p>
               <div className="flex gap-2">
                 <select
                   value={selectedTemplateId}
@@ -802,9 +993,10 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                   className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
                 >
                   <option value="">Select a routing template...</option>
-                  {routingTemplates.map(t => (
+                  {routingTemplates.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.code} - {t.name || 'Unnamed'} ({t.operation_count || 0} ops, {formatTime(t.total_run_time_minutes)})
+                      {t.code} - {t.name || "Unnamed"} ({t.operation_count || 0}{" "}
+                      ops, {formatTime(t.total_run_time_minutes)})
                     </option>
                   ))}
                 </select>
@@ -824,10 +1016,16 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-400">
-                  Routing: <span className="text-white">{productRouting.code || productRouting.routing_code}</span>
+                  Routing:{" "}
+                  <span className="text-white">
+                    {productRouting.code || productRouting.routing_code}
+                  </span>
                 </span>
                 <span className="text-gray-400">
-                  Total Time: <span className="text-amber-400 font-medium">{formatTime(productRouting.total_run_time_minutes)}</span>
+                  Total Time:{" "}
+                  <span className="text-amber-400 font-medium">
+                    {formatTime(productRouting.total_run_time_minutes)}
+                  </span>
                 </span>
               </div>
 
@@ -837,33 +1035,66 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                   <thead className="bg-gray-800/50">
                     <tr>
                       <th className="text-left py-2 px-3 text-gray-400">#</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Operation</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Work Center</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Run Time</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Setup</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Cost</th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Operation
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Work Center
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Run Time
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Setup
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Cost
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {(productRouting.operations || []).map((op, idx) => (
-                      <tr key={op.id || idx} className="border-b border-gray-800">
-                        <td className="py-2 px-3 text-gray-500">{op.sequence}</td>
+                      <tr
+                        key={op.id || idx}
+                        className="border-b border-gray-800"
+                      >
+                        <td className="py-2 px-3 text-gray-500">
+                          {op.sequence}
+                        </td>
                         <td className="py-2 px-3">
-                          <div className="text-white font-medium">{op.operation_name || op.operation_code}</div>
+                          <div className="text-white font-medium">
+                            {op.operation_name || op.operation_code}
+                          </div>
                           {op.operation_code && op.operation_name && (
-                            <div className="text-gray-500 text-xs">{op.operation_code}</div>
+                            <div className="text-gray-500 text-xs">
+                              {op.operation_code}
+                            </div>
                           )}
                         </td>
-                        <td className="py-2 px-3 text-gray-400">{op.work_center_name || op.work_center_code}</td>
+                        <td className="py-2 px-3 text-gray-400">
+                          {op.work_center_name || op.work_center_code}
+                        </td>
                         <td className="py-2 px-3">
                           <input
                             type="number"
                             step="0.1"
-                            value={timeOverrides[op.operation_code]?.run_time_minutes ?? parseFloat(op.run_time_minutes || 0)}
-                            onChange={(e) => updateOperationTime(op.operation_code, 'run_time_minutes', e.target.value)}
+                            value={
+                              timeOverrides[op.operation_code]
+                                ?.run_time_minutes ??
+                              parseFloat(op.run_time_minutes || 0)
+                            }
+                            onChange={(e) =>
+                              updateOperationTime(
+                                op.operation_code,
+                                "run_time_minutes",
+                                e.target.value
+                              )
+                            }
                             className="w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-sm"
                           />
-                          <span className="text-gray-500 text-xs ml-1">min</span>
+                          <span className="text-gray-500 text-xs ml-1">
+                            min
+                          </span>
                         </td>
                         <td className="py-2 px-3 text-gray-400">
                           {formatTime(op.setup_time_minutes)}
@@ -885,9 +1116,9 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                   className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white text-sm"
                 >
                   <option value="">Change template...</option>
-                  {routingTemplates.map(t => (
+                  {routingTemplates.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.code} - {t.name || 'Unnamed'}
+                      {t.code} - {t.name || "Unnamed"}
                     </option>
                   ))}
                 </select>
@@ -910,10 +1141,14 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
           <h4 className="font-medium text-white">Add Component</h4>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Component</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Component
+              </label>
               <select
                 value={newLine.component_id}
-                onChange={(e) => setNewLine({ ...newLine, component_id: e.target.value })}
+                onChange={(e) =>
+                  setNewLine({ ...newLine, component_id: e.target.value })
+                }
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
               >
                 <option value="">Select component...</option>
@@ -925,22 +1160,30 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Quantity</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Quantity
+              </label>
               <input
                 type="number"
                 step="0.01"
                 value={newLine.quantity}
-                onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })}
+                onChange={(e) =>
+                  setNewLine({ ...newLine, quantity: e.target.value })
+                }
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Scrap Factor %</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Scrap Factor %
+              </label>
               <input
                 type="number"
                 step="0.1"
                 value={newLine.scrap_factor}
-                onChange={(e) => setNewLine({ ...newLine, scrap_factor: e.target.value })}
+                onChange={(e) =>
+                  setNewLine({ ...newLine, scrap_factor: e.target.value })
+                }
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
               />
             </div>
@@ -949,7 +1192,9 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
               <input
                 type="text"
                 value={newLine.notes}
-                onChange={(e) => setNewLine({ ...newLine, notes: e.target.value })}
+                onChange={(e) =>
+                  setNewLine({ ...newLine, notes: e.target.value })
+                }
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white"
               />
             </div>
@@ -1000,19 +1245,36 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
       {showExploded && explodedData && (
         <div className="fixed inset-0 z-[60] overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
-            <div className="fixed inset-0 bg-black/80" onClick={() => setShowExploded(false)} />
+            <div
+              className="fixed inset-0 bg-black/80"
+              onClick={() => setShowExploded(false)}
+            />
             <div className="relative bg-gray-900 border border-gray-700 rounded-xl shadow-xl max-w-4xl w-full mx-auto p-6">
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Exploded BOM View</h3>
-                  <p className="text-sm text-gray-400">All components flattened through sub-assemblies</p>
+                  <h3 className="text-lg font-semibold text-white">
+                    Exploded BOM View
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    All components flattened through sub-assemblies
+                  </p>
                 </div>
                 <button
                   onClick={() => setShowExploded(false)}
                   className="text-gray-400 hover:text-white p-1"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -1020,19 +1282,27 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
               {/* Summary Stats */}
               <div className="grid grid-cols-4 gap-4 mb-4">
                 <div className="bg-gray-800 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-bold text-white">{explodedData.total_components}</div>
+                  <div className="text-2xl font-bold text-white">
+                    {explodedData.total_components}
+                  </div>
                   <div className="text-xs text-gray-400">Total Components</div>
                 </div>
                 <div className="bg-gray-800 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-bold text-purple-400">{explodedData.max_depth}</div>
+                  <div className="text-2xl font-bold text-purple-400">
+                    {explodedData.max_depth}
+                  </div>
                   <div className="text-xs text-gray-400">Max Depth</div>
                 </div>
                 <div className="bg-gray-800 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-bold text-green-400">${parseFloat(explodedData.total_cost || 0).toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-green-400">
+                    ${parseFloat(explodedData.total_cost || 0).toFixed(2)}
+                  </div>
                   <div className="text-xs text-gray-400">Total Cost</div>
                 </div>
                 <div className="bg-gray-800 rounded-lg p-3 text-center">
-                  <div className="text-2xl font-bold text-blue-400">{explodedData.unique_components}</div>
+                  <div className="text-2xl font-bold text-blue-400">
+                    {explodedData.unique_components}
+                  </div>
                   <div className="text-xs text-gray-400">Unique Parts</div>
                 </div>
               </div>
@@ -1042,30 +1312,57 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                 <table className="w-full text-sm">
                   <thead className="bg-gray-800 sticky top-0">
                     <tr>
-                      <th className="text-left py-2 px-3 text-gray-400">Level</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Component</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Qty/Unit</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Extended Qty</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Unit Cost</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Line Cost</th>
-                      <th className="text-left py-2 px-3 text-gray-400">Stock</th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Level
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Component
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Qty/Unit
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Extended Qty
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Unit Cost
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Line Cost
+                      </th>
+                      <th className="text-left py-2 px-3 text-gray-400">
+                        Stock
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {explodedData.lines?.map((line, idx) => (
-                      <tr key={idx} className={`border-b border-gray-800 ${line.is_sub_assembly ? 'bg-purple-500/5' : ''}`}>
+                      <tr
+                        key={idx}
+                        className={`border-b border-gray-800 ${
+                          line.is_sub_assembly ? "bg-purple-500/5" : ""
+                        }`}
+                      >
                         <td className="py-2 px-3">
                           <div className="flex items-center gap-1">
                             {/* Indent based on level */}
-                            <span style={{ marginLeft: `${line.level * 12}px` }} className="text-gray-500">
-                              {line.level === 0 ? '' : '└─'}
+                            <span
+                              style={{ marginLeft: `${line.level * 12}px` }}
+                              className="text-gray-500"
+                            >
+                              {line.level === 0 ? "" : "└─"}
                             </span>
-                            <span className={`px-1.5 py-0.5 rounded text-xs ${
-                              line.level === 0 ? 'bg-blue-500/20 text-blue-400' :
-                              line.level === 1 ? 'bg-green-500/20 text-green-400' :
-                              line.level === 2 ? 'bg-yellow-500/20 text-yellow-400' :
-                              'bg-gray-500/20 text-gray-400'
-                            }`}>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-xs ${
+                                line.level === 0
+                                  ? "bg-blue-500/20 text-blue-400"
+                                  : line.level === 1
+                                  ? "bg-green-500/20 text-green-400"
+                                  : line.level === 2
+                                  ? "bg-yellow-500/20 text-yellow-400"
+                                  : "bg-gray-500/20 text-gray-400"
+                              }`}
+                            >
                               L{line.level}
                             </span>
                           </div>
@@ -1076,10 +1373,14 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                               <div className="text-white font-medium flex items-center gap-1">
                                 {line.component_name}
                                 {line.is_sub_assembly && (
-                                  <span className="text-purple-400 text-xs">(Sub)</span>
+                                  <span className="text-purple-400 text-xs">
+                                    (Sub)
+                                  </span>
                                 )}
                               </div>
-                              <div className="text-gray-500 text-xs">{line.component_sku}</div>
+                              <div className="text-gray-500 text-xs">
+                                {line.component_sku}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -1096,10 +1397,15 @@ function BOMDetailView({ bom, onClose, onUpdate, token, onCreateProductionOrder 
                           ${parseFloat(line.line_cost || 0).toFixed(2)}
                         </td>
                         <td className="py-2 px-3">
-                          {line.inventory_available >= line.extended_quantity ? (
-                            <span className="text-green-400 text-xs">OK ({line.inventory_available?.toFixed(1)})</span>
+                          {line.inventory_available >=
+                          line.extended_quantity ? (
+                            <span className="text-green-400 text-xs">
+                              OK ({line.inventory_available?.toFixed(1)})
+                            </span>
                           ) : (
-                            <span className="text-red-400 text-xs">Low ({line.inventory_available?.toFixed(1)})</span>
+                            <span className="text-red-400 text-xs">
+                              Low ({line.inventory_available?.toFixed(1)})
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -1135,15 +1441,14 @@ function CreateBOMForm({ onClose, onCreate, token }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/products?limit=500&is_raw_material=false`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/products?limit=500&is_raw_material=false`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (res.ok) {
         const data = await res.json();
         setProducts(data.items || data);
@@ -1151,7 +1456,20 @@ function CreateBOMForm({ onClose, onCreate, token }) {
     } catch (err) {
       console.error("Failed to fetch products:", err);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchProducts();
+    // Check if user just created an item and came back
+    const bomPending = sessionStorage.getItem("bom_creation_pending");
+    if (bomPending) {
+      sessionStorage.removeItem("bom_creation_pending");
+      // Refresh products list after a short delay to allow item creation to complete
+      setTimeout(() => {
+        fetchProducts();
+      }, 500);
+    }
+  }, [fetchProducts]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1200,10 +1518,24 @@ function CreateBOMForm({ onClose, onCreate, token }) {
       )}
 
       <div>
-        <label className="block text-sm text-gray-400 mb-1">Product *</label>
+        <div className="flex justify-between items-center mb-1">
+          <label className="block text-sm text-gray-400">Product *</label>
+          <Link
+            to="/admin/items?action=new"
+            className="text-xs text-blue-400 hover:text-blue-300 underline"
+            onClick={() => {
+              // Store that we're coming from BOM creation
+              sessionStorage.setItem("bom_creation_pending", "true");
+            }}
+          >
+            + Create New Item
+          </Link>
+        </div>
         <select
           value={formData.product_id}
-          onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, product_id: e.target.value })
+          }
           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
           required
         >
@@ -1214,10 +1546,25 @@ function CreateBOMForm({ onClose, onCreate, token }) {
             </option>
           ))}
         </select>
+        <p className="text-xs text-gray-500 mt-1">
+          Don't see the product?{" "}
+          <Link
+            to="/admin/items?action=new"
+            className="text-blue-400 hover:text-blue-300 underline"
+            onClick={() =>
+              sessionStorage.setItem("bom_creation_pending", "true")
+            }
+          >
+            Create it first
+          </Link>
+          , then return here.
+        </p>
       </div>
 
       <div>
-        <label className="block text-sm text-gray-400 mb-1">BOM Name (optional)</label>
+        <label className="block text-sm text-gray-400 mb-1">
+          BOM Name (optional)
+        </label>
         <input
           type="text"
           value={formData.name}
@@ -1232,7 +1579,9 @@ function CreateBOMForm({ onClose, onCreate, token }) {
         <input
           type="text"
           value={formData.revision}
-          onChange={(e) => setFormData({ ...formData, revision: e.target.value })}
+          onChange={(e) =>
+            setFormData({ ...formData, revision: e.target.value })
+          }
           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
         />
       </div>
@@ -1258,7 +1607,13 @@ function CreateBOMForm({ onClose, onCreate, token }) {
 }
 
 // Production Order Modal
-function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSuccess }) {
+function CreateProductionOrderModal({
+  bom,
+  quoteContext,
+  onClose,
+  token,
+  onSuccess,
+}) {
   // Calculate max producible based on inventory
   const calculateMaxProducible = () => {
     if (!bom.lines || bom.lines.length === 0) return Infinity;
@@ -1323,26 +1678,33 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
       const poCode = `PO-${year}-${timestamp}`;
 
       // Determine actual quantity to produce
-      const produceQty = createBackorder && !canFulfillAll ? maxProducible : quantity;
+      const produceQty =
+        createBackorder && !canFulfillAll ? maxProducible : quantity;
 
-      const res = await fetch(`${API_URL}/api/v1/production-orders?auto_start_print=false`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          code: poCode,
-          product_id: bom.product_id,
-          product_sku: bom.product_sku || `PROD-${bom.product_id}`,
-          product_name: bom.product_name || `Product #${bom.product_id}`,
-          quantity: produceQty,
-          priority: "normal",
-          notes: createBackorder && backorderQty > 0
-            ? `${notes ? notes + '\n' : ''}Partial fulfillment: ${produceQty} of ${quantity} ordered. Backorder: ${backorderQty} units pending materials.`
-            : (notes || null),
-        }),
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/production-orders?auto_start_print=false`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            code: poCode,
+            product_id: bom.product_id,
+            product_sku: bom.product_sku || `PROD-${bom.product_id}`,
+            product_name: bom.product_name || `Product #${bom.product_id}`,
+            quantity: produceQty,
+            priority: "normal",
+            notes:
+              createBackorder && backorderQty > 0
+                ? `${
+                    notes ? notes + "\n" : ""
+                  }Partial fulfillment: ${produceQty} of ${quantity} ordered. Backorder: ${backorderQty} units pending materials.`
+                : notes || null,
+          }),
+        }
+      );
 
       if (!res.ok) {
         const err = await res.json();
@@ -1372,7 +1734,9 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
 
       <div className="bg-gray-800 rounded-lg p-4">
         <div className="text-sm text-gray-400 mb-1">Product</div>
-        <div className="text-white font-medium">{bom.product_name || `Product #${bom.product_id}`}</div>
+        <div className="text-white font-medium">
+          {bom.product_name || `Product #${bom.product_id}`}
+        </div>
         <div className="text-gray-500 text-xs">{bom.product_sku}</div>
       </div>
 
@@ -1380,10 +1744,22 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
       {quoteContext && (
         <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
           <div className="flex items-center gap-2 text-blue-400 text-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
-            <span>From Quote: <strong>{quotedQty} units</strong> ordered</span>
+            <span>
+              From Quote: <strong>{quotedQty} units</strong> ordered
+            </span>
           </div>
         </div>
       )}
@@ -1392,14 +1768,26 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
       <div className="bg-gray-800/50 rounded-lg p-3 border border-gray-700">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-gray-400">Inventory Status</span>
-          <span className={`text-sm font-medium ${maxProducible >= quotedQty ? 'text-green-400' : maxProducible > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+          <span
+            className={`text-sm font-medium ${
+              maxProducible >= quotedQty
+                ? "text-green-400"
+                : maxProducible > 0
+                ? "text-yellow-400"
+                : "text-red-400"
+            }`}
+          >
             Can produce: {maxProducible} units
           </span>
         </div>
         {limitingComponent && maxProducible < quotedQty && (
           <div className="text-xs text-gray-500">
-            Limiting factor: <span className="text-yellow-400">{limitingComponent.component_name}</span>
-            {' '}({limitingComponent.inventory_available?.toFixed(2)} {limitingComponent.component_unit} available)
+            Limiting factor:{" "}
+            <span className="text-yellow-400">
+              {limitingComponent.component_name}
+            </span>{" "}
+            ({limitingComponent.inventory_available?.toFixed(2)}{" "}
+            {limitingComponent.component_unit} available)
           </div>
         )}
       </div>
@@ -1419,13 +1807,17 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
         </div>
         <div>
           <span className="text-gray-400">Unit Cost:</span>
-          <span className="text-green-400 ml-2">${parseFloat(bom.total_cost || 0).toFixed(2)}</span>
+          <span className="text-green-400 ml-2">
+            ${parseFloat(bom.total_cost || 0).toFixed(2)}
+          </span>
         </div>
       </div>
 
       {/* Quantity Input with Quick Set Buttons */}
       <div>
-        <label className="block text-sm text-gray-400 mb-1">Quantity to Produce</label>
+        <label className="block text-sm text-gray-400 mb-1">
+          Quantity to Produce
+        </label>
         <div className="flex gap-2">
           <input
             type="number"
@@ -1438,7 +1830,11 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
             <button
               type="button"
               onClick={() => setQuantity(quotedQty)}
-              className={`px-3 py-2 rounded-lg text-sm ${quantity === quotedQty ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+              className={`px-3 py-2 rounded-lg text-sm ${
+                quantity === quotedQty
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
             >
               Quoted ({quotedQty})
             </button>
@@ -1447,7 +1843,11 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
             <button
               type="button"
               onClick={() => setQuantity(maxProducible)}
-              className={`px-3 py-2 rounded-lg text-sm ${quantity === maxProducible ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+              className={`px-3 py-2 rounded-lg text-sm ${
+                quantity === maxProducible
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
             >
               Max ({maxProducible})
             </button>
@@ -1460,12 +1860,17 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
           <div className="flex items-center gap-2 text-yellow-400 text-sm font-medium mb-2">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
             </svg>
             Insufficient Inventory
           </div>
           <p className="text-sm text-gray-300 mb-3">
-            You can only produce <strong>{maxProducible}</strong> of <strong>{quantity}</strong> units with current inventory.
+            You can only produce <strong>{maxProducible}</strong> of{" "}
+            <strong>{quantity}</strong> units with current inventory.
           </p>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
@@ -1475,7 +1880,8 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
               className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500"
             />
             <span className="text-sm text-gray-300">
-              Create partial order ({maxProducible} units) + backorder ({backorderQty} units)
+              Create partial order ({maxProducible} units) + backorder (
+              {backorderQty} units)
             </span>
           </label>
         </div>
@@ -1486,7 +1892,11 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
           <div className="flex items-center gap-2 text-red-400 text-sm font-medium">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
             </svg>
             No inventory available - cannot produce any units
           </div>
@@ -1497,7 +1907,9 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
       )}
 
       <div>
-        <label className="block text-sm text-gray-400 mb-1">Notes (optional)</label>
+        <label className="block text-sm text-gray-400 mb-1">
+          Notes (optional)
+        </label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -1511,14 +1923,21 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
         <div className="flex justify-between text-sm">
           <span className="text-gray-400">Estimated Total Cost:</span>
           <span className="text-green-400 font-medium">
-            ${(parseFloat(bom.total_cost || 0) * (createBackorder && !canFulfillAll ? maxProducible : quantity)).toFixed(2)}
+            $
+            {(
+              parseFloat(bom.total_cost || 0) *
+              (createBackorder && !canFulfillAll ? maxProducible : quantity)
+            ).toFixed(2)}
           </span>
         </div>
         {createBackorder && !canFulfillAll && (
           <div className="flex justify-between text-sm mt-1">
-            <span className="text-gray-500">Backorder ({backorderQty} units):</span>
+            <span className="text-gray-500">
+              Backorder ({backorderQty} units):
+            </span>
             <span className="text-gray-400">
-              ${(parseFloat(bom.total_cost || 0) * backorderQty).toFixed(2)} (pending)
+              ${(parseFloat(bom.total_cost || 0) * backorderQty).toFixed(2)}{" "}
+              (pending)
             </span>
           </div>
         )}
@@ -1527,10 +1946,14 @@ function CreateProductionOrderModal({ bom, quoteContext, onClose, token, onSucce
       <div className="flex gap-2 pt-2">
         <button
           onClick={handleSubmit}
-          disabled={loading || quantity < 1 || (maxProducible === 0 && !createBackorder)}
+          disabled={
+            loading || quantity < 1 || (maxProducible === 0 && !createBackorder)
+          }
           className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg hover:from-orange-500 hover:to-amber-500 disabled:opacity-50"
         >
-          {loading ? "Creating..." : createBackorder && !canFulfillAll
+          {loading
+            ? "Creating..."
+            : createBackorder && !canFulfillAll
             ? `Create Order (${maxProducible} units)`
             : "Create Production Order"}
         </button>
@@ -1575,7 +1998,9 @@ export default function AdminBOM() {
   // Auto-open BOM for a specific product if passed in URL
   useEffect(() => {
     if (productId && boms.length > 0) {
-      const matchingBOM = boms.find(b => b.product_id === parseInt(productId));
+      const matchingBOM = boms.find(
+        (b) => b.product_id === parseInt(productId)
+      );
       if (matchingBOM) {
         // Store quote context before clearing params
         if (quotedQuantity || quoteId) {
@@ -1598,7 +2023,8 @@ export default function AdminBOM() {
     try {
       const params = new URLSearchParams();
       if (filters.search) params.set("search", filters.search);
-      if (filters.active !== "all") params.set("active", filters.active === "active");
+      if (filters.active !== "all")
+        params.set("active", filters.active === "active");
 
       const res = await fetch(`${API_URL}/api/v1/admin/bom?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -1681,7 +2107,9 @@ export default function AdminBOM() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-white">Bill of Materials</h1>
-          <p className="text-gray-400 mt-1">Manage product BOMs and components</p>
+          <p className="text-gray-400 mt-1">
+            Manage product BOMs and components
+          </p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -1733,26 +2161,51 @@ export default function AdminBOM() {
           <table className="w-full">
             <thead className="bg-gray-800/50">
               <tr>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Code</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Name</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Product</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Version</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Components</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Total Cost</th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Status</th>
-                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Actions</th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Code
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Name
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Product
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Version
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Components
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Total Cost
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Status
+                </th>
+                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
               {boms.map((bom) => (
-                <tr key={bom.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                  <td className="py-3 px-4 text-white font-medium">{bom.code}</td>
+                <tr
+                  key={bom.id}
+                  className="border-b border-gray-800 hover:bg-gray-800/50"
+                >
+                  <td className="py-3 px-4 text-white font-medium">
+                    {bom.code}
+                  </td>
                   <td className="py-3 px-4 text-gray-300">{bom.name}</td>
                   <td className="py-3 px-4 text-gray-400">
                     {bom.product?.name || `#${bom.product_id}`}
                   </td>
-                  <td className="py-3 px-4 text-gray-400">v{bom.version} ({bom.revision})</td>
-                  <td className="py-3 px-4 text-gray-400">{bom.line_count || 0}</td>
+                  <td className="py-3 px-4 text-gray-400">
+                    v{bom.version} ({bom.revision})
+                  </td>
+                  <td className="py-3 px-4 text-gray-400">
+                    {bom.line_count || 0}
+                  </td>
                   <td className="py-3 px-4 text-green-400 font-medium">
                     ${parseFloat(bom.total_cost || 0).toFixed(2)}
                   </td>

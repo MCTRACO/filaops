@@ -13,11 +13,13 @@ import io
 from decimal import Decimal
 from app.db.session import get_db
 from app.models import Product, ItemCategory, Inventory, BOM, BOMLine
+from app.models.inventory import InventoryLocation
 from app.models.manufacturing import Routing
 from app.api.v1.endpoints.auth import get_current_user
 from app.models.user import User
 from app.schemas.item import (
     ItemType,
+    ProcurementType,
     ItemCategoryCreate,
     ItemCategoryUpdate,
     ItemCategoryResponse,
@@ -29,6 +31,7 @@ from app.schemas.item import (
     ItemCSVImportRequest,
     ItemCSVImportResult,
     ItemBulkUpdateRequest,
+    MaterialItemCreate,
 )
 
 router = APIRouter()
@@ -295,6 +298,7 @@ async def delete_category(
 @router.get("", response_model=dict)
 async def list_items(
     item_type: Optional[str] = Query(None, description="Filter by item type"),
+    procurement_type: Optional[str] = Query(None, description="Filter by procurement type: make, buy, make_or_buy"),
     category_id: Optional[int] = Query(None, description="Filter by category"),
     search: Optional[str] = Query(None, description="Search SKU or name"),
     active_only: bool = Query(True, description="Only show active items"),
@@ -316,6 +320,9 @@ async def list_items(
 
     if item_type:
         query = query.filter(Product.item_type == item_type)
+
+    if procurement_type:
+        query = query.filter(Product.procurement_type == procurement_type)
 
     if category_id:
         # Get all descendant category IDs (including the selected one)
@@ -370,6 +377,7 @@ async def list_items(
             sku=item.sku,
             name=item.name,
             item_type=item.item_type or "finished_good",
+            procurement_type=item.procurement_type or "buy",
             category_id=item.category_id,
             category_name=item.item_category.name if item.item_category else None,
             unit=item.unit,
@@ -397,8 +405,38 @@ async def create_item(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new item"""
+    # Auto-generate SKU if not provided
+    if not request.sku or request.sku.strip() == "":
+        # Generate SKU based on item type and a sequence number
+        item_type_prefix = {
+            "finished_good": "FG",
+            "component": "COMP",
+            "supply": "SUP",
+            "service": "SRV",
+        }.get(request.item_type.value if hasattr(request.item_type, 'value') else str(request.item_type), "ITM")
+        
+        # Find the highest existing SKU with this prefix
+        existing_skus = db.query(Product.sku).filter(
+            Product.sku.like(f"{item_type_prefix}-%")
+        ).all()
+        
+        max_num = 0
+        for (sku,) in existing_skus:
+            try:
+                # Extract number from SKU like "FG-001" or "COMP-042"
+                parts = sku.split("-")
+                if len(parts) >= 2:
+                    num = int(parts[-1])
+                    max_num = max(max_num, num)
+            except (ValueError, IndexError):
+                pass
+        
+        # Generate new SKU with zero-padded number
+        new_num = max_num + 1
+        request.sku = f"{item_type_prefix}-{new_num:03d}"
+    
     # Check for duplicate SKU
-    existing = db.query(Product).filter(Product.sku == request.sku).first()
+    existing = db.query(Product).filter(Product.sku == request.sku.upper()).first()
     if existing:
         raise HTTPException(status_code=400, detail=f"SKU '{request.sku}' already exists")
 
@@ -414,6 +452,7 @@ async def create_item(
         description=request.description,
         unit=request.unit or "EA",
         item_type=request.item_type.value if request.item_type else "finished_good",
+        procurement_type=request.procurement_type.value if request.procurement_type else "buy",
         category_id=request.category_id,
         cost_method=request.cost_method.value if request.cost_method else "average",
         standard_cost=request.standard_cost,
@@ -442,6 +481,136 @@ async def create_item(
     return _build_item_response(item, db)
 
 
+@router.post("/material", response_model=ItemResponse, status_code=201)
+async def create_material_item(
+    request: MaterialItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a material item (shortcut for supply items with material_type/color).
+    
+    This is a convenience endpoint for creating filament/material products.
+    It automatically:
+    - Sets item_type='supply'
+    - Sets procurement_type='buy'
+    - Sets unit='kg'
+    - Links material_type_id and color_id
+    - Creates Inventory record
+    
+    The SKU is auto-generated as: MAT-{material_type_code}-{color_code}
+    """
+    from app.services.material_service import (
+        create_material_product,
+        get_material_type,
+        get_color,
+        MaterialNotFoundError,
+        ColorNotFoundError,
+    )
+    from app.models.item_category import ItemCategory
+    
+    # Validate material type and color exist
+    try:
+        material_type = get_material_type(db, request.material_type_code)
+        color = get_color(db, request.color_code)
+    except MaterialNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ColorNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    # Check if product already exists
+    sku = f"MAT-{material_type.code}-{color.code}"
+    existing = db.query(Product).filter(Product.sku == sku).first()
+    if existing:
+        # Return existing product, but update fields if provided
+        if request.cost_per_kg is not None:
+            existing.standard_cost = request.cost_per_kg
+        if request.selling_price is not None:
+            existing.selling_price = request.selling_price
+        if request.category_id is not None:
+            existing.category_id = request.category_id
+        
+        # Update initial inventory if provided
+        if request.initial_qty_kg and request.initial_qty_kg > 0:
+            inventory = db.query(Inventory).filter(
+                Inventory.product_id == existing.id
+            ).first()
+            if inventory:
+                inventory.on_hand_quantity = request.initial_qty_kg
+            else:
+                # Get default location
+                location = db.query(InventoryLocation).filter(
+                    InventoryLocation.code == 'MAIN'
+                ).first()
+                if not location:
+                    location = InventoryLocation(
+                        name="Main Warehouse",
+                        code="MAIN",
+                        type="warehouse"
+                    )
+                    db.add(location)
+                    db.flush()
+                
+                inventory = Inventory(
+                    product_id=existing.id,
+                    location_id=location.id,
+                    on_hand_quantity=request.initial_qty_kg,
+                    allocated_quantity=0
+                )
+                db.add(inventory)
+        
+        db.commit()
+        db.refresh(existing)
+        logger.info(f"Updated existing material item: {existing.sku}")
+        return _build_item_response(existing, db)
+    
+    # Create new material product
+    product = create_material_product(
+        db,
+        material_type_code=request.material_type_code,
+        color_code=request.color_code,
+        commit=False  # We'll commit after setting additional fields
+    )
+    
+    # Override cost if provided
+    if request.cost_per_kg is not None:
+        product.standard_cost = request.cost_per_kg
+    
+    # Set selling price if provided
+    if request.selling_price is not None:
+        product.selling_price = request.selling_price
+    
+    # Set category if provided, otherwise try to find Materials category
+    if request.category_id:
+        category = db.query(ItemCategory).filter(ItemCategory.id == request.category_id).first()
+        if not category:
+            raise HTTPException(status_code=400, detail=f"Category {request.category_id} not found")
+        product.category_id = request.category_id
+    else:
+        # Try to find a Materials category
+        materials_category = db.query(ItemCategory).filter(
+            ItemCategory.code.ilike('%MATERIAL%')
+        ).first()
+        if materials_category:
+            product.category_id = materials_category.id
+    
+    # Set initial inventory quantity if provided
+    if request.initial_qty_kg and request.initial_qty_kg > 0:
+        # Find the inventory record we just created
+        inventory = db.query(Inventory).filter(
+            Inventory.product_id == product.id
+        ).first()
+        if inventory:
+            inventory.on_hand_quantity = request.initial_qty_kg
+    
+    db.commit()
+    db.refresh(product)
+    
+    logger.info(f"Created material item: {product.sku}")
+    
+    return _build_item_response(product, db)
+
+
 # ============================================================================
 # Low Stock / Reorder Alerts
 # ============================================================================
@@ -449,20 +618,27 @@ async def create_item(
 @router.get("/low-stock")
 async def get_low_stock_items(
     include_zero_reorder: bool = False,
+    include_mrp_shortages: bool = Query(True, description="Include MRP shortages from active orders"),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
     """
-    Get items that are below their reorder point.
+    Get items that are below their reorder point OR have shortages from active orders.
 
-    Returns items where available_quantity <= reorder_point, sorted by shortfall.
+    Returns items where:
+    - available_quantity <= reorder_point (traditional low stock), OR
+    - net_shortage > 0 from MRP explosion of active sales orders (MRP shortages)
 
     - **include_zero_reorder**: Include items with reorder_point = 0 or NULL (default: False)
+    - **include_mrp_shortages**: Include items with shortages from active orders (default: True)
     - **limit**: Maximum number of items to return
     """
     from decimal import Decimal
+    from collections import defaultdict
 
-    # Query products with inventory, filter to those below reorder point
+    items_dict = {}  # product_id -> item data
+
+    # 1. Get items below reorder point (traditional low stock)
     query = db.query(Product, Inventory).outerjoin(
         Inventory, Product.id == Inventory.product_id
     ).filter(
@@ -474,7 +650,6 @@ async def get_low_stock_items(
         query = query.filter(Product.reorder_point > 0)
 
     # Filter to items below reorder point
-    # available_quantity <= reorder_point
     query = query.filter(
         or_(
             Inventory.available_quantity <= Product.reorder_point,
@@ -484,14 +659,13 @@ async def get_low_stock_items(
 
     results = query.limit(limit).all()
 
-    items = []
     for product, inventory in results:
         available = float(inventory.available_quantity) if inventory else 0
         on_hand = float(inventory.on_hand_quantity) if inventory else 0
         reorder_point = float(product.reorder_point) if product.reorder_point else 0
         shortfall = reorder_point - available
 
-        items.append({
+        items_dict[product.id] = {
             "id": product.id,
             "sku": product.sku,
             "name": product.name,
@@ -501,13 +675,148 @@ async def get_low_stock_items(
             "on_hand_qty": on_hand,
             "available_qty": available,
             "reorder_point": reorder_point,
-            "shortfall": shortfall,
+            "shortfall": shortfall,  # Shortfall from reorder point
+            "mrp_shortage": 0,  # Will be filled from MRP if applicable
             "cost": float(product.standard_cost or product.average_cost or 0),
             "preferred_vendor_id": product.preferred_vendor_id,
-        })
+            "shortage_source": "reorder_point",  # or "mrp" or "both"
+        }
 
-    # Sort by shortfall (most critical first)
+    # 2. Get MRP shortages from active sales orders (if enabled)
+    if include_mrp_shortages:
+        from app.models.sales_order import SalesOrder, SalesOrderLine
+        from app.services.mrp import MRPService
+
+        # Get all active sales orders (not cancelled, not completed)
+        active_orders = db.query(SalesOrder).filter(
+            SalesOrder.status.notin_(["cancelled", "completed", "delivered"]),
+        ).all()
+
+        mrp_service = MRPService(db)
+        
+        # Aggregate requirements across all active orders
+        all_requirements = []
+        for order in active_orders:
+            if order.order_type == "line_item":
+                # Get order lines
+                lines = db.query(SalesOrderLine).filter(
+                    SalesOrderLine.sales_order_id == order.id
+                ).all()
+                
+                for line in lines:
+                    if line.product_id:
+                        # Explode BOM for this line
+                        try:
+                            requirements = mrp_service.explode_bom(
+                                product_id=line.product_id,
+                                quantity=Decimal(str(line.quantity)),
+                                source_demand_type="sales_order",
+                                source_demand_id=order.id
+                            )
+                            all_requirements.extend(requirements)
+                        except Exception as e:
+                            # Skip if BOM explosion fails (no BOM, etc.)
+                            continue
+            elif order.order_type == "quote_based" and hasattr(order, 'quote_id') and order.quote_id:
+                # For quote-based orders, get product from quote
+                from app.models.quote import Quote
+                quote = db.query(Quote).filter(Quote.id == order.quote_id).first()
+                if quote and quote.product_id:
+                    try:
+                        requirements = mrp_service.explode_bom(
+                            product_id=quote.product_id,
+                            quantity=Decimal(str(order.quantity)),
+                            source_demand_type="sales_order",
+                            source_demand_id=order.id
+                        )
+                        all_requirements.extend(requirements)
+                    except Exception as e:
+                        # Skip if BOM explosion fails
+                        continue
+        
+        # Aggregate requirements by product_id (sum quantities)
+        aggregated_requirements = {}
+        
+        for req in all_requirements:
+            key = req.product_id
+            if key not in aggregated_requirements:
+                aggregated_requirements[key] = {
+                    "product_id": req.product_id,
+                    "product_sku": req.product_sku,
+                    "product_name": req.product_name,
+                    "gross_quantity": req.gross_quantity,
+                    "bom_level": req.bom_level,
+                }
+            else:
+                aggregated_requirements[key]["gross_quantity"] += req.gross_quantity
+        
+        # Calculate net requirements
+        if aggregated_requirements:
+            from app.services.mrp import ComponentRequirement
+            component_reqs = []
+            for req_data in aggregated_requirements.values():
+                component_reqs.append(
+                    ComponentRequirement(
+                        product_id=int(req_data["product_id"]),
+                        product_sku=str(req_data["product_sku"]),
+                        product_name=str(req_data["product_name"]),
+                        bom_level=int(req_data["bom_level"]),
+                        gross_quantity=Decimal(str(req_data["gross_quantity"])),
+                    )
+                )
+            
+            net_requirements = mrp_service.calculate_net_requirements(component_reqs)
+            
+            # Add MRP shortages to items_dict
+            for net_req in net_requirements:
+                if net_req.net_shortage > 0:
+                    product_id = net_req.product_id
+                    mrp_shortage = float(net_req.net_shortage)
+                    
+                    if product_id in items_dict:
+                        # Update existing item
+                        items_dict[product_id]["mrp_shortage"] = mrp_shortage
+                        items_dict[product_id]["shortfall"] = max(
+                            items_dict[product_id]["shortfall"],
+                            mrp_shortage
+                        )
+                        items_dict[product_id]["shortage_source"] = "both"
+                    else:
+                        # Add new item (not below reorder point, but has MRP shortage)
+                        product = db.query(Product).filter(Product.id == product_id).first()
+                        if product and product.active:
+                            inv = db.query(
+                                func.coalesce(func.sum(Inventory.on_hand_quantity), 0).label("on_hand"),
+                                func.coalesce(func.sum(Inventory.allocated_quantity), 0).label("allocated"),
+                            ).filter(Inventory.product_id == product_id).first()
+                            
+                            on_hand = float(inv.on_hand) if inv else 0
+                            allocated = float(inv.allocated) if inv else 0
+                            available = on_hand - allocated
+                            
+                            items_dict[product_id] = {
+                                "id": product.id,
+                                "sku": product.sku,
+                                "name": product.name,
+                                "item_type": product.item_type,
+                                "unit": product.unit,
+                                "category_name": product.item_category.name if product.item_category else None,
+                                "on_hand_qty": on_hand,
+                                "available_qty": available,
+                                "reorder_point": float(product.reorder_point) if product.reorder_point else None,
+                                "shortfall": mrp_shortage,
+                                "mrp_shortage": mrp_shortage,
+                                "cost": float(product.standard_cost or product.average_cost or 0),
+                                "preferred_vendor_id": product.preferred_vendor_id,
+                                "shortage_source": "mrp",
+                            }
+
+    # Convert to list and sort by shortfall (most critical first)
+    items = list(items_dict.values())
     items.sort(key=lambda x: x["shortfall"], reverse=True)
+    
+    # Limit results
+    items = items[:limit]
 
     return {
         "items": items,
@@ -582,6 +891,8 @@ async def update_item(
         if field == "sku" and value:
             value = value.upper()
         if field == "item_type" and value:
+            value = value.value if hasattr(value, "value") else value
+        if field == "procurement_type" and value:
             value = value.value if hasattr(value, "value") else value
         if field == "cost_method" and value:
             value = value.value if hasattr(value, "value") else value
@@ -677,19 +988,125 @@ async def import_items_csv(
         errors=[],
     )
 
+    # Marketplace column mappings for SKU
+    SKU_COLUMNS = [
+        # Standard variations
+        "sku", "SKU", "Sku", "product_sku", "Product SKU", "product-sku",
+        # Shopify
+        "Variant SKU", "variant_sku", "variant-sku", "VariantSKU",
+        # TikTok Shop
+        "SKU Code", "sku_code", "sku-code", "SKUCode",
+        # Amazon (ASIN can be used as SKU)
+        "ASIN", "asin", "Amazon ASIN",
+        # Generic
+        "Product Code", "product_code", "product-code",
+        "Item SKU", "item_sku", "item-sku",
+        "Product ID", "product_id", "product-id",
+    ]
+    
+    # Marketplace column mappings for Name
+    NAME_COLUMNS = [
+        # Standard variations
+        "name", "Name", "product_name", "Product Name", "product-name",
+        # Squarespace
+        "title", "Title", "Product Title", "product-title",
+        # Shopify
+        "Variant Title", "variant_title", "variant-title", "VariantTitle",
+        # TikTok Shop
+        "Product Title", "product_title", "product-title", "ProductTitle",
+        # Amazon
+        "Title", "title", "Product Title",
+        # Generic
+        "Item Name", "item_name", "item-name",
+        "Product Name", "product-name",
+    ]
+    
+    # Marketplace column mappings for Description
+    DESCRIPTION_COLUMNS = [
+        # Standard variations
+        "description", "Description", "product_description", "Product Description",
+        # Shopify
+        "Body (HTML)", "body_html", "Body", "body", "Body HTML",
+        # WooCommerce
+        "Short Description", "short_description", "short-description", "Short description",
+        "Description", "description",  # WooCommerce also has Description
+        # Generic
+        "Long Description", "long_description", "long-description",
+        "Product Description", "product-description",
+        "Item Description", "item_description",
+    ]
+    
+    # Marketplace column mappings for Price
+    PRICE_COLUMNS = [
+        # Standard variations
+        "selling_price", "Selling Price", "selling-price",
+        "price", "Price",  # Squarespace, Generic
+        # Shopify
+        "Variant Price", "variant_price", "variant-price", "VariantPrice",
+        "Variant Compare At Price", "variant_compare_at_price", "variant-compare-at-price",  # Original price
+        # WooCommerce (Sale price takes priority)
+        "Sale price", "sale_price", "sale-price", "Sale Price",
+        "Regular price", "regular_price", "regular-price", "Regular Price",
+        # TikTok Shop
+        "Unit Price", "unit_price", "unit-price", "UnitPrice",
+        # Generic
+        "Retail Price", "retail_price", "retail-price",
+        "List Price", "list_price", "list-price",
+        "Selling Price", "selling-price",
+    ]
+    
+    # Marketplace column mappings for Cost
+    COST_COLUMNS = [
+        # Standard variations
+        "standard_cost", "Standard Cost", "standard-cost",
+        "cost", "Cost",  # Squarespace, Generic
+        # Shopify
+        "Variant Cost", "variant_cost", "variant-cost", "VariantCost",
+        # Squarespace
+        "Wholesale Price", "wholesale_price", "wholesale-price",
+        # TikTok Shop
+        "Cost Price", "cost_price", "cost-price", "CostPrice",
+        # Amazon Business
+        "Purchase PPU", "purchase_ppu", "purchase-ppu",  # Per unit price
+        "Item Subtotal", "item_subtotal",  # Could be cost
+        # Generic
+        "Purchase Cost", "purchase_cost", "purchase-cost",
+        "Unit Cost", "unit_cost", "unit-cost",
+        "Wholesale Cost", "wholesale_cost",
+    ]
+
     for row_num, row in enumerate(reader, start=2):
         result.total_rows += 1
 
         try:
-            sku = row.get("sku", "").strip().upper()
+            # Find SKU using all possible column names
+            sku = ""
+            for col in SKU_COLUMNS:
+                if row.get(col, "").strip():
+                    sku = row.get(col, "").strip().upper()
+                    break
+            
             if not sku:
-                result.errors.append({"row": row_num, "error": "SKU is required"})
+                result.errors.append({
+                    "row": row_num, 
+                    "error": "SKU is required. Looked for: sku, SKU, Variant SKU, Product SKU, etc."
+                })
                 result.skipped += 1
                 continue
 
-            name = row.get("name", "").strip()
+            # Find name using all possible column names
+            name = ""
+            for col in NAME_COLUMNS:
+                if row.get(col, "").strip():
+                    name = row.get(col, "").strip()
+                    break
+            
             if not name:
-                result.errors.append({"row": row_num, "error": "Name is required", "sku": sku})
+                result.errors.append({
+                    "row": row_num, 
+                    "error": "Name is required. Looked for: name, title, Product Name, Variant Title, etc.",
+                    "sku": sku
+                })
                 result.skipped += 1
                 continue
 
@@ -697,39 +1114,248 @@ async def import_items_csv(
             existing = db.query(Product).filter(Product.sku == sku).first()
 
             if existing:
+                # Protect seeded example items from being overwritten
+                if existing.sku.startswith("SEED-EXAMPLE-"):
+                    result.errors.append({
+                        "row": row_num,
+                        "error": f"SKU '{sku}' is a seeded example item and cannot be overwritten. Please use a different SKU.",
+                        "sku": sku
+                    })
+                    result.skipped += 1
+                    continue
+                
                 if not update_existing:
                     result.skipped += 1
                     continue
 
-                # Update existing
+                # Update existing - use same column detection logic
                 existing.name = name
-                existing.description = row.get("description", "").strip() or existing.description
-                existing.unit = row.get("unit", "").strip() or existing.unit
-                existing.item_type = row.get("item_type", "").strip() or existing.item_type
-                if row.get("category_id"):
-                    existing.category_id = int(row["category_id"])
-                if row.get("standard_cost"):
-                    existing.standard_cost = float(row["standard_cost"])
-                if row.get("selling_price"):
-                    existing.selling_price = float(row["selling_price"])
+                
+                # Update description
+                for col in DESCRIPTION_COLUMNS:
+                    value = row.get(col, "").strip()
+                    if value:
+                        if "<" in value and ">" in value:
+                            import re
+                            existing.description = re.sub(r'<[^>]+>', '', value).strip()
+                        else:
+                            existing.description = value
+                        break
+                
+                # Update unit
+                unit = (row.get("unit", "") or row.get("Unit", "") or row.get("UOM", "")).strip()
+                if unit:
+                    existing.unit = unit
+                
+                # Update item type
+                item_type_raw = (row.get("item_type", "") or row.get("Item Type", "") or row.get("Type", "")).strip()
+                if item_type_raw:
+                    item_type_map = {
+                        "simple": "finished_good",
+                        "variable": "finished_good",
+                        "finished_good": "finished_good",
+                        "component": "component",
+                        "supply": "supply",
+                        "service": "service",
+                    }
+                    existing.item_type = item_type_map.get(item_type_raw.lower(), existing.item_type)
+                
+                # Update category - handle all marketplace formats
+                category_id_raw = (
+                    row.get("category_id", "") or
+                    row.get("Category ID", "") or
+                    row.get("category-id", "")
+                ).strip()
+                if category_id_raw:
+                    try:
+                        existing.category_id = int(category_id_raw)
+                    except ValueError:
+                        pass
+                else:
+                    # Try category name (Squarespace, WooCommerce, etc.)
+                    category_name_raw = (
+                        row.get("Category", "") or
+                        row.get("category", "") or
+                        row.get("Categories", "") or  # WooCommerce (comma-separated)
+                        row.get("Product Category", "") or
+                        row.get("Type", "") or  # Shopify uses Type
+                        row.get("Product Type", "")
+                    ).strip()
+                    
+                    if category_name_raw:
+                        # Handle WooCommerce comma-separated categories (take first)
+                        if "," in category_name_raw:
+                            category_name_raw = category_name_raw.split(",")[0].strip()
+                        
+                        # Try to find category by name (if categories exist)
+                        from app.models.item_category import ItemCategory
+                        category = db.query(ItemCategory).filter(
+                            ItemCategory.name.ilike(f"%{category_name_raw}%")
+                        ).first()
+                        if category:
+                            existing.category_id = category.id
+                
+                # Update cost
+                cost_raw = ""
+                for col in COST_COLUMNS:
+                    if row.get(col, "").strip():
+                        cost_raw = row.get(col, "").strip()
+                        break
+                if cost_raw:
+                    cost_clean = cost_raw.replace("$", "").replace(",", "").replace("€", "").replace("£", "").strip()
+                    try:
+                        existing.standard_cost = float(cost_clean)
+                    except ValueError:
+                        pass
+                
+                # Update price
+                selling_price_raw = ""
+                for col in PRICE_COLUMNS:
+                    value = row.get(col, "").strip()
+                    if value:
+                        if "sale" in col.lower() and value:
+                            selling_price_raw = value
+                            break
+                        elif not selling_price_raw:
+                            selling_price_raw = value
+                if selling_price_raw:
+                    price_clean = selling_price_raw.replace("$", "").replace(",", "").replace("€", "").replace("£", "").strip()
+                    try:
+                        existing.selling_price = float(price_clean)
+                    except ValueError:
+                        pass
+                
+                # Update reorder point
                 if row.get("reorder_point"):
-                    existing.reorder_point = float(row["reorder_point"])
-                existing.upc = row.get("upc", "").strip() or existing.upc
+                    try:
+                        existing.reorder_point = float(row["reorder_point"])
+                    except ValueError:
+                        pass
+                
+                # Update UPC - handle all marketplace formats
+                upc = (
+                    row.get("upc", "") or 
+                    row.get("UPC", "") or
+                    row.get("barcode", "") or
+                    row.get("Barcode", "") or
+                    row.get("EAN", "") or
+                    row.get("GTIN", "") or
+                    row.get("Product Code", "") or  # TikTok Shop
+                    row.get("product_code", "") or
+                    row.get("ASIN", "") or  # Amazon ASIN
+                    row.get("asin", "")
+                ).strip()
+                if upc:
+                    existing.upc = upc
+                
                 existing.updated_at = datetime.utcnow()
                 result.updated += 1
             else:
+                # Find price using all possible column names
+                # Priority: Sale price (if exists) > Regular price > Variant price > Price
+                selling_price_raw = ""
+                for col in PRICE_COLUMNS:
+                    value = row.get(col, "").strip()
+                    if value:
+                        # Prefer sale price if available (WooCommerce)
+                        if "sale" in col.lower() and value:
+                            selling_price_raw = value
+                            break
+                        elif not selling_price_raw:  # Use first found as fallback
+                            selling_price_raw = value
+                
+                selling_price = None
+                if selling_price_raw:
+                    # Remove $ signs, commas, and currency symbols
+                    selling_price_clean = selling_price_raw.replace("$", "").replace(",", "").replace("€", "").replace("£", "").strip()
+                    try:
+                        selling_price = float(selling_price_clean)
+                    except ValueError:
+                        result.errors.append({
+                            "row": row_num, 
+                            "error": f"Invalid price format: {selling_price_raw}", 
+                            "sku": sku
+                        })
+                
+                # Find cost using all possible column names
+                cost_raw = ""
+                for col in COST_COLUMNS:
+                    if row.get(col, "").strip():
+                        cost_raw = row.get(col, "").strip()
+                        break
+                
+                standard_cost = None
+                if cost_raw:
+                    # Remove $ signs, commas, and currency symbols
+                    cost_clean = cost_raw.replace("$", "").replace(",", "").replace("€", "").replace("£", "").strip()
+                    try:
+                        standard_cost = float(cost_clean)
+                    except ValueError:
+                        pass  # Cost is optional, just skip if invalid
+                
+                # Find description using all possible column names
+                description = None
+                for col in DESCRIPTION_COLUMNS:
+                    value = row.get(col, "").strip()
+                    if value:
+                        # Strip HTML tags if present (Shopify exports HTML)
+                        if "<" in value and ">" in value:
+                            import re
+                            description = re.sub(r'<[^>]+>', '', value).strip()
+                        else:
+                            description = value
+                        break
+                
+                # Handle category - can be ID or name (all marketplace formats)
+                final_category_id = default_category_id
+                # Try category_id first (numeric)
+                category_id_raw = (
+                    row.get("category_id", "") or
+                    row.get("Category ID", "") or
+                    row.get("category-id", "")
+                ).strip()
+                if category_id_raw:
+                    try:
+                        final_category_id = int(category_id_raw)
+                    except ValueError:
+                        pass
+                
+                # If no numeric ID, try category name (Squarespace, WooCommerce, etc.)
+                if not final_category_id or final_category_id == default_category_id:
+                    category_name_raw = (
+                        row.get("Category", "") or
+                        row.get("category", "") or
+                        row.get("Categories", "") or  # WooCommerce (comma-separated)
+                        row.get("Product Category", "") or
+                        row.get("Type", "") or  # Shopify uses Type
+                        row.get("Product Type", "")
+                    ).strip()
+                    
+                    if category_name_raw:
+                        # Handle WooCommerce comma-separated categories (take first)
+                        if "," in category_name_raw:
+                            category_name_raw = category_name_raw.split(",")[0].strip()
+                        
+                        # Try to find category by name (if categories exist)
+                        from app.models.item_category import ItemCategory
+                        category = db.query(ItemCategory).filter(
+                            ItemCategory.name.ilike(f"%{category_name_raw}%")
+                        ).first()
+                        if category:
+                            final_category_id = category.id
+                
                 # Create new
                 item = Product(
                     sku=sku,
                     name=name,
-                    description=row.get("description", "").strip() or None,
-                    unit=row.get("unit", "").strip() or "EA",
-                    item_type=row.get("item_type", "").strip() or default_item_type,
-                    category_id=int(row["category_id"]) if row.get("category_id") else default_category_id,
-                    standard_cost=float(row["standard_cost"]) if row.get("standard_cost") else None,
-                    selling_price=float(row["selling_price"]) if row.get("selling_price") else None,
+                    description=description,
+                    unit=row.get("unit", "") or row.get("Unit", "") or "EA",
+                    item_type=(row.get("item_type", "") or row.get("Item Type", "")).strip() or default_item_type,
+                    category_id=final_category_id,
+                    standard_cost=standard_cost,
+                    selling_price=selling_price,
                     reorder_point=float(row["reorder_point"]) if row.get("reorder_point") else None,
-                    upc=row.get("upc", "").strip() or None,
+                    upc=(row.get("upc", "") or row.get("UPC", "") or row.get("barcode", "") or row.get("Barcode", "") or row.get("EAN", "") or row.get("GTIN", "") or row.get("Product Code", "") or row.get("product_code", "") or row.get("ASIN", "") or row.get("asin", "")).strip() or None,
                     active=True,
                 )
                 db.add(item)
@@ -763,23 +1389,60 @@ async def bulk_update_items(
             raise HTTPException(status_code=400, detail=f"Category {request.category_id} not found")
 
     updated = 0
+    errors = []
+    
     for item_id in request.item_ids:
         item = db.query(Product).filter(Product.id == item_id).first()
-        if item:
+        if not item:
+            errors.append({"item_id": item_id, "error": "Item not found"})
+            continue
+            
+        try:
             if request.category_id is not None:
-                item.category_id = request.category_id
+                # Allow setting to None (0) to clear category
+                if request.category_id == 0:
+                    item.category_id = None
+                else:
+                    item.category_id = request.category_id
             if request.item_type is not None:
-                item.item_type = request.item_type.value
+                # Handle both enum and string values
+                item_type_value = request.item_type
+                if hasattr(item_type_value, 'value'):
+                    item_type_value = item_type_value.value
+                # Validate item type
+                valid_item_types = ['finished_good', 'component', 'supply', 'service']
+                if item_type_value in valid_item_types:
+                    item.item_type = item_type_value
+                else:
+                    raise ValueError(f"Invalid item_type: {item_type_value}")
+            if request.procurement_type is not None:
+                # Handle both enum and string values
+                proc_type_value = request.procurement_type
+                if hasattr(proc_type_value, 'value'):
+                    proc_type_value = proc_type_value.value
+                # Validate procurement type
+                valid_proc_types = ['make', 'buy', 'make_or_buy']
+                if proc_type_value in valid_proc_types:
+                    item.procurement_type = proc_type_value
+                else:
+                    raise ValueError(f"Invalid procurement_type: {proc_type_value}")
             if request.is_active is not None:
                 item.active = request.is_active
             item.updated_at = datetime.utcnow()
             updated += 1
+        except Exception as e:
+            errors.append({"item_id": item_id, "error": str(e)})
 
     db.commit()
 
-    logger.info(f"Bulk update: {updated} items updated")
+    logger.info(f"Bulk update: {updated} items updated, {len(errors)} errors")
 
-    return {"message": f"{updated} items updated"}
+    return {
+        "message": f"{updated} items updated",
+        "updated_count": updated,
+        "error_count": len(errors),
+        "errors": errors
+    }
 
 
 # ============================================================================
@@ -1043,6 +1706,7 @@ def _build_item_response(item: Product, db: Session) -> ItemResponse:
         description=item.description,
         unit=item.unit,
         item_type=ItemType(item.item_type) if item.item_type else ItemType.FINISHED_GOOD,
+        procurement_type=ProcurementType(item.procurement_type) if item.procurement_type else ProcurementType.BUY,
         category_id=item.category_id,
         cost_method=item.cost_method or "average",
         standard_cost=item.standard_cost,

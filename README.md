@@ -5,102 +5,111 @@
 [![License: BSL](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
 FilaOps is an open source ERP system built for 3D print farms. Manage products, inventory, BOMs, orders, and production - designed by someone who actually runs a print farm.
+
+![FilaOps Dashboard](docs/images/dashboard-preview.png)
+
+---
+
+## 🚀 Quick Start (Docker - Recommended)
+
+**No development experience required.** Just Docker and 5 minutes.
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/blb3dprinting/filaops.git
+cd filaops
+
+# 2. Start everything
+docker-compose up -d
+
+# 3. Open your browser
+# http://localhost:5173
+```
+
+**Default login:** admin@filaops.local / admin123
+
+📖 **[Full Installation Guide](INSTALL.md)** - Includes Windows/Mac/Linux instructions
 
 ---
 
 ## What You Get
 
 ### Core ERP (Fully Functional)
-- **Product Catalog** - SKUs, variants, material-aware costing
-- **Bill of Materials** - Multi-level BOMs with filament and hardware components
-- **Inventory Management** - Stock levels, low stock alerts, FIFO tracking
-- **Sales Orders** - Order management with status tracking
+- **Product Catalog** - Unified item master (finished goods, components, supplies, services)
+- **Bill of Materials** - Multi-level BOMs with explicit units of measure and cost-only flags
+- **Inventory Management** - Stock levels, allocations, low stock alerts with MRP integration
+- **Sales Orders** - Complete order management with status tracking and MRP explosion
 - **Production Orders** - Manufacturing workflow with operation tracking
-- **MRP** - Material requirements planning
-
-### Manufacturing
-- **Work Centers** - Machine pools and capacity planning
-- **Routings** - Operation sequences with time standards
-- **Traceability** - Serial numbers, lot tracking, recall queries (FDA/ISO ready)
+- **MRP** - Material requirements planning with shortage detection
+- **Purchasing** - Low stock alerts with MRP-driven requirements
+- **Shipping** - Multi-carrier support, production status validation, packing slips
 
 ### Admin Dashboard
-- Full React-based admin UI included
-- Manage products, BOMs, inventory, orders, production, shipping
-- Works out of the box with the backend API
+- Full React-based admin UI with **dark theme** (your eyes will thank you)
+- Real-time KPIs: overdue orders, low stock items, revenue metrics
+- Order Command Center: MRP explosion, material/capacity requirements, shortage detection
 
 ---
 
-## Documentation
+## 📖 Documentation
 
-- **[GETTING_STARTED.md](GETTING_STARTED.md)** - Step-by-step setup guide
-- **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** - Understanding the workflow (Products → BOMs → Orders → Production)
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - For contributors
+| Guide | Description |
+|-------|-------------|
+| **[INSTALL.md](INSTALL.md)** | Docker deployment for print farmers |
+| [GETTING_STARTED.md](GETTING_STARTED.md) | Development setup guide |
+| [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | Understanding the workflow |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | For contributors |
 
 ---
 
-## Quick Start
+## Development Setup (For Contributors)
+
+If you want to modify FilaOps or contribute, here's the dev setup:
 
 ### Prerequisites
-
 - Python 3.11+
 - Node.js 18+
 - SQL Server Express (or SQL Server)
 - ODBC Driver 17 for SQL Server
 
-### 1. Clone and Set Up Database
-
+### Backend
 ```bash
-git clone https://github.com/Blb3D/filaops.git
-cd filaops/backend
-
+cd backend
 pip install -r requirements.txt
-
-# Create database with all 36 tables + default data
-python ../scripts/fresh_database_setup.py --database FilaOps
-```
-
-### 2. Configure and Start Backend
-
-```bash
 cp .env.example .env
-# Edit .env: set DB_NAME=FilaOps
-
+# Edit .env with your database settings
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-API docs: http://localhost:8000/docs
-
-### 3. Start Frontend
-
+### Frontend
 ```bash
-cd ../frontend
+cd frontend
 npm install
 npm run dev
 ```
 
+API docs: http://localhost:8000/docs
 Admin UI: http://localhost:5173
-
-### 4. Log In
-
-- **Email:** `admin@localhost`
-- **Password:** `admin123`
-
-For detailed instructions, see **[GETTING_STARTED.md](GETTING_STARTED.md)**.
 
 ---
 
 ## Configuration
 
-Create `backend/.env`:
+### Docker (.env file)
 ```env
-# Database
+# Copy .env.example to .env and customize
+DB_PASSWORD=YourSecurePassword
+SECRET_KEY=your-64-char-hex-key
+```
+
+### Manual Setup (backend/.env)
+```env
 DB_HOST=localhost\SQLEXPRESS
 DB_NAME=FilaOps
 DB_TRUSTED_CONNECTION=true
-
-# Security
 SECRET_KEY=your-secure-secret-key
 ```
 
@@ -109,38 +118,19 @@ SECRET_KEY=your-secure-secret-key
 ## Project Structure
 ```
 filaops/
-+-- backend/
-|   +-- app/
-|   |   +-- api/v1/endpoints/   # REST API routes
-|   |   +-- models/             # SQLAlchemy ORM models
-|   |   +-- schemas/            # Pydantic schemas
-|   |   +-- services/           # Business logic
-|   |   +-- core/               # Config, security
-|   +-- requirements.txt
-+-- frontend/                   # React admin UI
-+-- mock-api/                   # Mock quote server (for contributors)
-+-- scripts/                    # Database setup scripts
-+-- docs/
+├── backend/           # FastAPI REST API
+│   ├── app/
+│   │   ├── api/       # REST endpoints
+│   │   ├── models/    # SQLAlchemy ORM
+│   │   ├── services/  # Business logic (MRP, etc)
+│   │   └── core/      # Config, security
+│   └── Dockerfile
+├── frontend/          # React admin UI
+│   └── Dockerfile
+├── docker-compose.yml # One-command deployment
+├── INSTALL.md         # User installation guide
+└── scripts/           # Database setup
 ```
-
----
-
-## Mock API (For Contributors)
-
-The `/mock-api` folder contains a mock quote server for UI development:
-- Parses real 3MF files
-- Returns fake quotes with realistic structure
-- Lets contributors improve the quote portal UI without access to proprietary pricing
-
-**This is for UI development only** - not for quoting real customers.
-```bash
-cd mock-api
-npm install
-node server.js
-# Runs on http://localhost:3001
-```
-
-See [mock-api/README.md](mock-api/README.md) for details.
 
 ---
 
@@ -148,17 +138,18 @@ See [mock-api/README.md](mock-api/README.md) for details.
 
 ### Products & Inventory
 ```
-GET    /api/v1/products           # List products
-POST   /api/v1/products           # Create product
-GET    /api/v1/inventory          # Current stock levels
-POST   /api/v1/inventory/adjust   # Adjust inventory
+GET    /api/v1/items              # List all items
+POST   /api/v1/items              # Create item
+GET    /api/v1/items/low-stock    # Low stock items + MRP shortages
+GET    /api/v1/admin/inventory/transactions  # Transaction history
 ```
 
-### Orders
+### Orders & MRP
 ```
 GET    /api/v1/sales-orders       # List sales orders
 POST   /api/v1/sales-orders       # Create sales order
-PATCH  /api/v1/sales-orders/{id}  # Update order status
+GET    /api/v1/sales-orders/{id}  # Order detail with MRP explosion
+POST   /api/v1/mrp/requirements   # Calculate material requirements
 ```
 
 ### Production
@@ -169,62 +160,72 @@ POST   /api/v1/production-orders/{id}/start
 POST   /api/v1/production-orders/{id}/complete
 ```
 
-### Traceability
-```
-GET    /api/v1/admin/traceability/lots
-GET    /api/v1/admin/traceability/serials
-GET    /api/v1/admin/traceability/recall/forward/{lot}
-GET    /api/v1/admin/traceability/recall/backward/{sn}
-```
-
-Full API docs at `/docs` when running.
+Full interactive API docs at `http://localhost:8000/docs` when running.
 
 ---
 
-## FilaOps Pro (Coming 2026)
+## FilaOps Tiers
 
-| Feature | Open Source | Pro | Enterprise |
-|---------|:-----------:|:---:|:----------:|
+| Feature | Community | Pro | Enterprise |
+|---------|:---------:|:---:|:----------:|
 | Products, BOMs, Inventory | ✅ | ✅ | ✅ |
 | Sales & Production Orders | ✅ | ✅ | ✅ |
-| Work Centers & Routing | ✅ | ✅ | ✅ |
+| MRP & Capacity Planning | ✅ | ✅ | ✅ |
 | Serial/Lot Traceability | ✅ | ✅ | ✅ |
-| MRP | ✅ | ✅ | ✅ |
 | Admin Dashboard UI | ✅ | ✅ | ✅ |
+| Docker Deployment | ✅ | ✅ | ✅ |
 | REST API | ✅ | ✅ | ✅ |
-| Mock Quote API | ✅ | - | - |
 | Customer Quote Portal | - | ✅ | ✅ |
-| Multi-Material Quoting | - | ✅ | ✅ |
+| Multi-User | - | ✅ | ✅ |
 | E-commerce Integrations | - | ✅ | ✅ |
-| Payment Processing | - | ✅ | ✅ |
-| Shipping Integrations | - | ✅ | ✅ |
-| Accounting Integrations | - | ✅ | ✅ |
 | Printer Fleet Management | - | - | ✅ |
-| Live Production Monitoring | - | - | ✅ |
 | ML Print Time Estimation | - | - | ✅ |
+| Priority Support | - | - | ✅ |
 
-Questions? [Contact us](mailto:hello@blb3dprinting.com) or open a [Discussion](https://github.com/Blb3D/filaops/discussions).
+**Pro & Enterprise coming 2026** - [Join the waitlist](mailto:hello@blb3dprinting.com)
+
+---
+
+## Recent Updates (December 2025)
+
+- ✅ **Docker deployment** - One-command setup for print farmers
+- ✅ MRP engine refactoring (Phase 5 complete)
+- ✅ Inventory transaction management
+- ✅ Enhanced dashboard with MRP-integrated alerts
+- ✅ Unified item master system
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
 
 ---
 
 ## Contributing
 
-Contributions welcome! This is the core ERP - help us make the foundation solid.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Key areas:
+- Bug fixes and testing
+- Documentation improvements
+- UI/UX enhancements
+- Performance optimization
 
 ---
 
 ## License
 
-Business Source License 1.1 - see [LICENSE](LICENSE).
+**Business Source License 1.1** - see [LICENSE](LICENSE)
 
-Converts to Apache 2.0 after 4 years.
+- ✅ Free for internal business use
+- ✅ Free for personal/educational use
+- ❌ Cannot be used to offer competing SaaS
+- 🔓 Converts to Apache 2.0 after 4 years
 
 ---
 
 ## Support
 
-- [GitHub Issues](https://github.com/Blb3D/filaops/issues)
-- [GitHub Discussions](https://github.com/Blb3D/filaops/discussions)
+- [GitHub Issues](https://github.com/blb3dprinting/filaops/issues) - Bug reports
+- [GitHub Discussions](https://github.com/blb3dprinting/filaops/discussions) - Questions & ideas
+- [Discord](https://discord.gg/filaops) - Community chat
 
 ---
 

@@ -1,0 +1,1132 @@
+import { useState, useEffect, useMemo } from "react";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+// Item type options
+const ITEM_TYPES = [
+  { value: "finished_good", label: "Finished Good", color: "blue", defaultProcurement: "make" },
+  { value: "component", label: "Component", color: "purple", defaultProcurement: "buy" },
+  { value: "supply", label: "Supply", color: "orange", defaultProcurement: "buy" },
+  { value: "service", label: "Service", color: "green", defaultProcurement: "buy" },
+];
+
+// Procurement type options (Make vs Buy)
+const PROCUREMENT_TYPES = [
+  { value: "make", label: "Make (Manufactured)", color: "green", needsBom: true, description: "Produced in-house with BOM & routing" },
+  { value: "buy", label: "Buy (Purchased)", color: "blue", needsBom: false, description: "Purchased from suppliers" },
+  { value: "make_or_buy", label: "Make or Buy", color: "yellow", needsBom: true, description: "Flexible sourcing" },
+];
+
+/**
+ * ItemWizard - Reusable item creation wizard with BOM builder
+ *
+ * Props:
+ * - isOpen: boolean - Whether the wizard is open
+ * - onClose: () => void - Called when wizard is closed
+ * - onSuccess: (item) => void - Called when item is created successfully
+ * - editingItem: object|null - If provided, edits existing item instead of creating new
+ * - categories: array - Available categories (optional, will fetch if not provided)
+ * - showPricing: boolean - Whether to show pricing step (default: true)
+ */
+export default function ItemWizard({ isOpen, onClose, onSuccess, editingItem = null, categories: propCategories = null, showPricing = true }) {
+  const token = localStorage.getItem("adminToken");
+
+  // Wizard step tracking
+  const [currentStep, setCurrentStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Data loaded from API
+  const [categories, setCategories] = useState(propCategories || []);
+  const [components, setComponents] = useState([]);
+  const [workCenters, setWorkCenters] = useState([]);
+  const [routingTemplates, setRoutingTemplates] = useState([]);
+
+  // Material wizard state
+  const [materialTypes, setMaterialTypes] = useState([]);
+  const [allColors, setAllColors] = useState([]);
+  const [showMaterialWizard, setShowMaterialWizard] = useState(false);
+  const [newMaterial, setNewMaterial] = useState({
+    material_type_code: "",
+    color_code: "",
+    quantity_kg: 1.0,
+    cost_per_kg: null,
+    in_stock: true,
+  });
+
+  // Sub-component wizard state
+  const [showSubComponentWizard, setShowSubComponentWizard] = useState(false);
+  const [subComponent, setSubComponent] = useState({
+    sku: "",
+    name: "",
+    description: "",
+    item_type: "component",
+    procurement_type: "buy",
+    unit: "EA",
+    standard_cost: null,
+  });
+
+  // Item form state
+  const [item, setItem] = useState({
+    sku: editingItem?.sku || "",
+    name: editingItem?.name || "",
+    description: editingItem?.description || "",
+    item_type: editingItem?.item_type || "finished_good",
+    procurement_type: editingItem?.procurement_type || "make",
+    category_id: editingItem?.category_id || null,
+    unit: editingItem?.unit || "EA",
+    standard_cost: editingItem?.standard_cost || null,
+    selling_price: editingItem?.selling_price || null,
+  });
+
+  // BOM state
+  const [bomLines, setBomLines] = useState([]);
+  const [calculatedCost, setCalculatedCost] = useState(0);
+
+  // Routing state
+  const [routingOperations, setRoutingOperations] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [laborCost, setLaborCost] = useState(0);
+
+  // Pricing state
+  const [targetMargin, setTargetMargin] = useState(40);
+
+  // Load data when wizard opens
+  useEffect(() => {
+    if (isOpen) {
+      if (!propCategories) fetchCategories();
+      fetchComponents();
+      fetchWorkCenters();
+      fetchRoutingTemplates();
+      fetchMaterialTypesAndColors();
+    }
+  }, [isOpen]);
+
+  // Auto-generate SKU when name changes
+  useEffect(() => {
+    if (item.name && !item.sku && !editingItem) {
+      const prefix = item.item_type === "finished_good" ? "FG" :
+                     item.item_type === "component" ? "CP" :
+                     item.item_type === "supply" ? "SP" : "SV";
+      const timestamp = Date.now().toString(36).toUpperCase();
+      setItem(prev => ({ ...prev, sku: `${prefix}-${timestamp}` }));
+    }
+  }, [item.name, item.item_type]);
+
+  // Calculate cost from BOM lines
+  useEffect(() => {
+    const total = bomLines.reduce((sum, line) => {
+      const lineCost = (line.quantity || 0) * (line.component_cost || 0);
+      return sum + lineCost;
+    }, 0);
+    setCalculatedCost(total);
+  }, [bomLines]);
+
+  // Calculate labor cost from routing
+  useEffect(() => {
+    const total = routingOperations.reduce((sum, op) => {
+      const timeHours = ((op.setup_time_minutes || 0) + (op.run_time_minutes || 0)) / 60;
+      const rate = op.rate_per_hour || 0;
+      return sum + (timeHours * rate);
+    }, 0);
+    setLaborCost(total);
+  }, [routingOperations]);
+
+  const totalCost = useMemo(() => calculatedCost + laborCost, [calculatedCost, laborCost]);
+  const suggestedPrice = useMemo(() => {
+    if (totalCost <= 0) return 0;
+    return totalCost / (1 - targetMargin / 100);
+  }, [totalCost, targetMargin]);
+
+  // Determine if item needs BOM based on procurement type
+  const itemNeedsBom = item.procurement_type === "make" || item.procurement_type === "make_or_buy";
+
+  // Steps config
+  const steps = showPricing
+    ? [
+        { id: 1, name: "Basic Info", description: "Item details & type" },
+        { id: 2, name: "BOM", description: "Components & materials", skip: !itemNeedsBom },
+        { id: 3, name: "Pricing", description: "Cost & margin" },
+      ]
+    : [
+        { id: 1, name: "Basic Info", description: "Item details & type" },
+        { id: 2, name: "BOM", description: "Components & materials", skip: !itemNeedsBom },
+      ];
+
+  const activeSteps = steps.filter(s => !s.skip);
+  const maxStep = activeSteps.length;
+
+  // Fetch functions
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/items/categories`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch categories:", err);
+    }
+  };
+
+  const fetchComponents = async () => {
+    try {
+      const itemsRes = await fetch(`${API_URL}/api/v1/items?limit=500&active_only=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const materialsRes = await fetch(`${API_URL}/api/v1/materials/for-bom`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      let allComponents = [];
+
+      if (itemsRes.ok) {
+        const data = await itemsRes.json();
+        allComponents = data.items || [];
+      }
+
+      if (materialsRes.ok) {
+        const materialsData = await materialsRes.json();
+        const materialItems = (materialsData.items || []).map(m => ({
+          ...m,
+          is_material: true,
+        }));
+        const existingIds = new Set(allComponents.map(c => c.id));
+        const newMaterials = materialItems.filter(m => !existingIds.has(m.id));
+        allComponents = [...allComponents, ...newMaterials];
+      }
+
+      setComponents(allComponents);
+    } catch (err) {
+      console.error("Failed to fetch components:", err);
+    }
+  };
+
+  const fetchWorkCenters = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/work-centers/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWorkCenters(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch work centers:", err);
+    }
+  };
+
+  const fetchRoutingTemplates = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/routings/?templates_only=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRoutingTemplates(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch routing templates:", err);
+    }
+  };
+
+  const fetchMaterialTypesAndColors = async () => {
+    try {
+      const typesRes = await fetch(`${API_URL}/api/v1/materials/types?customer_visible_only=false`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (typesRes.ok) {
+        const data = await typesRes.json();
+        setMaterialTypes(data.materials || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch material types:", err);
+    }
+  };
+
+  // Fetch colors when material type is selected
+  const fetchColorsForType = async (materialTypeCode) => {
+    if (!materialTypeCode) {
+      setAllColors([]);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `${API_URL}/api/v1/materials/types/${materialTypeCode}/colors?in_stock_only=false&customer_visible_only=false`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setAllColors(data.colors || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch colors for material type:", err);
+    }
+  };
+
+  // BOM Line handlers
+  const addBomLine = (component) => {
+    const existing = bomLines.find(bl => bl.component_id === component.id);
+    if (!existing) {
+      setBomLines([...bomLines, {
+        component_id: component.id,
+        component_sku: component.sku,
+        component_name: component.name,
+        component_unit: component.unit,
+        component_cost: component.standard_cost || component.average_cost || component.cost || 0,
+        quantity: component.unit === "kg" ? 0.05 : 1,
+        is_material: component.is_material || false,
+      }]);
+    }
+  };
+
+  const removeBomLine = (componentId) => {
+    setBomLines(bomLines.filter(bl => bl.component_id !== componentId));
+  };
+
+  const updateBomQuantity = (componentId, quantity) => {
+    setBomLines(bomLines.map(bl =>
+      bl.component_id === componentId
+        ? { ...bl, quantity: Math.max(0.001, quantity) }
+        : bl
+    ));
+  };
+
+  // Sub-component creation
+  const startSubComponent = () => {
+    setSubComponent({
+      sku: "",
+      name: "",
+      description: "",
+      item_type: "component",
+      procurement_type: "buy",
+      unit: "EA",
+      standard_cost: null,
+    });
+    setShowSubComponentWizard(true);
+  };
+
+  const handleSaveSubComponent = async () => {
+    if (!subComponent.name) {
+      setError("Component name is required");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const sku = subComponent.sku || `CP-${Date.now().toString(36).toUpperCase()}`;
+      const res = await fetch(`${API_URL}/api/v1/items`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...subComponent,
+          sku,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to create component");
+      }
+
+      const created = await res.json();
+      setComponents(prev => [...prev, created]);
+      addBomLine(created);
+      setShowSubComponentWizard(false);
+      await fetchComponents();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Material creation
+  const handleCreateMaterial = async () => {
+    if (!newMaterial.material_type_code || !newMaterial.color_code) {
+      setError("Material type and color are required");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/materials/inventory`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newMaterial),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to create material");
+      }
+
+      const created = await res.json();
+      const newComponent = {
+        id: created.product_id,
+        sku: created.sku,
+        name: created.name,
+        item_type: "supply",
+        procurement_type: "buy",
+        unit: "kg",
+        standard_cost: created.cost_per_kg || 0,
+        is_material: true,
+        in_stock: created.in_stock,
+      };
+      setComponents(prev => [...prev, newComponent]);
+      addBomLine(newComponent);
+      setNewMaterial({
+        material_type_code: "",
+        color_code: "",
+        quantity_kg: 1.0,
+        cost_per_kg: null,
+        in_stock: true,
+      });
+      setShowMaterialWizard(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Routing template application
+  const applyRoutingTemplate = (template) => {
+    if (!template) {
+      setSelectedTemplate(null);
+      setRoutingOperations([]);
+      return;
+    }
+    setSelectedTemplate(template);
+    if (template.operations) {
+      setRoutingOperations(template.operations.map((op, idx) => ({
+        ...op,
+        id: `new-${idx}`,
+        sequence: idx + 1,
+      })));
+    }
+  };
+
+  // Save item
+  const handleSave = async () => {
+    if (!item.sku || !item.name) {
+      setError("SKU and Name are required");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Create/Update item
+      const itemPayload = {
+        sku: item.sku,
+        name: item.name,
+        description: item.description || null,
+        item_type: item.item_type,
+        procurement_type: item.procurement_type,
+        category_id: item.category_id,
+        unit: item.unit || "EA",
+        standard_cost: totalCost > 0 ? totalCost : item.standard_cost,
+        selling_price: item.selling_price,
+      };
+
+      const itemUrl = editingItem
+        ? `${API_URL}/api/v1/items/${editingItem.id}`
+        : `${API_URL}/api/v1/items`;
+      const itemRes = await fetch(itemUrl, {
+        method: editingItem ? "PATCH" : "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(itemPayload),
+      });
+
+      if (!itemRes.ok) {
+        const err = await itemRes.json();
+        throw new Error(err.detail || "Failed to save item");
+      }
+
+      const createdItem = await itemRes.json();
+
+      // 2. Create BOM if needed and has lines
+      if (itemNeedsBom && bomLines.length > 0 && !editingItem) {
+        const bomPayload = {
+          product_id: createdItem.id,
+          lines: bomLines.map((line, idx) => ({
+            component_id: line.component_id,
+            quantity: line.quantity,
+            sequence: idx + 1,
+          })),
+        };
+
+        const bomRes = await fetch(`${API_URL}/api/v1/admin/bom/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(bomPayload),
+        });
+
+        if (!bomRes.ok) {
+          console.warn("BOM creation failed, but item was created");
+        }
+      }
+
+      // 3. Create Routing if has operations
+      if (routingOperations.length > 0 && !editingItem) {
+        const routingPayload = {
+          product_id: createdItem.id,
+          version: 1,
+          revision: "1.0",
+          is_active: true,
+          operations: routingOperations.map(op => ({
+            work_center_id: op.work_center_id,
+            sequence: op.sequence,
+            operation_code: op.operation_code,
+            operation_name: op.operation_name,
+            setup_time_minutes: op.setup_time_minutes,
+            run_time_minutes: op.run_time_minutes,
+            runtime_source: "manual",
+          })),
+        };
+
+        const routingRes = await fetch(`${API_URL}/api/v1/routings/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(routingPayload),
+        });
+
+        if (!routingRes.ok) {
+          console.warn("Routing creation failed, but item was created");
+        }
+      }
+
+      // Success!
+      if (onSuccess) onSuccess(createdItem);
+      handleClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setCurrentStep(1);
+    setItem({
+      sku: "",
+      name: "",
+      description: "",
+      item_type: "finished_good",
+      procurement_type: "make",
+      category_id: null,
+      unit: "EA",
+      standard_cost: null,
+      selling_price: null,
+    });
+    setBomLines([]);
+    setRoutingOperations([]);
+    setError(null);
+    if (onClose) onClose();
+  };
+
+  const nextStep = () => {
+    const currentIdx = activeSteps.findIndex(s => s.id === currentStep);
+    if (currentIdx < activeSteps.length - 1) {
+      setCurrentStep(activeSteps[currentIdx + 1].id);
+    }
+  };
+
+  const prevStep = () => {
+    const currentIdx = activeSteps.findIndex(s => s.id === currentStep);
+    if (currentIdx > 0) {
+      setCurrentStep(activeSteps[currentIdx - 1].id);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col m-4">
+        {/* Header */}
+        <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-bold text-white">
+              {editingItem ? "Edit Item" : "Create New Item"}
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Step {activeSteps.findIndex(s => s.id === currentStep) + 1} of {maxStep}: {activeSteps.find(s => s.id === currentStep)?.name}
+            </p>
+          </div>
+          <button onClick={handleClose} className="text-gray-400 hover:text-white p-2">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Step indicators */}
+        <div className="px-6 py-3 bg-gray-800/50 border-b border-gray-800">
+          <div className="flex gap-4">
+            {activeSteps.map((step, idx) => (
+              <div key={step.id} className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                  currentStep === step.id
+                    ? "bg-blue-600 text-white"
+                    : activeSteps.findIndex(s => s.id === currentStep) > idx
+                      ? "bg-green-600 text-white"
+                      : "bg-gray-700 text-gray-400"
+                }`}>
+                  {activeSteps.findIndex(s => s.id === currentStep) > idx ? "✓" : idx + 1}
+                </div>
+                <span className={currentStep === step.id ? "text-white" : "text-gray-500"}>{step.name}</span>
+                {idx < activeSteps.length - 1 && <span className="text-gray-600 mx-2">→</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Error display */}
+        {error && (
+          <div className="mx-6 mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Step 1: Basic Info */}
+          {currentStep === 1 && (
+            <div className="space-y-6">
+              {/* Item Type */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Item Type</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {ITEM_TYPES.map(type => (
+                    <button
+                      key={type.value}
+                      type="button"
+                      onClick={() => {
+                        setItem({
+                          ...item,
+                          item_type: type.value,
+                          procurement_type: type.defaultProcurement,
+                        });
+                      }}
+                      className={`p-3 rounded-lg border text-sm font-medium transition-all ${
+                        item.item_type === type.value
+                          ? `bg-${type.color}-600/20 border-${type.color}-500 text-${type.color}-400`
+                          : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600"
+                      }`}
+                    >
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Procurement Type (Make vs Buy) */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Procurement Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PROCUREMENT_TYPES.map(proc => (
+                    <button
+                      key={proc.value}
+                      type="button"
+                      onClick={() => setItem({ ...item, procurement_type: proc.value })}
+                      className={`p-3 rounded-lg border text-left transition-all ${
+                        item.procurement_type === proc.value
+                          ? proc.value === "make" ? "bg-green-600/20 border-green-500 text-green-400"
+                            : proc.value === "buy" ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                            : "bg-yellow-600/20 border-yellow-500 text-yellow-400"
+                          : "bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600"
+                      }`}
+                    >
+                      <div className="font-medium text-sm">{proc.label}</div>
+                      <div className="text-xs opacity-70">{proc.description}</div>
+                    </button>
+                  ))}
+                </div>
+                {itemNeedsBom && (
+                  <p className="text-xs text-green-400 mt-2">This item will have a BOM and/or routing</p>
+                )}
+              </div>
+
+              {/* Basic fields */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">SKU *</label>
+                  <input
+                    type="text"
+                    value={item.sku}
+                    onChange={(e) => setItem({ ...item, sku: e.target.value.toUpperCase() })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-mono"
+                    placeholder="Auto-generated"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Name *</label>
+                  <input
+                    type="text"
+                    value={item.name}
+                    onChange={(e) => setItem({ ...item, name: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                    placeholder="Item name"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Description</label>
+                <textarea
+                  value={item.description}
+                  onChange={(e) => setItem({ ...item, description: e.target.value })}
+                  rows={2}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Category</label>
+                  <select
+                    value={item.category_id || ""}
+                    onChange={(e) => setItem({ ...item, category_id: e.target.value ? parseInt(e.target.value) : null })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  >
+                    <option value="">-- None --</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.full_path || cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Unit</label>
+                  <input
+                    type="text"
+                    value={item.unit}
+                    onChange={(e) => setItem({ ...item, unit: e.target.value.toUpperCase() })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: BOM Builder */}
+          {currentStep === 2 && (
+            <div className="space-y-6">
+              {/* BOM Components Section */}
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <label className="text-sm text-gray-400 font-medium">BOM Components</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowMaterialWizard(true)}
+                      className="text-xs px-2 py-1 bg-pink-600/20 border border-pink-500/30 text-pink-400 rounded hover:bg-pink-600/30"
+                    >
+                      + Add Filament
+                    </button>
+                    <button
+                      type="button"
+                      onClick={startSubComponent}
+                      className="text-xs px-2 py-1 bg-purple-600/20 border border-purple-500/30 text-purple-400 rounded hover:bg-purple-600/30"
+                    >
+                      + Create Component
+                    </button>
+                  </div>
+                </div>
+
+                {/* Material Wizard */}
+                {showMaterialWizard && (
+                  <div className="bg-pink-900/20 border border-pink-500/30 rounded-lg p-4 mb-3 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-pink-400 font-medium text-sm">Add Filament to Inventory</span>
+                      <button type="button" onClick={() => setShowMaterialWizard(false)} className="text-gray-400 hover:text-white text-xs">Cancel</button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Material Type *</label>
+                        <select
+                          value={newMaterial.material_type_code}
+                          onChange={(e) => {
+                            const code = e.target.value;
+                            setNewMaterial({ ...newMaterial, material_type_code: code, color_code: "" });
+                            fetchColorsForType(code);
+                          }}
+                          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white text-sm"
+                        >
+                          <option value="">Select material...</option>
+                          {materialTypes.map(mt => (
+                            <option key={mt.code} value={mt.code}>{mt.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Color *</label>
+                        <select
+                          value={newMaterial.color_code}
+                          onChange={(e) => setNewMaterial({ ...newMaterial, color_code: e.target.value })}
+                          disabled={!newMaterial.material_type_code}
+                          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white text-sm disabled:opacity-50"
+                        >
+                          <option value="">{newMaterial.material_type_code ? "Select color..." : "Select material first"}</option>
+                          {allColors.map(c => (
+                            <option key={c.code} value={c.code}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Quantity (kg)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={newMaterial.quantity_kg}
+                          onChange={(e) => setNewMaterial({ ...newMaterial, quantity_kg: parseFloat(e.target.value) || 1.0 })}
+                          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Cost per kg ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={newMaterial.cost_per_kg || ""}
+                          onChange={(e) => setNewMaterial({ ...newMaterial, cost_per_kg: parseFloat(e.target.value) || null })}
+                          placeholder="Auto from material"
+                          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleCreateMaterial}
+                        disabled={loading || !newMaterial.material_type_code || !newMaterial.color_code}
+                        className="px-3 py-1.5 bg-pink-600 text-white text-sm rounded hover:bg-pink-500 disabled:opacity-50"
+                      >
+                        {loading ? "Creating..." : "Add to Inventory & BOM"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-Component Wizard */}
+                {showSubComponentWizard && (
+                  <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4 mb-3 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-purple-400 font-medium text-sm">New Component</span>
+                      <button type="button" onClick={() => setShowSubComponentWizard(false)} className="text-gray-400 hover:text-white text-xs">Cancel</button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Component Name *</label>
+                        <input
+                          type="text"
+                          value={subComponent.name}
+                          onChange={(e) => setSubComponent({ ...subComponent, name: e.target.value })}
+                          placeholder="e.g. M3 Heat Insert"
+                          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">SKU</label>
+                        <input
+                          type="text"
+                          value={subComponent.sku}
+                          onChange={(e) => setSubComponent({ ...subComponent, sku: e.target.value.toUpperCase() })}
+                          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white text-sm font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Unit Cost ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={subComponent.standard_cost || ""}
+                          onChange={(e) => setSubComponent({ ...subComponent, standard_cost: parseFloat(e.target.value) || null })}
+                          placeholder="0.00"
+                          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">Unit</label>
+                        <input
+                          type="text"
+                          value={subComponent.unit}
+                          onChange={(e) => setSubComponent({ ...subComponent, unit: e.target.value.toUpperCase() })}
+                          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-white text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleSaveSubComponent}
+                        disabled={loading || !subComponent.name}
+                        className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded hover:bg-purple-500 disabled:opacity-50"
+                      >
+                        {loading ? "Creating..." : "Create & Add to BOM"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Component Dropdown */}
+                <select
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const comp = components.find(c => String(c.id) === val);
+                    if (comp) addBomLine(comp);
+                    e.target.value = "";
+                  }}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                >
+                  <option value="">-- Select component or material to add --</option>
+                  <optgroup label="Components & Supplies">
+                    {components.filter(c => !c.is_material && !bomLines.find(bl => bl.component_id === c.id)).map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.sku} - {c.name} (${parseFloat(c.standard_cost || c.average_cost || c.cost || 0).toFixed(2)}/{c.unit})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Filament / Materials">
+                    {components.filter(c => c.is_material && !bomLines.find(bl => bl.component_id === c.id)).map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.in_stock ? "" : "(Out of Stock)"} (${parseFloat(c.standard_cost || 0).toFixed(3)}/{c.unit})
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              {/* BOM Lines */}
+              {bomLines.length > 0 && (
+                <div className="bg-gray-800/50 rounded-lg border border-gray-700 divide-y divide-gray-700">
+                  {bomLines.map(line => (
+                    <div key={line.component_id} className="p-3 flex items-center gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium">{line.component_name}</span>
+                          {line.is_material && (
+                            <span className="text-xs bg-purple-600/30 text-purple-300 px-1.5 py-0.5 rounded">Filament</span>
+                          )}
+                        </div>
+                        <div className="text-gray-500 text-xs font-mono">{line.component_sku}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-gray-400 text-sm">Qty:</label>
+                        <input
+                          type="number"
+                          min="0.001"
+                          step="0.001"
+                          value={line.quantity}
+                          onChange={(e) => updateBomQuantity(line.component_id, parseFloat(e.target.value) || 0.001)}
+                          className="w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-white text-center"
+                        />
+                        <span className="text-gray-500 text-sm">{line.component_unit}</span>
+                      </div>
+                      <div className="text-gray-400 text-sm">
+                        @ ${parseFloat(line.component_cost).toFixed(2)}
+                      </div>
+                      <div className="text-green-400 font-medium w-20 text-right">
+                        ${(line.quantity * line.component_cost).toFixed(2)}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeBomLine(line.component_id)}
+                        className="text-red-400 hover:text-red-300 p-1"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <div className="p-3 flex justify-between items-center bg-gray-800/80">
+                    <span className="text-white font-medium">Material Cost</span>
+                    <span className="text-green-400 font-bold">${calculatedCost.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+
+              {bomLines.length === 0 && (
+                <div className="text-center py-8 text-gray-500 border border-dashed border-gray-700 rounded-lg">
+                  No components added yet. Select from the dropdown above or create new ones.
+                </div>
+              )}
+
+              {/* Routing Templates */}
+              {routingTemplates.length > 0 && (
+                <div className="border-t border-gray-700 pt-4">
+                  <label className="text-sm text-gray-400 font-medium mb-2 block">Routing Template (optional)</label>
+                  <select
+                    value={selectedTemplate?.id || ""}
+                    onChange={(e) => {
+                      const tpl = routingTemplates.find(t => t.id === parseInt(e.target.value));
+                      applyRoutingTemplate(tpl || null);
+                    }}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  >
+                    <option value="">-- No routing --</option>
+                    {routingTemplates.map(t => (
+                      <option key={t.id} value={t.id}>{t.name || t.code}</option>
+                    ))}
+                  </select>
+                  {routingOperations.length > 0 && (
+                    <div className="mt-2 text-sm text-gray-400">
+                      {routingOperations.length} operations, est. labor: ${laborCost.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Pricing */}
+          {currentStep === 3 && showPricing && (
+            <div className="space-y-6">
+              {/* Cost Summary */}
+              <div className="bg-gray-800/50 rounded-lg border border-gray-700 p-4 space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Material Cost</span>
+                  <span className="text-white">${calculatedCost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Labor Cost</span>
+                  <span className="text-white">${laborCost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between border-t border-gray-700 pt-3">
+                  <span className="text-white font-medium">Total Cost</span>
+                  <span className="text-green-400 font-bold">${totalCost.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Margin Calculator */}
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Target Margin: {targetMargin}%</label>
+                <input
+                  type="range"
+                  min="10"
+                  max="80"
+                  value={targetMargin}
+                  onChange={(e) => setTargetMargin(parseInt(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>10%</span>
+                  <span>80%</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Standard Cost</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={totalCost > 0 ? totalCost.toFixed(2) : item.standard_cost || ""}
+                    onChange={(e) => setItem({ ...item, standard_cost: parseFloat(e.target.value) || null })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Auto-filled from BOM + Labor</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Selling Price</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={item.selling_price || ""}
+                      onChange={(e) => setItem({ ...item, selling_price: parseFloat(e.target.value) || null })}
+                      className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setItem({ ...item, selling_price: suggestedPrice })}
+                      className="px-3 py-2 bg-green-600/20 border border-green-500/30 text-green-400 rounded-lg text-sm hover:bg-green-600/30"
+                    >
+                      ${suggestedPrice.toFixed(2)}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Click suggested price to apply</p>
+                </div>
+              </div>
+
+              {item.selling_price && totalCost > 0 && (
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-blue-400">Actual Margin</span>
+                    <span className="text-white font-bold">
+                      {(((item.selling_price - totalCost) / item.selling_price) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mt-1">
+                    <span className="text-blue-400">Profit per Unit</span>
+                    <span className="text-green-400 font-bold">${(item.selling_price - totalCost).toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-gray-800 flex justify-between">
+          <button
+            type="button"
+            onClick={prevStep}
+            disabled={activeSteps.findIndex(s => s.id === currentStep) === 0}
+            className="px-4 py-2 text-gray-400 hover:text-white disabled:opacity-50"
+          >
+            Back
+          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-4 py-2 text-gray-400 hover:text-white"
+            >
+              Cancel
+            </button>
+            {activeSteps.findIndex(s => s.id === currentStep) < activeSteps.length - 1 ? (
+              <button
+                type="button"
+                onClick={nextStep}
+                disabled={!item.name}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50"
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={loading || !item.name || !item.sku}
+                className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-500 hover:to-purple-500 disabled:opacity-50"
+              >
+                {loading ? "Creating..." : editingItem ? "Save Changes" : "Create Item"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

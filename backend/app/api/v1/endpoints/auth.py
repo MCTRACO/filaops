@@ -183,6 +183,7 @@ async def register_user(
         user_id=new_user.id,
         token_hash=token_hash,
         expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        created_at=datetime.utcnow(),  # Explicitly set created_at for SQL Server
     )
     db.add(refresh_token_record)
     db.commit()
@@ -222,47 +223,95 @@ async def login_user(
     Raises:
         HTTPException 401 if credentials are incorrect
     """
-    # Get user by email (username field in OAuth2 form)
-    user = db.query(User).filter(User.email == form_data.username).first()
+    try:
+        # Get user by email (username field in OAuth2 form)
+        user = db.query(User).filter(User.email == form_data.username).first()
 
-    # Verify user exists and password is correct
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+        # Verify user exists and password is correct
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Verify password
+        try:
+            password_valid = verify_password(form_data.password, user.password_hash)
+        except Exception as e:
+            # Password hash is malformed
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Password verification error: {str(e)}"
+            )
+        
+        if not password_valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Check if user is active
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is inactive"
+            )
+
+        # Update last login timestamp
+        user.last_login_at = datetime.utcnow()
+        db.commit()
+        db.refresh(user)
+
+        # Generate tokens
+        access_token = create_access_token(user.id)
+        refresh_token = create_refresh_token(user.id)
+
+        # Store refresh token in database
+        token_hash = hash_refresh_token(refresh_token)
+        expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        
+        # Check if token hash already exists (shouldn't happen, but handle it)
+        existing_token = db.query(RefreshToken).filter(
+            RefreshToken.token_hash == token_hash
+        ).first()
+        
+        if existing_token:
+            # Revoke old token
+            existing_token.revoked = True
+            existing_token.revoked_at = datetime.utcnow()
+            db.commit()
+            # Generate new token to avoid collision
+            refresh_token = create_refresh_token(user.id)
+            token_hash = hash_refresh_token(refresh_token)
+            expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        
+        refresh_token_record = RefreshToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            created_at=datetime.utcnow(),  # Explicitly set created_at for SQL Server
         )
+        db.add(refresh_token_record)
+        db.commit()
 
-    # Check if user is active
-    if not user.is_active:
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log the actual error for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Login error: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Login failed: {str(e)}"
         )
-
-    # Update last login timestamp
-    user.last_login_at = datetime.utcnow()
-    db.commit()
-
-    # Generate tokens
-    access_token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
-
-    # Store refresh token in database
-    token_hash = hash_refresh_token(refresh_token)
-    refresh_token_record = RefreshToken(
-        user_id=user.id,
-        token_hash=token_hash,
-        expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-    )
-    db.add(refresh_token_record)
-    db.commit()
-
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer"
-    }
 
 
 # ============================================================================
@@ -331,6 +380,7 @@ async def refresh_access_token(
         user_id=user.id,
         token_hash=new_token_hash,
         expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        created_at=datetime.utcnow(),  # Explicitly set created_at for SQL Server
     )
     db.add(new_refresh_token_record)
     db.commit()

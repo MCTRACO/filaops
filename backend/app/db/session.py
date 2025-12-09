@@ -3,21 +3,21 @@ Database session management
 """
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from urllib.parse import quote_plus
 import logging
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Build connection string for SQL Server with Windows Authentication
-connection_string = (
-    f"mssql+pyodbc://{settings.DB_HOST}/{settings.DB_NAME}"
-    f"?driver=ODBC+Driver+17+for+SQL+Server"
-    f"&Trusted_Connection=yes"
-)
+# Use the database_url property from settings
+# This handles both Windows Authentication (local dev) and SQL Server auth (Docker)
+connection_string = settings.database_url
 
-logger.info(f"Database connection: {settings.DB_HOST}/{settings.DB_NAME}")
+# Log connection info (without password)
+if settings.DB_TRUSTED_CONNECTION:
+    logger.info(f"Database connection: {settings.DB_HOST}/{settings.DB_NAME} (Windows Auth)")
+else:
+    logger.info(f"Database connection: {settings.DB_HOST}/{settings.DB_NAME} (SQL Server Auth)")
 
 # Create engine
 engine = create_engine(
