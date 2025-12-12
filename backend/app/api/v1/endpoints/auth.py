@@ -227,10 +227,11 @@ async def login_user(
         try:
             password_valid = verify_password(form_data.password, user.password_hash)
         except Exception as e:
-            # Password hash is malformed
+            # Password hash is malformed - log details, don't expose to client
+            logger.error(f"Password verification error for user {user.id}: {str(e)}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Password verification error: {str(e)}"
+                detail="Authentication error. Please contact support."
             )
         
         if not password_valid:

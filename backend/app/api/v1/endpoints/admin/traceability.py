@@ -120,10 +120,8 @@ async def create_traceability_profile(
     db.commit()
     db.refresh(profile)
 
-    # Also update user's traceability_level for quick access
-    db.execute(
-        f"UPDATE users SET traceability_level = '{request.traceability_level}' WHERE id = {request.user_id}"
-    )
+    # Also update user's traceability_level for quick access (using ORM to prevent SQL injection)
+    user.traceability_level = request.traceability_level
     db.commit()
 
     return profile
@@ -162,12 +160,12 @@ async def update_traceability_profile(
     db.commit()
     db.refresh(profile)
 
-    # Update user's quick-access field
+    # Update user's quick-access field (using ORM to prevent SQL injection)
     if 'traceability_level' in update_data:
-        db.execute(
-            f"UPDATE users SET traceability_level = '{update_data['traceability_level']}' WHERE id = {user_id}"
-        )
-        db.commit()
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.traceability_level = update_data['traceability_level']
+            db.commit()
 
     return profile
 
