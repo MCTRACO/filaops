@@ -245,7 +245,7 @@ async def get_existing_products(
     """
     Get existing products that can be mapped to Amazon items
     """
-    query = db.query(Product).filter(Product.active== True)
+    query = db.query(Product).filter(Product.active.is_(True))
 
     if search:
         search_filter = f"%{search}%"
@@ -328,7 +328,7 @@ async def execute_import(
             # Parse date
             try:
                 order_date = datetime.strptime(order.order_date, "%m/%d/%Y").date()
-            except:
+            except ValueError:
                 order_date = datetime.utcnow().date()
 
             # Create PO

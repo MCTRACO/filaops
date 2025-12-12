@@ -11,7 +11,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, desc, and_
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db

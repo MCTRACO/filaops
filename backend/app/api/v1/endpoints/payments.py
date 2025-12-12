@@ -5,7 +5,7 @@ Record, track, and manage payments for sales orders.
 """
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, desc, and_
+from sqlalchemy import func, desc
 from typing import Optional
 from datetime import datetime, timedelta
 from decimal import Decimal

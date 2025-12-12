@@ -9,7 +9,6 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 import sys
 import traceback
-from pathlib import Path
 
 from app.db.session import get_db
 from app.models.user import User

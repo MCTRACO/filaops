@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
-from app.models import Quote, Product, BOM, SalesOrder, SalesOrderLine, ProductionOrder
+from app.models import Quote, Product, BOM, SalesOrder, ProductionOrder
 from app.services.bom_service import auto_create_product_and_bom, validate_quote_for_bom
 from app.logging_config import get_logger
 
@@ -158,7 +158,7 @@ def convert_quote_to_order(
             product = db.query(Product).get(quote.product_id)
             bom = db.query(BOM).filter(
                 BOM.product_id == product.id,
-                BOM.active== True
+                BOM.active.is_(True)
             ).first()
         else:
             # Create product and BOM now

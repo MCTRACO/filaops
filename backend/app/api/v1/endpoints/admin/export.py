@@ -23,7 +23,7 @@ async def export_products(
     db: Session = Depends(get_db)
 ):
     """Export products to CSV"""
-    products = db.query(Product).filter(Product.active== True).all()
+    products = db.query(Product).filter(Product.active.is_(True)).all()
     
     output = io.StringIO()
     writer = csv.writer(output)

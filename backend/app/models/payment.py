@@ -4,7 +4,7 @@ Payment Model
 Tracks payment transactions for sales orders with full audit trail.
 Supports partial payments, multiple payment methods, and refunds.
 """
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Text, Boolean
+from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 

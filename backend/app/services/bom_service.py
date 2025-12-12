@@ -16,10 +16,8 @@ from decimal import Decimal
 
 from app.models import Product, Quote, BOM, BOMLine
 from app.services.material_service import (
-    get_material_product_for_bom,
     get_material_product,
     create_material_product,
-    MaterialColorNotAvailableError,
     MaterialNotFoundError,
     ColorNotFoundError,
 )
@@ -167,7 +165,7 @@ def determine_best_box(quote: Quote, db: Session) -> Optional[Product]:
     # 2. Products in packaging/shipping categories
     box_products = db.query(Product).filter(
         and_(
-            Product.active== True,
+            Product.active.is_(True),
             Product.name.like('%box%')  # Match boxes by name
         )
     ).all()

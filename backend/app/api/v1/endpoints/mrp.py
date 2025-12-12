@@ -16,7 +16,7 @@ from app.models.user import User
 from app.api.v1.deps import get_current_staff_user
 from app.schemas.mrp import (
     MRPRunRequest, MRPRunResponse, MRPRunSummary,
-    PlannedOrderCreate, PlannedOrderUpdate, PlannedOrderResponse,
+    PlannedOrderResponse,
     PlannedOrderListResponse,
     FirmPlannedOrderRequest, ReleasePlannedOrderRequest, ReleasePlannedOrderResponse,
     RequirementsSummary, NetRequirement,

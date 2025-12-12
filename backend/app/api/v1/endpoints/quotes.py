@@ -810,7 +810,6 @@ async def generate_quote_pdf(
             quote_img.hAlign = 'RIGHT'
 
             # Create a table with quote info on left, image on right
-            from reportlab.platypus import KeepTogether
             info_table = Table(
                 [[left_content, quote_img]],
                 colWidths=[4.5*inch, 2.2*inch]

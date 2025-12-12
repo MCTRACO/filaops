@@ -19,7 +19,6 @@ from app.models.sales_order import SalesOrder
 from app.models.production_order import ProductionOrder
 from app.models.bom import BOM
 from app.models.product import Product
-from app.models.inventory import Inventory
 from app.api.v1.deps import get_current_staff_user
 
 router = APIRouter(prefix="/dashboard", tags=["Admin - Dashboard"])
@@ -126,7 +125,7 @@ async def get_dashboard(
         .join(Product)
         .filter(
             Product.type == "custom",
-            BOM.active== True,
+            BOM.active.is_(True),
         )
         .count()
     )
@@ -252,7 +251,7 @@ async def get_dashboard(
         .join(Product)
         .filter(
             Product.type == "custom",
-            BOM.active== True,
+            BOM.active.is_(True),
         )
         .order_by(desc(BOM.created_at))
         .limit(10)
@@ -325,14 +324,13 @@ async def get_dashboard_summary(
     boms_needing_review = (
         db.query(BOM)
         .join(Product)
-        .filter(BOM.active== True)
+        .filter(BOM.active.is_(True))
         .count()
     )
-    active_boms = db.query(BOM).filter(BOM.active== True).count()
+    active_boms = db.query(BOM).filter(BOM.active.is_(True)).count()
 
     # Low Stock Items (below reorder point + MRP shortages)
     # Use the same logic as /items/low-stock endpoint - just get the count
-    from sqlalchemy import or_
     from app.models.inventory import Inventory
     from collections import defaultdict
     from app.models.sales_order import SalesOrderLine
@@ -344,7 +342,7 @@ async def get_dashboard_summary(
     
     # Get all products with reorder points
     products_with_reorder = db.query(Product).filter(
-        Product.active== True,
+        Product.active.is_(True),
         Product.reorder_point.isnot(None),
         Product.reorder_point > 0
     ).all()
@@ -525,7 +523,7 @@ async def get_pending_bom_reviews(
     """
     boms = (
         db.query(BOM)
-        .filter(BOM.active== True)
+        .filter(BOM.active.is_(True))
         .order_by(desc(BOM.created_at))
         .limit(limit)
         .all()

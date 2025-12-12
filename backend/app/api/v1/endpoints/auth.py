@@ -100,7 +100,6 @@ async def get_current_user(
 
 # Re-export from deps for backwards compatibility
 # NOTE: Prefer importing from app.api.v1.deps directly
-from app.api.v1.deps import get_current_admin_user, get_current_staff_user
 
 
 # ============================================================================
@@ -340,7 +339,7 @@ async def refresh_access_token(
     stored_token = db.query(RefreshToken).filter(
         RefreshToken.token_hash == token_hash,
         RefreshToken.user_id == user_id,
-        RefreshToken.revoked == False
+        RefreshToken.revoked.is_(False)
     ).first()
 
     if not stored_token or not stored_token.is_valid:
@@ -894,7 +893,7 @@ async def complete_password_reset(
     # Revoke all existing refresh tokens for security
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user.id,
-        RefreshToken.revoked == False
+        RefreshToken.revoked.is_(False)
     ).update({"revoked": True, "revoked_at": datetime.utcnow()})
 
     db.commit()

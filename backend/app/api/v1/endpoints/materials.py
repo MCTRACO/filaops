@@ -3,7 +3,7 @@ Material API Endpoints
 
 Provides material type and color options for the quote portal.
 """
-from typing import Optional, List
+from typing import List
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query
 from fastapi.responses import StreamingResponse
@@ -23,8 +23,8 @@ from app.services.material_service import (
     get_portal_material_options,
     get_available_material_types,
     get_available_colors_for_material,
+    get_material_product_for_bom,
     MaterialNotFoundError,
-    ColorNotFoundError,
 )
 # MaterialInventory removed - using unified Inventory table (Phase 1.4)
 
@@ -412,7 +412,7 @@ def get_materials_for_bom(
                         "color_code": color.code,
                         "color_hex": color.hex_code,
                     })
-                except Exception as e:
+                except Exception:
                     # Skip materials that can't be resolved
                     continue
 

@@ -175,7 +175,6 @@ async def get_license_info(
 ):
     """Get current license information"""
     # Disabled - just return tier from environment variable
-    from app.core.settings import settings
     from app.core.features import get_current_tier
     
     tier = get_current_tier(db, current_user)

@@ -340,7 +340,7 @@ async def list_locations(
     db: Session = Depends(get_db),
 ):
     """List all inventory locations"""
-    locations = db.query(InventoryLocation).filter(InventoryLocation.active== True).all()
+    locations = db.query(InventoryLocation).filter(InventoryLocation.active.is_(True)).all()
     return [
         {
             "id": loc.id,

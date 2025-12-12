@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.models.sales_order import SalesOrder
 from app.models.production_order import ProductionOrder
-from app.models.inventory import InventoryTransaction, Inventory
+from app.models.inventory import InventoryTransaction
 from app.models.bom import BOM
 
 
@@ -210,7 +210,7 @@ class TransactionAuditService:
         elif po.product_id:
             return self.db.query(BOM).filter(
                 BOM.product_id == po.product_id,
-                BOM.active== True
+                BOM.active.is_(True)
             ).first()
         return None
 

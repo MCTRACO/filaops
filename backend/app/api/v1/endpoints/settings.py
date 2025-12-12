@@ -214,7 +214,7 @@ async def upload_company_logo(
     if file.content_type not in allowed_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type. Allowed: PNG, JPEG, GIF, WebP"
+            detail="Invalid file type. Allowed: PNG, JPEG, GIF, WebP"
         )
 
     # Limit file size (2MB)
