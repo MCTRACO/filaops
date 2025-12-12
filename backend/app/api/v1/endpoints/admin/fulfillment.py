@@ -45,7 +45,7 @@ def get_default_location(db: Session) -> InventoryLocation:
     if not location:
         # Try to get any active location
         location = db.query(InventoryLocation).filter(
-            InventoryLocation.active.is_(True)
+            InventoryLocation.active== True
         ).first()
     
     if not location:
@@ -363,7 +363,7 @@ async def get_production_order_details(
     
     # Get additional details
     product = db.query(Product).filter(Product.id == po.product_id).first() if po.product_id else None
-    bom = db.query(BOM).filter(BOM.product_id == po.product_id, BOM.active.is_(True)).first() if po.product_id else None
+    bom = db.query(BOM).filter(BOM.product_id == po.product_id, BOM.active== True).first() if po.product_id else None
     
     # Get quote details
     quote = db.query(Quote).filter(Quote.product_id == po.product_id).first() if po.product_id else None
@@ -510,7 +510,7 @@ async def start_production(
     elif po.product_id:
         bom = db.query(BOM).filter(
             BOM.product_id == po.product_id,
-            BOM.active.is_(True)
+            BOM.active== True
         ).first()
 
     if bom and bom.lines:
@@ -719,7 +719,7 @@ async def complete_print(
     elif po.product_id:
         bom = db.query(BOM).filter(
             BOM.product_id == po.product_id,
-            BOM.active.is_(True)
+            BOM.active== True
         ).first()
 
     # Build a set of component_ids that should be consumed at production stage
@@ -1180,7 +1180,7 @@ async def get_orders_ready_to_ship(
         if quote and quote.product_id:
             bom = db.query(BOM).filter(
                 BOM.product_id == quote.product_id,
-                BOM.active.is_(True)
+                BOM.active== True
             ).first()
 
             if bom and bom.lines:
@@ -1254,7 +1254,7 @@ async def get_available_boxes(
 
     # Get all box products (matching the pattern used in bom_service)
     box_products = db.query(Product).filter(
-        Product.active.is_(True),
+        Product.active== True,
         Product.name.like('%box%')
     ).all()
 
@@ -1473,7 +1473,7 @@ async def buy_consolidated_shipping_label(
         elif po.product_id:
             bom = db.query(BOM).filter(
                 BOM.product_id == po.product_id,
-                BOM.active.is_(True)
+                BOM.active== True
             ).first()
 
         if not bom or not bom.lines:
@@ -1540,7 +1540,7 @@ async def buy_consolidated_shipping_label(
             elif po.product_id:
                 bom = db.query(BOM).filter(
                     BOM.product_id == po.product_id,
-                    BOM.active.is_(True)
+                    BOM.active== True
                 ).first()
 
             if not bom or not bom.lines:
@@ -1781,7 +1781,7 @@ async def buy_shipping_label(
         elif po.product_id:
             bom = db.query(BOM).filter(
                 BOM.product_id == po.product_id,
-                BOM.active.is_(True)
+                BOM.active== True
             ).first()
 
         if not bom or not bom.lines:
