@@ -314,7 +314,7 @@ def raw_material_pla(db):
         name="PLA Filament - Black",
         item_type="supply",
         procurement_type="buy",
-        unit="kg",
+        unit="KG",
         standard_cost=Decimal("20.00"),
         lead_time_days=7,
         safety_stock=Decimal("2.0"),
@@ -337,7 +337,7 @@ def raw_material_petg(db):
         name="PETG Filament - White",
         item_type="supply",
         procurement_type="buy",
-        unit="kg",
+        unit="KG",
         standard_cost=Decimal("25.00"),
         lead_time_days=10,
         safety_stock=Decimal("1.0"),
@@ -434,7 +434,7 @@ def finished_product_simple(db, raw_material_pla, packaging_box):
         component_id=raw_material_pla.id,
         sequence=1,
         quantity=Decimal("0.1"),  # 100g of filament
-        unit="kg",
+        unit="KG",
         scrap_factor=Decimal("5.0"),  # 5% scrap
     )
     db.add(line1)
@@ -491,7 +491,7 @@ def sub_assembly(db, raw_material_petg, hardware_insert):
         component_id=raw_material_petg.id,
         sequence=1,
         quantity=Decimal("0.05"),
-        unit="kg",
+        unit="KG",
         scrap_factor=Decimal("10.0"),  # Higher scrap for small parts
     )
     db.add(line1)
@@ -549,7 +549,7 @@ def finished_product_multilevel(db, raw_material_pla, packaging_box, sub_assembl
         component_id=raw_material_pla.id,
         sequence=1,
         quantity=Decimal("0.2"),
-        unit="kg",
+        unit="KG",
         scrap_factor=Decimal("5.0"),
     )
     db.add(line1)

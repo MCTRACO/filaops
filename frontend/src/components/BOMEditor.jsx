@@ -21,6 +21,7 @@ export default function BOMEditor({
   const [lines, setLines] = useState([]);
   const [components, setComponents] = useState([]);
   const [materials, setMaterials] = useState([]);
+  const [uomClasses, setUomClasses] = useState([]);
   const [showAddLine, setShowAddLine] = useState(false);
   const [editingLine, setEditingLine] = useState(null);
 
@@ -43,6 +44,7 @@ export default function BOMEditor({
       }
       fetchComponents();
       fetchMaterials();
+      fetchUomClasses();
       setError(null);
     }
   }, [isOpen, bomId, productId]);
@@ -97,7 +99,7 @@ export default function BOMEditor({
         setComponents(data.items || []);
       }
     } catch (err) {
-      // Components fetch failure is non-critical - component selector will be empty
+      // Components fetch failure is non-critical
     }
   };
 
@@ -111,7 +113,21 @@ export default function BOMEditor({
         setMaterials(data.items || []);
       }
     } catch (err) {
-      // Materials fetch failure is non-critical - material selector will be empty
+      // Materials fetch failure is non-critical
+    }
+  };
+
+  const fetchUomClasses = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/admin/uom/classes`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUomClasses(data);
+      }
+    } catch (err) {
+      setUomClasses([]);
     }
   };
 
@@ -177,7 +193,7 @@ export default function BOMEditor({
           const res = await fetch(
             `${API_URL}/api/v1/admin/bom/${bom.id}/lines/${line.id}`,
             {
-              method: "PUT",
+              method: "PATCH",
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`,
@@ -246,7 +262,7 @@ export default function BOMEditor({
       setError("Please select a component");
       return;
     }
-    
+
     const component = allComponents.find(
       (c) => c.id === parseInt(newLine.component_id)
     );
@@ -256,14 +272,17 @@ export default function BOMEditor({
     }
 
     // Check if component is already in BOM
-    const existing = lines.find(l => l.component_id === parseInt(newLine.component_id));
+    const existing = lines.find(
+      (l) => l.component_id === parseInt(newLine.component_id)
+    );
     if (existing) {
       setError("This component is already in the BOM");
       return;
     }
 
-    // Set unit based on component type (materials use "kg", others use their unit or "EA")
-    const defaultUnit = component.unit || (component.item_type === "supply" ? "kg" : "EA");
+    // Set unit based on component type
+    const defaultUnit =
+      component.unit || (component.item_type === "supply" ? "KG" : "EA");
 
     setLines([
       ...lines,
@@ -274,7 +293,7 @@ export default function BOMEditor({
         component_name: component.name,
         component_unit: defaultUnit,
         component_cost: component.standard_cost || component.average_cost || 0,
-        unit: newLine.unit || defaultUnit, // Use selected unit or default
+        unit: newLine.unit || defaultUnit,
       },
     ]);
 
@@ -301,6 +320,36 @@ export default function BOMEditor({
     setLines(updated);
   };
 
+  // Render UOM select options
+  const renderUomOptions = () => {
+    if (uomClasses.length > 0) {
+      return uomClasses.map((cls) => (
+        <optgroup
+          key={cls.uom_class}
+          label={cls.uom_class.charAt(0).toUpperCase() + cls.uom_class.slice(1)}
+        >
+          {cls.units.map((u) => (
+            <option key={u.code} value={u.code}>
+              {u.code}
+            </option>
+          ))}
+        </optgroup>
+      ));
+    }
+    // Fallback
+    return (
+      <>
+        <option value="EA">EA</option>
+        <option value="KG">KG</option>
+        <option value="G">G</option>
+        <option value="LB">LB</option>
+        <option value="M">M</option>
+        <option value="FT">FT</option>
+        <option value="HR">HR</option>
+      </>
+    );
+  };
+
   if (!isOpen) return null;
 
   const totalCost = lines.reduce((sum, line) => {
@@ -309,23 +358,23 @@ export default function BOMEditor({
   }, 0);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">
+            <h2 className="text-2xl font-bold text-white">
               {bom ? `Edit BOM: ${bom.code || bom.name}` : "Create BOM"}
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-gray-400 hover:text-white"
             >
               ✕
             </button>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl">
               {error}
             </div>
           )}
@@ -333,171 +382,214 @@ export default function BOMEditor({
           {/* BOM Lines */}
           <div className="mb-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Components</h3>
+              <h3 className="text-lg font-semibold text-white">Components</h3>
               <button
                 onClick={() => setShowAddLine(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
               >
                 + Add Component
               </button>
             </div>
 
             {lines.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-400">
                 No components added yet. Click "Add Component" to get started.
               </div>
             ) : (
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border p-2 text-left">Seq</th>
-                    <th className="border p-2 text-left">Component</th>
-                    <th className="border p-2 text-right">Quantity</th>
-                    <th className="border p-2 text-left">Unit</th>
-                    <th className="border p-2 text-right">Scrap %</th>
-                    <th className="border p-2 text-right">Cost</th>
-                    <th className="border p-2 text-center">Cost Only</th>
-                    <th className="border p-2 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((line, index) => (
-                    <tr key={index}>
-                      <td className="border p-2">{index + 1}</td>
-                      <td className="border p-2">
-                        {line.component_sku || line.component?.sku} -{" "}
-                        {line.component_name || line.component?.name}
-                      </td>
-                      <td className="border p-2">
-                        <input
-                          type="number"
-                          step="0.001"
-                          min="0"
-                          value={line.quantity}
-                          onChange={(e) =>
-                            updateLine(
-                              index,
-                              "quantity",
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="w-20 text-right border rounded px-2 py-1"
-                        />
-                      </td>
-                      <td className="border p-2">
-                        <input
-                          type="text"
-                          value={line.unit || "EA"}
-                          onChange={(e) =>
-                            updateLine(index, "unit", e.target.value)
-                          }
-                          className="w-16 border rounded px-2 py-1"
-                          placeholder="EA"
-                        />
-                      </td>
-                      <td className="border p-2">
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="100"
-                          value={line.scrap_factor || 0}
-                          onChange={(e) =>
-                            updateLine(
-                              index,
-                              "scrap_factor",
-                              parseFloat(e.target.value) || 0
-                            )
-                          }
-                          className="w-20 text-right border rounded px-2 py-1"
-                        />
-                      </td>
-                      <td className="border p-2 text-right">
-                        $
-                        {(
-                          line.quantity *
-                          (1 + (line.scrap_factor || 0)) *
-                          (line.component_cost || 0)
-                        ).toFixed(2)}
-                      </td>
-                      <td className="border p-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={line.is_cost_only || false}
-                          onChange={(e) =>
-                            updateLine(index, "is_cost_only", e.target.checked)
-                          }
-                        />
-                      </td>
-                      <td className="border p-2 text-center">
-                        <button
-                          onClick={() => removeLine(index)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          Remove
-                        </button>
-                      </td>
+              <div className="border border-gray-700 rounded-xl overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-800/50">
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">
+                        Seq
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">
+                        Component
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">
+                        Quantity
+                      </th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">
+                        Unit
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">
+                        Scrap %
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">
+                        Cost
+                      </th>
+                      <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">
+                        Cost Only
+                      </th>
+                      <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">
+                        Actions
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-gray-50 font-semibold">
-                    <td colSpan="5" className="border p-2 text-right">
-                      Total Material Cost:
-                    </td>
-                    <td className="border p-2 text-right">
-                      ${totalCost.toFixed(2)}
-                    </td>
-                    <td colSpan="2" className="border"></td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {lines.map((line, index) => (
+                      <tr key={index} className="hover:bg-gray-800/30">
+                        <td className="px-4 py-3 text-gray-300">{index + 1}</td>
+                        <td className="px-4 py-3 text-white">
+                          <span className="font-medium">
+                            {line.component_sku || line.component?.sku}
+                          </span>
+                          <span className="text-gray-400">
+                            {" "}
+                            - {line.component_name || line.component?.name}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            value={line.quantity}
+                            onChange={(e) =>
+                              updateLine(
+                                index,
+                                "quantity",
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            className="w-24 text-right bg-gray-800 border border-gray-700 rounded-lg px-3 py-1 text-white focus:border-blue-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={line.unit || "EA"}
+                            onChange={(e) =>
+                              updateLine(index, "unit", e.target.value)
+                            }
+                            className="w-20 bg-gray-800 border border-gray-700 rounded-lg px-2 py-1 text-white focus:border-blue-500 focus:outline-none"
+                          >
+                            {renderUomOptions()}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={line.scrap_factor || 0}
+                            onChange={(e) =>
+                              updateLine(
+                                index,
+                                "scrap_factor",
+                                parseFloat(e.target.value) || 0
+                              )
+                            }
+                            className="w-20 text-right bg-gray-800 border border-gray-700 rounded-lg px-3 py-1 text-white focus:border-blue-500 focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right text-white">
+                          $
+                          {(
+                            line.quantity *
+                            (1 + (line.scrap_factor || 0) / 100) *
+                            (line.component_cost || 0)
+                          ).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={line.is_cost_only || false}
+                            onChange={(e) =>
+                              updateLine(
+                                index,
+                                "is_cost_only",
+                                e.target.checked
+                              )
+                            }
+                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => removeLine(index)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-800/50 font-semibold">
+                      <td
+                        colSpan="5"
+                        className="px-4 py-3 text-right text-gray-300"
+                      >
+                        Total Material Cost:
+                      </td>
+                      <td className="px-4 py-3 text-right text-white">
+                        ${totalCost.toFixed(2)}
+                      </td>
+                      <td colSpan="2"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             )}
           </div>
 
           {/* Add Line Form */}
           {showAddLine && (
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold mb-3">Add Component</h4>
+            <div className="mb-6 p-4 bg-gray-800 border border-gray-700 rounded-xl">
+              <h4 className="font-semibold text-white mb-3">Add Component</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Component
                   </label>
                   <select
                     value={newLine.component_id}
                     onChange={(e) => {
                       const selectedId = e.target.value;
-                      const selected = allComponents.find(c => c.id === parseInt(selectedId));
-                      setNewLine({ 
-                        ...newLine, 
+                      const selected = allComponents.find(
+                        (c) => c.id === parseInt(selectedId)
+                      );
+                      setNewLine({
+                        ...newLine,
                         component_id: selectedId,
-                        unit: selected?.unit || (selected?.item_type === "supply" ? "kg" : "EA")
+                        unit:
+                          selected?.unit ||
+                          (selected?.item_type === "supply" ? "KG" : "EA"),
                       });
                     }}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                   >
                     <option value="">Select component...</option>
                     <optgroup label="Components & Supplies">
-                      {components.filter(c => !lines.find(l => l.component_id === c.id)).map((comp) => (
-                        <option key={comp.id} value={comp.id}>
-                          {comp.sku} - {comp.name} ({comp.unit || "EA"})
-                        </option>
-                      ))}
+                      {components
+                        .filter(
+                          (c) => !lines.find((l) => l.component_id === c.id)
+                        )
+                        .map((comp) => (
+                          <option key={comp.id} value={comp.id}>
+                            {comp.sku} - {comp.name} ({comp.unit || "EA"})
+                          </option>
+                        ))}
                     </optgroup>
                     {materials.length > 0 && (
                       <optgroup label="Materials (Filament)">
-                        {materials.filter(m => !lines.find(l => l.component_id === m.id)).map((mat) => (
-                          <option key={mat.id} value={mat.id}>
-                            {mat.sku} - {mat.name} ({mat.unit || "kg"})
-                          </option>
-                        ))}
+                        {materials
+                          .filter(
+                            (m) => !lines.find((l) => l.component_id === m.id)
+                          )
+                          .map((mat) => (
+                            <option key={mat.id} value={mat.id}>
+                              {mat.sku} - {mat.name} ({mat.unit || "KG"})
+                            </option>
+                          ))}
                       </optgroup>
                     )}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Quantity
                   </label>
                   <input
@@ -511,23 +603,25 @@ export default function BOMEditor({
                         quantity: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Unit</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                    Unit
+                  </label>
+                  <select
                     value={newLine.unit}
                     onChange={(e) =>
                       setNewLine({ ...newLine, unit: e.target.value })
                     }
-                    className="w-full px-3 py-2 border rounded-md"
-                    placeholder="EA, kg, HR, etc."
-                  />
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+                  >
+                    {renderUomOptions()}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
+                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Scrap Factor (%)
                   </label>
                   <input
@@ -542,7 +636,7 @@ export default function BOMEditor({
                         scrap_factor: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -554,22 +648,22 @@ export default function BOMEditor({
                   onChange={(e) =>
                     setNewLine({ ...newLine, is_cost_only: e.target.checked })
                   }
-                  className="mr-2"
+                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 mr-2"
                 />
-                <label htmlFor="cost_only" className="text-sm">
-                  Cost only (not consumed)
+                <label htmlFor="cost_only" className="text-sm text-gray-300">
+                  Cost only (not consumed from inventory)
                 </label>
               </div>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-4 flex gap-2">
                 <button
                   onClick={addLine}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
                 >
                   Add
                 </button>
                 <button
                   onClick={() => setShowAddLine(false)}
-                  className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400"
+                  className="px-4 py-2 bg-gray-700 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-600"
                 >
                   Cancel
                 </button>
@@ -578,18 +672,18 @@ export default function BOMEditor({
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-700">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border rounded-md hover:bg-gray-50"
+              className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-700"
               disabled={loading}
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
               disabled={loading || lines.length === 0}
             >
               {loading ? "Saving..." : bom ? "Update BOM" : "Create BOM"}

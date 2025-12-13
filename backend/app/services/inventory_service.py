@@ -16,8 +16,63 @@ from app.models.bom import BOM, BOMLine
 from app.models.production_order import ProductionOrder
 from app.models.sales_order import SalesOrder
 from app.logging_config import get_logger
+from app.services.uom_service import convert_quantity_safe, format_conversion_note, UOMConversionError
 
 logger = get_logger(__name__)
+
+
+def convert_and_generate_notes(
+    db: Session,
+    bom_qty: Decimal,
+    line_unit: str,
+    component_unit: str,
+    component_name: str,
+    component_sku: str,
+    reference_prefix: str,
+    reference_code: str,
+) -> Tuple[Decimal, str]:
+    """Convert BOM quantity to component unit and generate transaction notes.
+    
+    Args:
+        db: Database session
+        bom_qty: Quantity in BOM line units
+        line_unit: BOM line unit code
+        component_unit: Component's inventory unit code
+        component_name: Component product name
+        component_sku: Component SKU (for logging)
+        reference_prefix: Prefix for notes (e.g., "Consumed for PO#", "Shipping materials for SO#")
+        reference_code: Reference code/number for notes
+    
+    Returns:
+        Tuple of (total_qty, notes) where total_qty is the converted quantity
+        and notes is the formatted transaction description
+    
+    Raises:
+        UOMConversionError: If units are incompatible and conversion fails.
+            This prevents dangerous inventory errors (e.g., treating 225 G as 225 KG).
+            The calling transaction will be rolled back automatically.
+    """
+    if line_unit != component_unit:
+        total_qty, was_converted = convert_quantity_safe(db, bom_qty, line_unit, component_unit)
+        if was_converted:
+            notes = f"{reference_prefix}{reference_code}: " + \
+                format_conversion_note(bom_qty, line_unit, total_qty, component_unit, component_name)
+        else:
+            # Conversion failed (incompatible units) - ABORT to prevent inventory errors
+            # Using bom_qty would be dangerous: e.g., 225 G treated as 225 KG = massive error
+            error_msg = (
+                f"UOM conversion failed for {reference_prefix}{reference_code}: "
+                f"Cannot convert {line_unit} to {component_unit} for component {component_sku} ({component_name}). "
+                f"Attempted to convert {bom_qty} {line_unit} but units are incompatible. "
+                f"Transaction aborted to prevent inventory errors."
+            )
+            logger.error(error_msg)
+            raise UOMConversionError(error_msg)
+    else:
+        total_qty = bom_qty
+        notes = f"{reference_prefix}{reference_code}: {total_qty} {component_unit} of {component_name}"
+    
+    return total_qty, notes
 
 
 def get_or_create_default_location(db: Session) -> InventoryLocation:
@@ -172,7 +227,23 @@ def consume_production_materials(
         base_qty = Decimal(str(line.quantity))
         scrap_factor = Decimal(str(line.scrap_factor or 0)) / Decimal("100")
         qty_with_scrap = base_qty * (Decimal("1") + scrap_factor)
-        total_qty = qty_with_scrap * quantity_completed
+        bom_qty = qty_with_scrap * quantity_completed
+
+        # UOM Conversion: Convert BOM line unit to component's inventory unit
+        # e.g., BOM says 225.23 G, but component is stored in KG
+        line_unit = (line.unit or component.unit or "EA").upper()
+        component_unit = (component.unit or "EA").upper()
+
+        total_qty, notes = convert_and_generate_notes(
+            db=db,
+            bom_qty=bom_qty,
+            line_unit=line_unit,
+            component_unit=component_unit,
+            component_name=component.name,
+            component_sku=component.sku,
+            reference_prefix="Consumed for PO#",
+            reference_code=production_order.code,
+        )
 
         # Create consumption transaction
         txn = create_inventory_transaction(
@@ -183,14 +254,14 @@ def consume_production_materials(
             quantity=total_qty,
             reference_type="production_order",
             reference_id=production_order.id,
-            notes=f"Consumed for PO#{production_order.work_order_number}: {component.name}",
+            notes=notes,
             cost_per_unit=component.cost,
             created_by=created_by,
         )
         transactions.append(txn)
 
         logger.info(
-            f"Consumed {total_qty} {component.unit} of {component.sku} "
+            f"Consumed {total_qty} {component_unit} of {component.sku} "
             f"for production order {production_order.id}"
         )
 
@@ -231,7 +302,7 @@ def receive_finished_goods(
         quantity=quantity_completed,
         reference_type="production_order",
         reference_id=production_order.id,
-        notes=f"Completed production PO#{production_order.work_order_number}",
+        notes=f"Completed production PO#{production_order.code}",
         cost_per_unit=product.cost,
         created_by=created_by,
     )
@@ -340,7 +411,22 @@ def consume_shipping_materials(
                 continue
 
             # Calculate quantity to consume
-            total_qty = Decimal(str(line.quantity)) * Decimal(str(qty))
+            bom_qty = Decimal(str(line.quantity)) * Decimal(str(qty))
+
+            # UOM Conversion: Convert BOM line unit to component's inventory unit
+            line_unit = (line.unit or component.unit or "EA").upper()
+            component_unit = (component.unit or "EA").upper()
+
+            total_qty, notes = convert_and_generate_notes(
+                db=db,
+                bom_qty=bom_qty,
+                line_unit=line_unit,
+                component_unit=component_unit,
+                component_name=component.name,
+                component_sku=component.sku,
+                reference_prefix="Shipping materials for SO#",
+                reference_code=sales_order.order_number,
+            )
 
             txn = create_inventory_transaction(
                 db=db,
@@ -350,14 +436,14 @@ def consume_shipping_materials(
                 quantity=total_qty,
                 reference_type="sales_order",
                 reference_id=sales_order.id,
-                notes=f"Shipping materials for SO#{sales_order.order_number}: {component.name}",
+                notes=notes,
                 cost_per_unit=component.cost,
                 created_by=created_by,
             )
             transactions.append(txn)
 
             logger.info(
-                f"Consumed {total_qty} {component.unit} of {component.sku} "
+                f"Consumed {total_qty} {component_unit} of {component.sku} "
                 f"for shipping order {sales_order.id}"
             )
 

@@ -72,15 +72,47 @@ def get_component_inventory(component_id: int, db: Session) -> dict:
     }
 
 
+def build_line_response(line: BOMLine, component: Optional[Product], comp_cost: Decimal) -> dict:
+    """Build a standardized BOM line response dict.
+    
+    Args:
+        line: The BOMLine object
+        component: The component Product (may be None)
+        comp_cost: The component cost as Decimal
+    
+    Returns:
+        Dict containing the standardized line response
+    """
+    # Calculate line cost only when comp_cost and quantity are present
+    line_cost = None
+    if comp_cost and comp_cost > 0 and line.quantity:
+        line_cost = float(comp_cost) * float(line.quantity)
+    
+    return {
+        "id": line.id,
+        "bom_id": line.bom_id,
+        "component_id": line.component_id,
+        "quantity": line.quantity,
+        "unit": line.unit,
+        "sequence": line.sequence,
+        "consume_stage": line.consume_stage,
+        "is_cost_only": line.is_cost_only,
+        "scrap_factor": line.scrap_factor,
+        "notes": line.notes,
+        "component_sku": component.sku if component else None,
+        "component_name": component.name if component else None,
+        "component_unit": component.unit if component else None,
+        "component_cost": float(comp_cost) if comp_cost else None,
+        "line_cost": line_cost,
+    }
+
+
 def build_bom_response(bom: BOM, db: Session) -> dict:
     """Build a full BOM response with product info and lines"""
     lines = []
     for line in bom.lines:
         component = db.query(Product).filter(Product.id == line.component_id).first()
         component_cost = get_effective_cost(component) if component else Decimal("0")
-        line_cost = None
-        if component and component_cost > 0 and line.quantity:
-            line_cost = float(component_cost) * float(line.quantity)
 
         # Get inventory status
         inventory = get_component_inventory(line.component_id, db)
@@ -94,27 +126,19 @@ def build_bom_response(bom: BOM, db: Session) -> dict:
             BOM.active== True
         ).first() is not None
 
-        lines.append({
-            "id": line.id,
-            "bom_id": line.bom_id,
-            "component_id": line.component_id,
-            "quantity": line.quantity,
-            "sequence": line.sequence,
-            "scrap_factor": line.scrap_factor,
-            "notes": line.notes,
-            "component_sku": component.sku if component else None,
-            "component_name": component.name if component else None,
-            "component_unit": component.unit if component else None,
-            "component_cost": float(component_cost) if component_cost else None,
-            "line_cost": line_cost,
-            # Inventory info
+        # Build base line response using helper
+        line_dict = build_line_response(line, component, component_cost)
+        
+        # Add inventory and sub-assembly info specific to this endpoint
+        line_dict.update({
             "inventory_on_hand": inventory["on_hand"],
             "inventory_available": inventory["available"],
             "is_available": is_available,
             "shortage": shortage,
-            # Sub-assembly indicator
             "has_bom": component_has_bom,
         })
+        
+        lines.append(line_dict)
 
     product = bom.product
     return {
@@ -317,7 +341,10 @@ async def create_bom(
                 bom_id=bom.id,
                 component_id=line_data.component_id,
                 quantity=line_data.quantity,
+                unit=line_data.unit or component.unit or "EA",
                 sequence=line_data.sequence or seq,
+                consume_stage=line_data.consume_stage or "production",
+                is_cost_only=line_data.is_cost_only or False,
                 scrap_factor=line_data.scrap_factor,
                 notes=line_data.notes,
             )
@@ -456,12 +483,15 @@ async def add_bom_line(
     else:
         sequence = line_data.sequence
 
-    # Create line
+    # Create line - inherit unit from component if not specified
     line = BOMLine(
         bom_id=bom_id,
         component_id=line_data.component_id,
         quantity=line_data.quantity,
+        unit=line_data.unit or component.unit or "EA",
         sequence=sequence,
+        consume_stage=line_data.consume_stage or "production",
+        is_cost_only=line_data.is_cost_only or False,
         scrap_factor=line_data.scrap_factor,
         notes=line_data.notes,
     )
@@ -496,7 +526,10 @@ async def add_bom_line(
         "bom_id": line.bom_id,
         "component_id": line.component_id,
         "quantity": line.quantity,
+        "unit": line.unit,
         "sequence": line.sequence,
+        "consume_stage": line.consume_stage,
+        "is_cost_only": line.is_cost_only,
         "scrap_factor": line.scrap_factor,
         "notes": line.notes,
         "component_sku": component.sku,
@@ -555,9 +588,6 @@ async def update_bom_line(
     # Get component for response
     component = db.query(Product).filter(Product.id == line.component_id).first()
     comp_cost = get_effective_cost(component) if component else Decimal("0")
-    line_cost = None
-    if component and comp_cost > 0 and line.quantity:
-        line_cost = float(comp_cost) * float(line.quantity)
 
     logger.info(
         "BOM line updated",
@@ -569,20 +599,7 @@ async def update_bom_line(
         }
     )
 
-    return {
-        "id": line.id,
-        "bom_id": line.bom_id,
-        "component_id": line.component_id,
-        "quantity": line.quantity,
-        "sequence": line.sequence,
-        "scrap_factor": line.scrap_factor,
-        "notes": line.notes,
-        "component_sku": component.sku if component else None,
-        "component_name": component.name if component else None,
-        "component_unit": component.unit if component else None,
-        "component_cost": float(comp_cost) if comp_cost else None,
-        "line_cost": line_cost,
-    }
+    return build_line_response(line, component, comp_cost)
 
 
 @router.delete("/{bom_id}/lines/{line_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -758,7 +775,10 @@ async def copy_bom(
                 bom_id=new_bom.id,
                 component_id=line.component_id,
                 quantity=line.quantity,
+                unit=line.unit,
                 sequence=line.sequence,
+                consume_stage=line.consume_stage,
+                is_cost_only=line.is_cost_only,
                 scrap_factor=line.scrap_factor,
                 notes=line.notes,
             )

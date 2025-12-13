@@ -454,10 +454,16 @@ function BOMDetailView({
         setSelectedTemplateId("");
       } else {
         const errData = await res.json();
-        toast.error(`Failed to apply routing template: ${errData.detail || "Unknown error"}`);
+        toast.error(
+          `Failed to apply routing template: ${
+            errData.detail || "Unknown error"
+          }`
+        );
       }
     } catch (err) {
-      toast.error(`Failed to apply routing template: ${err.message || "Network error"}`);
+      toast.error(
+        `Failed to apply routing template: ${err.message || "Network error"}`
+      );
     } finally {
       setApplyingTemplate(false);
     }
@@ -495,10 +501,14 @@ function BOMDetailView({
         await fetchProductRouting();
       } else {
         const errData = await res.json();
-        toast.error(`Failed to update operation: ${errData.detail || "Unknown error"}`);
+        toast.error(
+          `Failed to update operation: ${errData.detail || "Unknown error"}`
+        );
       }
     } catch (err) {
-      toast.error(`Failed to update operation: ${err.message || "Network error"}`);
+      toast.error(
+        `Failed to update operation: ${err.message || "Network error"}`
+      );
     }
   };
 
@@ -531,7 +541,9 @@ function BOMDetailView({
         toast.error("Failed to load exploded BOM view. Please try again.");
       }
     } catch (err) {
-      toast.error(`Failed to load exploded BOM: ${err.message || "Network error"}`);
+      toast.error(
+        `Failed to load exploded BOM: ${err.message || "Network error"}`
+      );
     } finally {
       setLoading(false);
     }
@@ -598,7 +610,9 @@ function BOMDetailView({
         onUpdate();
       } else {
         const errorData = await res.json();
-        toast.error(`Failed to add BOM line: ${errorData.detail || "Unknown error"}`);
+        toast.error(
+          `Failed to add BOM line: ${errorData.detail || "Unknown error"}`
+        );
       }
     } catch (err) {
       toast.error(`Failed to add BOM line: ${err.message || "Network error"}`);
@@ -629,10 +643,14 @@ function BOMDetailView({
         onUpdate();
       } else {
         const errorData = await res.json();
-        toast.error(`Failed to update BOM line: ${errorData.detail || "Unknown error"}`);
+        toast.error(
+          `Failed to update BOM line: ${errorData.detail || "Unknown error"}`
+        );
       }
     } catch (err) {
-      toast.error(`Failed to update BOM line: ${err.message || "Network error"}`);
+      toast.error(
+        `Failed to update BOM line: ${err.message || "Network error"}`
+      );
     } finally {
       setLoading(false);
     }
@@ -656,10 +674,14 @@ function BOMDetailView({
         onUpdate();
       } else {
         const errorData = await res.json();
-        toast.error(`Failed to delete BOM line: ${errorData.detail || "Unknown error"}`);
+        toast.error(
+          `Failed to delete BOM line: ${errorData.detail || "Unknown error"}`
+        );
       }
     } catch (err) {
-      toast.error(`Failed to delete BOM line: ${err.message || "Network error"}`);
+      toast.error(
+        `Failed to delete BOM line: ${err.message || "Network error"}`
+      );
     } finally {
       setLoading(false);
     }
@@ -680,10 +702,16 @@ function BOMDetailView({
         onUpdate();
       } else {
         const errorData = await res.json();
-        toast.error(`Failed to recalculate BOM cost: ${errorData.detail || "Unknown error"}`);
+        toast.error(
+          `Failed to recalculate BOM cost: ${
+            errorData.detail || "Unknown error"
+          }`
+        );
       }
     } catch (err) {
-      toast.error(`Failed to recalculate BOM cost: ${err.message || "Network error"}`);
+      toast.error(
+        `Failed to recalculate BOM cost: ${err.message || "Network error"}`
+      );
     } finally {
       setLoading(false);
     }
@@ -912,13 +940,13 @@ function BOMDetailView({
                   ) : (
                     <span>
                       {parseFloat(line.quantity).toFixed(2)}{" "}
-                      {line.component_unit || ""}
+                      {line.unit || line.component_unit || "EA"}
                     </span>
                   )}
                 </td>
                 <td className="py-2 px-3 text-gray-400">
                   ${parseFloat(line.component_cost || 0).toFixed(2)}/
-                  {line.component_unit || "ea"}
+                  {line.unit || line.component_unit || "EA"}
                 </td>
                 <td className="py-2 px-3 text-green-400 font-medium">
                   ${parseFloat(line.line_cost || 0).toFixed(2)}
@@ -2148,7 +2176,9 @@ export default function AdminBOM() {
         fetchBOMs();
       } else {
         const errorData = await res.json();
-        toast.error(`Failed to delete BOM: ${errorData.detail || "Unknown error"}`);
+        toast.error(
+          `Failed to delete BOM: ${errorData.detail || "Unknown error"}`
+        );
       }
     } catch (err) {
       toast.error(`Failed to delete BOM: ${err.message || "Network error"}`);
@@ -2167,7 +2197,9 @@ export default function AdminBOM() {
         fetchBOMs();
       } else {
         const errorData = await res.json();
-        toast.error(`Failed to copy BOM: ${errorData.detail || "Unknown error"}`);
+        toast.error(
+          `Failed to copy BOM: ${errorData.detail || "Unknown error"}`
+        );
       }
     } catch (err) {
       toast.error(`Failed to copy BOM: ${err.message || "Network error"}`);

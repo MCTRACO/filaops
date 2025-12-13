@@ -1,6 +1,6 @@
 /**
  * ItemForm - Simple single-screen form for creating/editing items
- * 
+ *
  * Replaces the complex ItemWizard with a clean, focused form.
  * BOM and Routing are managed separately via dedicated editors.
  */
@@ -20,16 +20,17 @@ const PROCUREMENT_TYPES = [
   { value: "make_or_buy", label: "Make or Buy" },
 ];
 
-export default function ItemForm({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
-  editingItem = null 
+export default function ItemForm({
+  isOpen,
+  onClose,
+  onSuccess,
+  editingItem = null,
 }) {
   const token = localStorage.getItem("adminToken");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [uomClasses, setUomClasses] = useState([]);
 
   const [formData, setFormData] = useState({
     sku: editingItem?.sku || "",
@@ -46,6 +47,7 @@ export default function ItemForm({
   useEffect(() => {
     if (isOpen) {
       fetchCategories();
+      fetchUomClasses();
       if (editingItem) {
         setFormData({
           sku: editingItem.sku || "",
@@ -86,8 +88,32 @@ export default function ItemForm({
         setCategories(data);
       }
     } catch (err) {
-      // Categories fetch failure is non-critical - user can still create items
-      // Error is silently handled to avoid blocking the form
+      // Categories fetch failure is non-critical; log for troubleshooting
+      console.error("ItemForm: fetchCategories failed", {
+        endpoint: `${API_URL}/api/v1/items/categories`,
+        message: err?.message,
+        stack: err?.stack,
+      });
+    }
+  };
+
+  const fetchUomClasses = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/admin/uom/classes`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUomClasses(data);
+      }
+    } catch (err) {
+      // UOM fetch failure - use default list; log for troubleshooting
+      console.error("ItemForm: fetchUomClasses failed", {
+        endpoint: `${API_URL}/api/v1/admin/uom/classes`,
+        message: err?.message,
+        stack: err?.stack,
+      });
+      setUomClasses([]);
     }
   };
 
@@ -97,7 +123,6 @@ export default function ItemForm({
     setError(null);
 
     try {
-      // For PATCH, only send fields that are being updated
       const payload = {
         sku: formData.sku,
         name: formData.name,
@@ -105,15 +130,19 @@ export default function ItemForm({
         item_type: formData.item_type,
         procurement_type: formData.procurement_type,
         unit: formData.unit,
-        standard_cost: formData.standard_cost ? parseFloat(formData.standard_cost) : null,
-        selling_price: formData.selling_price ? parseFloat(formData.selling_price) : null,
+        standard_cost: formData.standard_cost
+          ? parseFloat(formData.standard_cost)
+          : null,
+        selling_price: formData.selling_price
+          ? parseFloat(formData.selling_price)
+          : null,
         category_id: formData.category_id || null,
       };
 
       const url = editingItem
         ? `${API_URL}/api/v1/items/${editingItem.id}`
         : `${API_URL}/api/v1/items`;
-      
+
       const method = editingItem ? "PATCH" : "POST";
 
       const res = await fetch(url, {
@@ -143,23 +172,23 @@ export default function ItemForm({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">
+            <h2 className="text-2xl font-bold text-white">
               {editingItem ? "Edit Item" : "Create New Item"}
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-gray-400 hover:text-white"
             >
               ✕
             </button>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl">
               {error}
             </div>
           )}
@@ -168,55 +197,96 @@ export default function ItemForm({
             {/* Basic Info */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  SKU <span className="text-gray-400 text-xs">(auto-generated if empty)</span>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  SKU{" "}
+                  <span className="text-gray-500 text-xs">
+                    (auto-generated if empty)
+                  </span>
                 </label>
                 <input
                   type="text"
                   value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
-                  className="w-full px-3 py-2 border rounded-md"
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      sku: e.target.value.toUpperCase(),
+                    })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                   placeholder="Leave empty for auto-generation"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Unit <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Unit <span className="text-red-400">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   required
                   value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
-                  placeholder="EA, kg, HR, etc."
-                />
+                  onChange={(e) =>
+                    setFormData({ ...formData, unit: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+                >
+                  {uomClasses.length > 0 ? (
+                    uomClasses.map((cls) => (
+                      <optgroup
+                        key={cls.uom_class}
+                        label={
+                          cls.uom_class.charAt(0).toUpperCase() +
+                          cls.uom_class.slice(1)
+                        }
+                      >
+                        {cls.units.map((u) => (
+                          <option key={u.code} value={u.code}>
+                            {u.code} - {u.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  ) : (
+                    // Fallback if UOM API not available
+                    <>
+                      <option value="EA">EA - Each</option>
+                      <option value="KG">KG - Kilogram</option>
+                      <option value="G">G - Gram</option>
+                      <option value="LB">LB - Pound</option>
+                      <option value="M">M - Meter</option>
+                      <option value="FT">FT - Foot</option>
+                      <option value="HR">HR - Hour</option>
+                    </>
+                  )}
+                </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Name <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Name <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md"
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                 placeholder="Item name"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 Description
               </label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md"
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                 rows="3"
                 placeholder="Item description"
               />
@@ -225,14 +295,16 @@ export default function ItemForm({
             {/* Classification */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Item Type <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Item Type <span className="text-red-400">*</span>
                 </label>
                 <select
                   required
                   value={formData.item_type}
-                  onChange={(e) => setFormData({ ...formData, item_type: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
+                  onChange={(e) =>
+                    setFormData({ ...formData, item_type: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                 >
                   {ITEM_TYPES.map((type) => (
                     <option key={type.value} value={type.value}>
@@ -243,14 +315,19 @@ export default function ItemForm({
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Procurement Type <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Procurement Type <span className="text-red-400">*</span>
                 </label>
                 <select
                   required
                   value={formData.procurement_type}
-                  onChange={(e) => setFormData({ ...formData, procurement_type: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      procurement_type: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                 >
                   {PROCUREMENT_TYPES.map((type) => (
                     <option key={type.value} value={type.value}>
@@ -262,13 +339,20 @@ export default function ItemForm({
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 Category
               </label>
               <select
                 value={formData.category_id || ""}
-                onChange={(e) => setFormData({ ...formData, category_id: e.target.value ? parseInt(e.target.value) : null })}
-                className="w-full px-3 py-2 border rounded-md"
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    category_id: e.target.value
+                      ? parseInt(e.target.value)
+                      : null,
+                  })
+                }
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
               >
                 <option value="">No category</option>
                 {categories.map((cat) => (
@@ -282,58 +366,67 @@ export default function ItemForm({
             {/* Pricing */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Standard Cost
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.standard_cost}
-                  onChange={(e) => setFormData({ ...formData, standard_cost: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
+                  onChange={(e) =>
+                    setFormData({ ...formData, standard_cost: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                   placeholder="0.00"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Selling Price
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.selling_price}
-                  onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
+                  onChange={(e) =>
+                    setFormData({ ...formData, selling_price: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-700">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-700"
                 disabled={loading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
                 disabled={loading}
               >
-                {loading ? "Saving..." : editingItem ? "Update Item" : "Create Item"}
+                {loading
+                  ? "Saving..."
+                  : editingItem
+                  ? "Update Item"
+                  : "Create Item"}
               </button>
             </div>
           </form>
 
           {formData.procurement_type === "make" && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
-              <strong>Note:</strong> This item requires a BOM and Routing. 
-              Create the item first, then add BOM and Routing from the item detail page.
+            <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-sm text-blue-300">
+              <strong>Note:</strong> This item requires a BOM and Routing.
+              Create the item first, then add BOM and Routing from the item
+              detail page.
             </div>
           )}
         </div>
@@ -341,4 +434,3 @@ export default function ItemForm({
     </div>
   );
 }
-

@@ -19,6 +19,7 @@ from app.models.traceability import (
     SerialNumber, MaterialLot, ProductionLotConsumption, CustomerTraceabilityProfile
 )
 from app.models.company_settings import CompanySettings
+from app.models.uom import UnitOfMeasure
 # from app.models.license import License  # Disabled until ready for production
 
 __all__ = [
@@ -72,6 +73,8 @@ __all__ = [
     "CustomerTraceabilityProfile",
     # Company Settings
     "CompanySettings",
+    # Units of Measure
+    "UnitOfMeasure",
     # License (disabled until ready)
     # "License",
 ]

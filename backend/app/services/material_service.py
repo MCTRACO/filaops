@@ -261,7 +261,7 @@ def create_material_product(
         description=f"Filament supply: {material_type.name} in {color.name}",
         item_type='supply',
         procurement_type='buy',
-        unit='kg',
+        unit='KG',
         standard_cost=material_type.base_price_per_kg,
         material_type_id=material_type.id,
         color_id=color.id,

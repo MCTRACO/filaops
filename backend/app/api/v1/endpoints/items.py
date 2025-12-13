@@ -493,12 +493,12 @@ async def create_material_item(
 ):
     """
     Create a material item (shortcut for supply items with material_type/color).
-    
+
     This is a convenience endpoint for creating filament/material products.
     It automatically:
     - Sets item_type='supply'
     - Sets procurement_type='buy'
-    - Sets unit='kg'
+    - Sets unit='KG'
     - Links material_type_id and color_id
     - Creates Inventory record
     

@@ -2,7 +2,7 @@
 Bill of Materials Pydantic Schemas
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime, date
 from decimal import Decimal
 
@@ -15,7 +15,10 @@ class BOMLineBase(BaseModel):
     """Base BOM line fields"""
     component_id: int = Field(..., description="Component product ID")
     quantity: Decimal = Field(..., gt=0, description="Required quantity")
+    unit: Optional[str] = Field(None, max_length=20, description="Unit of measure (defaults to component's unit)")
     sequence: Optional[int] = Field(None, description="Line sequence/order")
+    consume_stage: Literal["production", "shipping"] = Field("production", description="When to consume: 'production' or 'shipping'")
+    is_cost_only: Optional[bool] = Field(False, description="If true, for costing only - no inventory allocation")
     scrap_factor: Optional[Decimal] = Field(0, ge=0, le=100, description="Scrap percentage")
     notes: Optional[str] = Field(None, max_length=1000)
 
@@ -29,7 +32,10 @@ class BOMLineUpdate(BaseModel):
     """Update an existing BOM line"""
     component_id: Optional[int] = None
     quantity: Optional[Decimal] = Field(None, gt=0)
+    unit: Optional[str] = Field(None, max_length=20)
     sequence: Optional[int] = None
+    consume_stage: Optional[Literal["production", "shipping"]] = Field(None, description="When to consume: 'production' or 'shipping'")
+    is_cost_only: Optional[bool] = None
     scrap_factor: Optional[Decimal] = Field(None, ge=0, le=100)
     notes: Optional[str] = Field(None, max_length=1000)
 

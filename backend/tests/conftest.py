@@ -174,7 +174,7 @@ def sample_material(db_session):
         name="Test PLA Filament",
         description="Test material",
         category="Raw Material",
-        unit="kg",
+        unit="KG",
         cost=Decimal("20.00"),
         is_raw_material=True,
         active=True,

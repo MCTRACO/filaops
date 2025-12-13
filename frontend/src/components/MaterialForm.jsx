@@ -71,7 +71,7 @@ export default function MaterialForm({
         setMaterialTypes(data.materials || []);
       }
     } catch (err) {
-      // Material types fetch failure is non-critical - type selector will be empty
+      // Material types fetch failure is non-critical
     }
   };
 
@@ -88,7 +88,6 @@ export default function MaterialForm({
         setColors(data.colors || []);
       }
     } catch (err) {
-      // Colors fetch failure - color selector will be empty
       setColors([]);
     }
   };
@@ -181,21 +180,21 @@ export default function MaterialForm({
   const selectedMaterial = materialTypes.find(m => m.code === formData.material_type_code);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-xl w-full max-w-lg">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Create New Material</h2>
+            <h2 className="text-2xl font-bold text-white">Create New Material</h2>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-gray-400 hover:text-white"
             >
               ✕
             </button>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl">
               {error}
             </div>
           )}
@@ -203,8 +202,8 @@ export default function MaterialForm({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Material Type */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Material Type <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Material Type <span className="text-red-400">*</span>
               </label>
               <select
                 required
@@ -213,7 +212,7 @@ export default function MaterialForm({
                   setFormData({ ...formData, material_type_code: e.target.value, color_code: "" });
                   setSelectedMaterialType(e.target.value);
                 }}
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
               >
                 <option value="">Select material type...</option>
                 {materialTypes.map((mt) => (
@@ -223,14 +222,14 @@ export default function MaterialForm({
                 ))}
               </select>
               {selectedMaterial && (
-                <p className="mt-1 text-sm text-gray-600">{selectedMaterial.description}</p>
+                <p className="mt-1 text-sm text-gray-400">{selectedMaterial.description}</p>
               )}
             </div>
 
             {/* Color */}
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Color <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Color <span className="text-red-400">*</span>
               </label>
 
               {!showColorForm ? (
@@ -239,7 +238,7 @@ export default function MaterialForm({
                     required={!showColorForm}
                     value={formData.color_code}
                     onChange={(e) => setFormData({ ...formData, color_code: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                     disabled={!formData.material_type_code}
                   >
                     <option value="">
@@ -260,16 +259,16 @@ export default function MaterialForm({
                     <button
                       type="button"
                       onClick={() => setShowColorForm(true)}
-                      className="mt-2 text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                      className="mt-2 text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
                     >
                       <span>+</span> Create new color for this material
                     </button>
                   )}
                 </>
               ) : (
-                <div className="border rounded-md p-3 bg-gray-50 space-y-3">
+                <div className="border border-gray-700 rounded-xl p-3 bg-gray-800 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-700">New Color</span>
+                    <span className="text-sm font-medium text-gray-300">New Color</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -277,38 +276,38 @@ export default function MaterialForm({
                         setNewColorName("");
                         setNewColorHex("#000000");
                       }}
-                      className="text-gray-500 hover:text-gray-700 text-sm"
+                      className="text-gray-400 hover:text-white text-sm"
                     >
                       Cancel
                     </button>
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Color Name *</label>
+                    <label className="block text-xs text-gray-400 mb-1">Color Name *</label>
                     <input
                       type="text"
                       value={newColorName}
                       onChange={(e) => setNewColorName(e.target.value)}
                       placeholder="e.g., Mystic Blue"
-                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-500 text-sm focus:border-blue-500 focus:outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Hex Color (optional)</label>
+                    <label className="block text-xs text-gray-400 mb-1">Hex Color (optional)</label>
                     <div className="flex gap-2 items-center">
                       <input
                         type="color"
                         value={newColorHex}
                         onChange={(e) => setNewColorHex(e.target.value)}
-                        className="w-10 h-10 border rounded cursor-pointer"
+                        className="w-10 h-10 border border-gray-600 rounded cursor-pointer bg-gray-700"
                       />
                       <input
                         type="text"
                         value={newColorHex}
                         onChange={(e) => setNewColorHex(e.target.value)}
                         placeholder="#000000"
-                        className="flex-1 px-3 py-2 border rounded-md text-sm"
+                        className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:border-blue-500 focus:outline-none"
                       />
                     </div>
                   </div>
@@ -317,7 +316,7 @@ export default function MaterialForm({
                     type="button"
                     onClick={handleCreateColor}
                     disabled={creatingColor || !newColorName.trim()}
-                    className="w-full px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 text-sm"
+                    className="w-full px-3 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 text-sm"
                   >
                     {creatingColor ? "Creating..." : "Create Color"}
                   </button>
@@ -327,7 +326,7 @@ export default function MaterialForm({
 
             {/* Initial Quantity */}
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
                 Initial Quantity (kg)
               </label>
               <input
@@ -336,7 +335,7 @@ export default function MaterialForm({
                 min="0"
                 value={formData.initial_qty_kg}
                 onChange={(e) => setFormData({ ...formData, initial_qty_kg: e.target.value })}
-                className="w-full px-3 py-2 border rounded-md"
+                className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                 placeholder="0.000"
               />
             </div>
@@ -344,7 +343,7 @@ export default function MaterialForm({
             {/* Pricing */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Cost per kg
                 </label>
                 <input
@@ -353,13 +352,13 @@ export default function MaterialForm({
                   min="0"
                   value={formData.cost_per_kg}
                   onChange={(e) => setFormData({ ...formData, cost_per_kg: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                   placeholder="0.00"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Selling Price per kg
                 </label>
                 <input
@@ -368,25 +367,25 @@ export default function MaterialForm({
                   min="0"
                   value={formData.selling_price}
                   onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                   placeholder="0.00"
                 />
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-700">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border rounded-md hover:bg-gray-50"
+                className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-700"
                 disabled={loading}
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
                 disabled={loading || !formData.material_type_code || !formData.color_code}
               >
                 {loading ? "Creating..." : "Create Material"}
@@ -394,8 +393,8 @@ export default function MaterialForm({
             </div>
           </form>
 
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-800">
-            <strong>Note:</strong> This will create a Product with SKU format: 
+          <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-sm text-blue-300">
+            <strong>Note:</strong> This will create a Product with SKU format:
             MAT-{formData.material_type_code || "TYPE"}-{formData.color_code || "COLOR"}
           </div>
         </div>
@@ -403,4 +402,3 @@ export default function MaterialForm({
     </div>
   );
 }
-

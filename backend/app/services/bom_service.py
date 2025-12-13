@@ -386,7 +386,7 @@ def auto_create_product_and_bom(quote: Quote, db: Session) -> Tuple[Product, BOM
         slot = entry["slot"]
         color_name = entry["color_name"]
 
-        # Material quantity = weight in kg (converted from grams)
+        # Material quantity = weight in KG (converted from grams)
         material_quantity_per_part = mat_grams / 1000.0
         total_material_quantity = material_quantity_per_part * quote.quantity
 
@@ -395,9 +395,11 @@ def auto_create_product_and_bom(quote: Quote, db: Session) -> Tuple[Product, BOM
             bom_id=bom.id,
             component_id=mat_product.id,
             sequence=line_sequence,
-            quantity=total_material_quantity,  # Total material for all parts (in kg)
+            quantity=total_material_quantity,  # Total material for all parts (in KG)
+            unit="KG",
+            consume_stage="production",
             notes=f"Material{slot_info}: {mat_product.name}. "
-                  f"{quote.quantity} parts @ {material_quantity_per_part:.3f}kg each. "
+                  f"{quote.quantity} parts @ {material_quantity_per_part:.3f}KG each. "
                   f"Color: {color_name}. SKU: {mat_product.sku}"
         )
 
@@ -412,6 +414,7 @@ def auto_create_product_and_bom(quote: Quote, db: Session) -> Tuple[Product, BOM
         component_id=box_product.id,
         sequence=line_sequence,
         quantity=1.0,  # One box per order
+        unit="EA",
         consume_stage='shipping',  # Consumed when label is purchased, not at production
         notes=f"Shipping box: {box_product.name}"
     )
@@ -430,6 +433,8 @@ def auto_create_product_and_bom(quote: Quote, db: Session) -> Tuple[Product, BOM
             component_id=machine_time_product.id,
             sequence=line_sequence,
             quantity=print_hours,  # Hours of machine time
+            unit="HR",
+            is_cost_only=True,  # Machine time is for costing, not inventory
             notes=f"Machine time: {print_hours:.2f}hr @ ${MACHINE_HOURLY_RATE}/hr = ${machine_cost:.2f}"
         )
 

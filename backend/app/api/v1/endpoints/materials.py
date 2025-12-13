@@ -762,7 +762,7 @@ async def import_materials_csv(
                     description=f"Filament supply: {material_type.name} in {color_name}",
                     item_type="supply",
                     procurement_type="buy",
-                    unit="kg",
+                    unit="KG",
                     standard_cost=float(price) if price else float(material_type.base_price_per_kg),
                     material_type_id=material_type.id,
                     color_id=color.id,
