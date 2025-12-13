@@ -353,7 +353,7 @@ export default function BOMEditor({
   if (!isOpen) return null;
 
   const totalCost = lines.reduce((sum, line) => {
-    const qty = line.quantity * (1 + (line.scrap_factor || 0));
+    const qty = line.quantity * (1 + (line.scrap_factor || 0) / 100);
     return sum + qty * (line.component_cost || 0);
   }, 0);
 
