@@ -168,6 +168,22 @@ const ManufacturingIcon = () => (
   </svg>
 );
 
+const PrintersIcon = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+    />
+  </svg>
+);
+
 const CustomersIcon = () => (
   <svg
     className="w-5 h-5"
@@ -317,6 +333,7 @@ const navGroups = [
     items: [
       { path: "/admin/production", label: "Production", icon: ProductionIcon },
       { path: "/admin/manufacturing", label: "Manufacturing", icon: ManufacturingIcon },
+      { path: "/admin/printers", label: "Printers", icon: PrintersIcon },
       { path: "/admin/purchasing", label: "Purchasing", icon: PurchasingIcon },
       { path: "/admin/shipping", label: "Shipping", icon: ShippingIcon },
     ],

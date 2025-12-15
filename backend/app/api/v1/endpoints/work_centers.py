@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.db.session import get_db
 from app.logging_config import get_logger
 from app.models.manufacturing import WorkCenter, Resource
+from app.models.printer import Printer
 from app.api.v1.deps import get_current_user
 from app.models.user import User
 from app.schemas.manufacturing import (
@@ -342,6 +343,47 @@ async def update_resource_status(
     logger.info(f"Resource {resource.code} status: {old_status} -> {new_status.value}")
 
     return {"id": resource_id, "status": new_status.value}
+
+
+# ============================================================================
+# Printers linked to Work Center
+# ============================================================================
+
+@router.get("/{wc_id}/printers")
+async def list_work_center_printers(
+    wc_id: int,
+    active_only: bool = True,
+    db: Session = Depends(get_db),
+):
+    """
+    List printers assigned to a work center.
+
+    Returns basic printer info for display in the work center card.
+    """
+    work_center = db.query(WorkCenter).filter(WorkCenter.id == wc_id).first()
+    if not work_center:
+        raise HTTPException(status_code=404, detail="Work center not found")
+
+    query = db.query(Printer).filter(Printer.work_center_id == wc_id)
+
+    if active_only:
+        query = query.filter(Printer.active == True)  # noqa: E712 - SQL Server requires == True
+
+    printers = query.order_by(Printer.code).all()
+
+    return [
+        {
+            "id": p.id,
+            "code": p.code,
+            "name": p.name,
+            "model": p.model,
+            "brand": p.brand,
+            "status": p.status,
+            "ip_address": p.ip_address,
+            "active": p.active,
+        }
+        for p in printers
+    ]
 
 
 # ============================================================================

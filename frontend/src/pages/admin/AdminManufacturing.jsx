@@ -513,6 +513,7 @@ function WorkCenterCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [resources, setResources] = useState([]);
+  const [printers, setPrinters] = useState([]);
   const [loadingResources, setLoadingResources] = useState(false);
 
   const token = localStorage.getItem("adminToken");
@@ -536,9 +537,28 @@ function WorkCenterCard({
     }
   };
 
+  const fetchPrinters = async () => {
+    if (printers.length > 0) return;
+    try {
+      const res = await fetch(
+        `${API_URL}/api/v1/work-centers/${workCenter.id}/printers?active_only=false`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setPrinters(data);
+      }
+    } catch (err) {
+      // Printers fetch failure is non-critical
+    }
+  };
+
   useEffect(() => {
     if (expanded) {
       fetchResources();
+      if (workCenter.center_type === "machine") {
+        fetchPrinters();
+      }
     }
   }, [expanded]);
 
@@ -679,6 +699,71 @@ function WorkCenterCard({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Printers Section - only for machine type work centers */}
+          {workCenter.center_type === "machine" && (
+            <div className="mt-4 pt-4 border-t border-gray-800">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="text-sm font-medium text-gray-400">
+                  🖨️ Printers Assigned
+                </h4>
+                <a
+                  href="/admin/printers"
+                  className="text-sm text-blue-400 hover:text-blue-300"
+                >
+                  Manage Printers →
+                </a>
+              </div>
+
+              {printers.length === 0 ? (
+                <div className="text-gray-500 text-sm">
+                  No printers assigned to this pool. Assign printers from the Printers page.
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  {printers.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between p-3 bg-gray-900 rounded border border-gray-800"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            p.status === "idle" ? "bg-green-500" :
+                            p.status === "printing" ? "bg-blue-500" :
+                            p.status === "error" ? "bg-red-500" :
+                            "bg-gray-500"
+                          }`}
+                        />
+                        <span className="font-mono text-sm text-gray-300">
+                          {p.code}
+                        </span>
+                        <span className="text-white">{p.name}</span>
+                        <span className="text-xs text-gray-500">
+                          ({p.model})
+                        </span>
+                        {p.ip_address && (
+                          <span className="text-xs text-purple-400">
+                            {p.ip_address}
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs ${
+                          p.status === "idle" ? "bg-green-900/30 text-green-400" :
+                          p.status === "printing" ? "bg-blue-900/30 text-blue-400" :
+                          p.status === "error" ? "bg-red-900/30 text-red-400" :
+                          "bg-gray-700 text-gray-400"
+                        }`}
+                      >
+                        {p.status || "offline"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
