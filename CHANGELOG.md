@@ -2,6 +2,60 @@
 
 All notable changes to FilaOps will be documented in this file.
 
+## [1.4.0] - 2025-12-15
+
+### Added
+
+- **Enhanced MRP System**: Major improvements to Material Requirements Planning
+  - Full BOM explosion with multi-level component requirements
+  - Unit of Measure (UOM) conversion support for mixed-unit BOMs (e.g., G to KG)
+  - Sub-assembly due date cascading (configurable via `MRP_ENABLE_SUB_ASSEMBLY_CASCADING`)
+  - MRP trigger service for automatic recalculation on order events
+  - New MRP tracking fields on sales orders
+- **Dashboard Reorganization**: Improved admin dashboard layout
+  - Grouped metrics into Sales, Inventory, and Operations sections
+  - Clickable StatCards that navigate to relevant pages
+  - "View all →" quick links on section headers
+- **Locations Management**: New admin page for inventory locations (`/admin/locations`)
+  - CRUD operations for warehouse locations
+  - Location hierarchy support
+- **Production Order Improvements**:
+  - Unique constraint on production order codes (prevents duplicates)
+  - Auto-transition sales orders to "ready_to_ship" when production completes
+  - Material availability checking with UOM awareness
+
+### Fixed
+
+- **BOM Issues** (Issue #55): Multiple BOM-related bugs resolved
+  - Units now display correctly (G, KG, M) instead of defaulting to "EA"
+  - BOM line updates work properly (fixed 405 Method Not Allowed error)
+  - Scrap factor calculation now correct in cost display
+  - UOM conversion for cost when BOM line unit differs from component unit
+- **Lint Errors**: Fixed E402 import ordering and removed redundant logger recreation
+
+### Security
+
+- Removed hardcoded printer credentials from codebase
+- Replaced personal email with business contact email
+
+### Technical
+
+- New migrations: `006_add_mrp_tracking_to_sales_orders.py`, `007_ensure_production_order_code_unique.py`
+- Added `mrp_trigger_service.py` for automatic MRP recalculation
+- Enhanced `uom_service.py` with database-backed conversion
+- Added `qty_needed` field to BOM response showing effective quantity with scrap
+
+## [1.3.1] - 2025-12-12
+
+### Fixed
+
+- **Remote Access Login Issue** (Issue #50): Fixed "Failed to fetch" error for network access
+  - Login page shows warning with instructions to set `VITE_API_URL`
+- **No Colors Available** (Issue #44): Seed data now includes 15 basic colors
+  - BambuLab-style materials linked to common colors
+- **Setup Wizard UX**: Clearer messaging about seed data
+- **CI/Test Fixes**: Resolved ruff lint errors, fixed test database setup
+
 ## [1.3.0] - 2025-12-11
 
 ### Added
