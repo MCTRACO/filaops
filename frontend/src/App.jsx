@@ -27,6 +27,7 @@ import AdminPayments from "./pages/admin/AdminPayments";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminLocations from "./pages/admin/AdminLocations";
 import AdminAccounting from "./pages/admin/AdminAccounting";
+import AdminPrinters from "./pages/admin/AdminPrinters";
 // import AdminLicense from "./pages/admin/AdminLicense";  // Disabled until ready
 import Pricing from "./pages/Pricing";
 
@@ -81,6 +82,7 @@ export default function App() {
           <Route path="users" element={<AdminUsers />} />
           <Route path="locations" element={<AdminLocations />} />
           <Route path="accounting" element={<AdminAccounting />} />
+          <Route path="printers" element={<AdminPrinters />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
       </Routes>

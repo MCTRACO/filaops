@@ -53,6 +53,7 @@ class WorkCenter(Base):
     # Relationships
     resources = relationship("Resource", back_populates="work_center", cascade="all, delete-orphan")
     routing_operations = relationship("RoutingOperation", back_populates="work_center")
+    printers = relationship("Printer", back_populates="work_center")
 
     def __repr__(self):
         return f"<WorkCenter {self.code}: {self.name}>"

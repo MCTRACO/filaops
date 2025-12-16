@@ -76,6 +76,26 @@ from .purchasing import (
     ReceivePORequest,
     ReceivePOResponse
 )
+from .printer import (
+    PrinterBrand,
+    PrinterStatus,
+    PrinterCapabilities,
+    PrinterConnectionConfig,
+    PrinterCreate,
+    PrinterUpdate,
+    PrinterResponse,
+    PrinterListResponse,
+    DiscoveredPrinterResponse,
+    DiscoveryResultResponse,
+    DiscoveryRequest,
+    PrinterCSVImportRequest,
+    PrinterCSVImportResult,
+    PrinterStatusUpdate,
+    PrinterConnectionTest,
+    PrinterConnectionTestResult,
+    PrinterBrandInfo,
+    PrinterModelInfo
+)
 
 __all__ = [
     # Auth schemas
@@ -149,4 +169,23 @@ __all__ = [
     "ReceiveLineItem",
     "ReceivePORequest",
     "ReceivePOResponse",
+    # Printer schemas
+    "PrinterBrand",
+    "PrinterStatus",
+    "PrinterCapabilities",
+    "PrinterConnectionConfig",
+    "PrinterCreate",
+    "PrinterUpdate",
+    "PrinterResponse",
+    "PrinterListResponse",
+    "DiscoveredPrinterResponse",
+    "DiscoveryResultResponse",
+    "DiscoveryRequest",
+    "PrinterCSVImportRequest",
+    "PrinterCSVImportResult",
+    "PrinterStatusUpdate",
+    "PrinterConnectionTest",
+    "PrinterConnectionTestResult",
+    "PrinterBrandInfo",
+    "PrinterModelInfo",
 ]
