@@ -35,9 +35,10 @@ export default function AdminLogin() {
       // Show connection error - this helps users diagnose VITE_API_URL issues
       setApiError(
         `Cannot connect to API at ${API_URL}. ` +
-        (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-          ? `If accessing remotely, ensure VITE_API_URL is set to the server's address (e.g., http://${window.location.hostname}:8000) and rebuild the frontend.`
-          : "Please ensure the backend is running.")
+          (window.location.hostname !== "localhost" &&
+          window.location.hostname !== "127.0.0.1"
+            ? `If accessing remotely, ensure VITE_API_URL is set to the server's address (e.g., http://${window.location.hostname}:8001) and rebuild the frontend.`
+            : "Please ensure the backend is running.")
       );
     } finally {
       setCheckingSetup(false);
@@ -84,7 +85,9 @@ export default function AdminLogin() {
       const userData = await meRes.json();
 
       if (!["admin", "operator"].includes(userData.account_type)) {
-        throw new Error("Access denied. Please use an admin or operator account.");
+        throw new Error(
+          "Access denied. Please use an admin or operator account."
+        );
       }
 
       // Store token and user data
@@ -120,20 +123,30 @@ export default function AdminLogin() {
             FilaOps
           </Link>
           <h1 className="text-xl text-white mt-4">Staff Login</h1>
-          <p className="text-gray-400 mt-2">
-            Sign in to access FilaOps
-          </p>
+          <p className="text-gray-400 mt-2">Sign in to access FilaOps</p>
         </div>
 
         {/* API Connection Error */}
         {apiError && (
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
             <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <svg
+                className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
               </svg>
               <div>
-                <h3 className="text-yellow-400 font-medium">Connection Issue</h3>
+                <h3 className="text-yellow-400 font-medium">
+                  Connection Issue
+                </h3>
                 <p className="text-yellow-200/70 text-sm mt-1">{apiError}</p>
               </div>
             </div>

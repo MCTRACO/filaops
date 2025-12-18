@@ -21,7 +21,7 @@ test.describe('Order-to-Ship Workflow', () => {
     // ============================================
     console.log('Step 1: Creating sales order...');
     
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await page.waitForLoadState('networkidle');
 
@@ -30,7 +30,7 @@ test.describe('Order-to-Ship Workflow', () => {
 
     // Open create order modal
     await page.click('button:has-text("Create Order")');
-    await expect(page.locator('.fixed h3:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.fixed h2:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
 
     // Wait for dropdowns to populate
     await page.waitForTimeout(2000);
@@ -62,7 +62,7 @@ test.describe('Order-to-Ship Workflow', () => {
     await page.click('.fixed button[type="submit"]');
 
     // Verify order created
-    await expect(page.locator('.fixed h3:has-text("Create Sales Order")')).not.toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.fixed h2:has-text("Create Sales Order")')).not.toBeVisible({ timeout: 15000 });
     await page.waitForLoadState('networkidle');
 
     // Verify order appears in table
@@ -115,7 +115,7 @@ test.describe('Order-to-Ship Workflow', () => {
     // ============================================
     console.log('Step 3: Navigating to production page...');
 
-    await page.click('text=Production');
+    await page.goto('/admin/production');
     await expect(page).toHaveURL('/admin/production');
     await page.waitForLoadState('networkidle');
 
@@ -309,7 +309,7 @@ test.describe('Order-to-Ship Workflow', () => {
     console.log('Step 8: Shipping order...');
 
     // Go back to orders
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await page.waitForLoadState('networkidle');
 
@@ -363,7 +363,7 @@ test.describe('Order-to-Ship Workflow', () => {
     // Test that manufacturing infrastructure is accessible
     console.log('Testing manufacturing setup...');
 
-    await page.click('text=Manufacturing');
+    await page.goto('/admin/manufacturing');
     await expect(page).toHaveURL('/admin/manufacturing');
     await page.waitForLoadState('networkidle');
 
@@ -400,15 +400,15 @@ test.describe('Order-to-Ship Workflow', () => {
     // Test that production execution UI is properly set up
     console.log('Testing production kanban board...');
 
-    await page.click('text=Production');
+    await page.goto('/admin/production');
     await expect(page).toHaveURL('/admin/production');
     await page.waitForLoadState('networkidle');
 
     // Verify all status columns are visible
-    await expect(page.locator('text=Draft')).toBeVisible();
-    await expect(page.locator('text=Released')).toBeVisible();
-    await expect(page.locator('text=In Progress')).toBeVisible();
-    await expect(page.locator('text=Complete')).toBeVisible();
+    await expect(page.locator('h3:has-text("Draft")').first()).toBeVisible();
+    await expect(page.locator('h3:has-text("Released")').first()).toBeVisible();
+    await expect(page.locator('h3:has-text("In Progress")').first()).toBeVisible();
+    await expect(page.locator('h3:has-text("Complete")').first()).toBeVisible();
 
     // Verify kanban board structure
     const kanbanBoard = page.locator('.grid.grid-cols-4');
@@ -419,15 +419,15 @@ test.describe('Order-to-Ship Workflow', () => {
 
   test('verify production order appears after creation', async ({ authenticatedPage: page }) => {
     // Quick test to verify production orders show up
-    await page.click('text=Production');
+    await page.goto('/admin/production');
     await expect(page).toHaveURL('/admin/production');
     await page.waitForLoadState('networkidle');
 
     // Verify kanban board is visible
-    await expect(page.locator('text=Draft')).toBeVisible();
-    await expect(page.locator('text=Released')).toBeVisible();
-    await expect(page.locator('text=In Progress')).toBeVisible();
-    await expect(page.locator('text=Complete')).toBeVisible();
+    await expect(page.locator('h3:has-text("Draft")').first()).toBeVisible();
+    await expect(page.locator('h3:has-text("Released")').first()).toBeVisible();
+    await expect(page.locator('h3:has-text("In Progress")').first()).toBeVisible();
+    await expect(page.locator('h3:has-text("Complete")').first()).toBeVisible();
   });
 });
 

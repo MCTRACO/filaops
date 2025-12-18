@@ -16,6 +16,402 @@ const ITEM_TYPES = [
   { value: "service", label: "Service", color: "green" },
 ];
 
+// Category tree node component (extracted to fix bundler hoisting issue)
+function CategoryNode({
+  node,
+  depth = 0,
+  expandedCategories,
+  selectedCategory,
+  toggleExpand,
+  setSelectedCategory,
+  setEditingCategory,
+  setShowCategoryModal,
+  handleDeleteCategory,
+}) {
+  // FORCE REBUILD TEST
+  const hasChildren = node.children?.length > 0;
+  const isExpanded = expandedCategories.has(node.id);
+  const isSelected = selectedCategory === node.id;
+
+  return (
+    <div>
+      <div
+        className={`group flex items-center rounded-lg text-sm transition-colors ${
+          isSelected
+            ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+            : "text-gray-400 hover:bg-gray-800 hover:text-white"
+        }`}
+        style={{ paddingLeft: `${8 + depth * 12}px` }}
+      >
+        {/* Expand/Collapse toggle */}
+        {hasChildren ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleExpand(node.id);
+            }}
+            className="p-1 hover:text-white"
+          >
+            <span className="text-xs">{isExpanded ? "▼" : "▶"}</span>
+          </button>
+        ) : (
+          <span className="w-5" />
+        )}
+
+        {/* Category name - click to filter */}
+        <button
+          onClick={() => setSelectedCategory(isSelected ? null : node.id)}
+          className="flex-1 text-left py-2 pr-2"
+        >
+          {node.name}
+        </button>
+
+        {/* Edit/Delete buttons */}
+        <div className="flex items-center gap-1 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 sm:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingCategory(node);
+              setShowCategoryModal(true);
+            }}
+            className="p-1 text-gray-500 hover:text-blue-400"
+            title="Edit category"
+            aria-label={`Edit category ${node.name}`}
+          >
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+              />
+            </svg>
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteCategory(node);
+            }}
+            className="p-1 text-gray-500 hover:text-red-400"
+            title="Delete category"
+            aria-label={`Delete category ${node.name}`}
+          >
+            <svg
+              className="w-3 h-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Recursive children */}
+      {hasChildren && isExpanded && (
+        <div>
+          {node.children.map((child) => (
+            <CategoryNode
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              expandedCategories={expandedCategories}
+              selectedCategory={selectedCategory}
+              toggleExpand={toggleExpand}
+              setSelectedCategory={setSelectedCategory}
+              setEditingCategory={setEditingCategory}
+              setShowCategoryModal={setShowCategoryModal}
+              handleDeleteCategory={handleDeleteCategory}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Bulk Update Modal Component (extracted to fix bundler hoisting issue)
+function BulkUpdateModal({ categories, selectedCount, onSave, onClose }) {
+  const toast = useToast();
+  const [form, setForm] = useState({
+    category_id: "",
+    item_type: "",
+    procurement_type: "",
+    is_active: "",
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const updateData = {};
+    if (form.category_id !== "") {
+      const categoryId = parseInt(form.category_id);
+      if (!isNaN(categoryId)) {
+        updateData.category_id = categoryId;
+      }
+    }
+    if (form.item_type) updateData.item_type = form.item_type;
+    if (form.procurement_type)
+      updateData.procurement_type = form.procurement_type;
+    if (form.is_active !== "") updateData.is_active = form.is_active === "true";
+
+    if (Object.keys(updateData).length === 0) {
+      toast.warning("Please select at least one field to update");
+      return;
+    }
+
+    onSave(updateData);
+    setForm({
+      category_id: "",
+      item_type: "",
+      procurement_type: "",
+      is_active: "",
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold text-white mb-4">
+          Bulk Update {selectedCount} Item{selectedCount !== 1 ? "s" : ""}
+        </h2>
+        <p className="text-gray-400 text-sm mb-6">
+          Update the selected items. Leave fields empty to keep current values.
+        </p>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-2">Category</label>
+            <select
+              value={form.category_id}
+              onChange={(e) =>
+                setForm({ ...form, category_id: e.target.value })
+              }
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="">-- Keep Current --</option>
+              <option value="0">-- No Category --</option>
+              {categories
+                .filter((cat) => cat.is_active)
+                .map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-2">
+              Item Type
+            </label>
+            <select
+              value={form.item_type}
+              onChange={(e) => setForm({ ...form, item_type: e.target.value })}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="">-- Keep Current --</option>
+              {ITEM_TYPES.filter((type) => type.value !== "filament").map(
+                (type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+          <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-2">
+              Procurement Type
+            </label>
+            <select
+              value={form.procurement_type}
+              onChange={(e) =>
+                setForm({ ...form, procurement_type: e.target.value })
+              }
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="">-- Keep Current --</option>
+              <option value="make">Make</option>
+              <option value="buy">Buy</option>
+              <option value="make_or_buy">Make or Buy</option>
+            </select>
+          </div>
+          <div className="mb-6">
+            <label className="block text-gray-400 text-sm mb-2">Status</label>
+            <select
+              value={form.is_active}
+              onChange={(e) => setForm({ ...form, is_active: e.target.value })}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="">-- Keep Current --</option>
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-400 hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-500 hover:to-purple-500"
+            >
+              Update {selectedCount} Item{selectedCount !== 1 ? "s" : ""}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Category Modal Component (extracted to fix bundler hoisting issue)
+function CategoryModal({ category, categories, onSave, onClose }) {
+  const [form, setForm] = useState({
+    code: category?.code || "",
+    name: category?.name || "",
+    parent_id: category?.parent_id || "",
+    description: category?.description || "",
+    sort_order: category?.sort_order || 0,
+    is_active: category?.is_active ?? true,
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const data = { ...form };
+    if (data.parent_id === "") data.parent_id = null;
+    else if (data.parent_id) data.parent_id = parseInt(data.parent_id);
+    data.sort_order = parseInt(data.sort_order) || 0;
+    onSave(data);
+  };
+
+  const availableParents = categories.filter((c) => c.id !== category?.id);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md">
+        <div className="p-6 border-b border-gray-800">
+          <h2 className="text-xl font-bold text-white">
+            {category ? "Edit Category" : "Add New Category"}
+          </h2>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Code *</label>
+            <input
+              type="text"
+              value={form.code}
+              onChange={(e) =>
+                setForm({ ...form, code: e.target.value.toUpperCase() })
+              }
+              required
+              placeholder="e.g. FILAMENT"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Name *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              required
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">
+              Parent Category
+            </label>
+            <select
+              value={form.parent_id}
+              onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            >
+              <option value="">-- Root Level --</option>
+              {availableParents.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.full_path || c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">
+              Description
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              rows={2}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">
+                Sort Order
+              </label>
+              <input
+                type="number"
+                value={form.sort_order}
+                onChange={(e) =>
+                  setForm({ ...form, sort_order: e.target.value })
+                }
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+              />
+            </div>
+            <div className="flex items-center pt-6">
+              <input
+                type="checkbox"
+                id="cat_active"
+                checked={form.is_active}
+                onChange={(e) =>
+                  setForm({ ...form, is_active: e.target.checked })
+                }
+                className="rounded"
+              />
+              <label htmlFor="cat_active" className="text-gray-400 ml-2">
+                Active
+              </label>
+            </div>
+          </div>
+          <div className="flex justify-end gap-4 pt-4 border-t border-gray-800">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-400 hover:text-white"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-500 hover:to-purple-500"
+            >
+              {category ? "Save Changes" : "Create Category"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminItems() {
   const toast = useToast();
   const [items, setItems] = useState([]);
@@ -59,20 +455,7 @@ export default function AdminItems() {
 
   const token = localStorage.getItem("adminToken");
 
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setPagination((prev) => ({ ...prev, page: 1 }));
-  }, [selectedCategory, filters.itemType, filters.activeOnly]);
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     if (!token) return;
     try {
       // Fetch flat list
@@ -97,7 +480,11 @@ export default function AdminItems() {
     } catch (err) {
       // Category fetch failure is non-critical - category tree will just be empty
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
 
   const fetchItems = useCallback(async () => {
     if (!token) return;
@@ -137,6 +524,15 @@ export default function AdminItems() {
     selectedCategory,
   ]);
 
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  }, [selectedCategory, filters.itemType, filters.activeOnly]);
+
   // Server-side search is now used, so filteredItems is just items
   const filteredItems = items;
 
@@ -150,7 +546,7 @@ export default function AdminItems() {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [filters.search]);
+  }, [filters.search, pagination.page, fetchItems]);
 
   // Pagination helpers
   const totalPages = Math.ceil(pagination.total / pagination.pageSize);
@@ -196,109 +592,6 @@ export default function AdminItems() {
     } catch (err) {
       toast.error(err.message);
     }
-  };
-
-  // Category tree component
-  const CategoryNode = ({ node, depth = 0 }) => {
-    const hasChildren = node.children?.length > 0;
-    const isExpanded = expandedCategories.has(node.id);
-    const isSelected = selectedCategory === node.id;
-
-    return (
-      <div>
-        <div
-          className={`group flex items-center rounded-lg text-sm transition-colors ${
-            isSelected
-              ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-              : "text-gray-400 hover:bg-gray-800 hover:text-white"
-          }`}
-          style={{ paddingLeft: `${8 + depth * 12}px` }}
-        >
-          {/* Expand/Collapse toggle */}
-          {hasChildren ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleExpand(node.id);
-              }}
-              className="p-1 hover:text-white"
-            >
-              <span className="text-xs">{isExpanded ? "▼" : "▶"}</span>
-            </button>
-          ) : (
-            <span className="w-5" /> // Spacer for alignment
-          )}
-
-          {/* Category name - click to filter */}
-          <button
-            onClick={() => setSelectedCategory(isSelected ? null : node.id)}
-            className="flex-1 text-left py-2 pr-2"
-          >
-            {node.name}
-          </button>
-
-          {/* Edit/Delete buttons - show on hover */}
-          <div className="flex items-center gap-1 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 sm:opacity-100 transition-opacity">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditingCategory(node);
-                setShowCategoryModal(true);
-              }}
-              className="p-1 text-gray-500 hover:text-blue-400"
-              title="Edit category"
-              aria-label={`Edit category ${node.name}`}
-            >
-              <svg
-                className="w-3 h-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                />
-              </svg>
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteCategory(node);
-              }}
-              className="p-1 text-gray-500 hover:text-red-400"
-              title="Delete category"
-              aria-label={`Delete category ${node.name}`}
-            >
-              <svg
-                className="w-3 h-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Children - only show if expanded */}
-        {hasChildren && isExpanded && (
-          <div>
-            {node.children.map((child) => (
-              <CategoryNode key={child.id} node={child} depth={depth + 1} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
   };
 
   // Stats calculations
@@ -488,7 +781,17 @@ export default function AdminItems() {
 
           <div className="space-y-1">
             {categoryTree.map((node) => (
-              <CategoryNode key={node.id} node={node} />
+              <CategoryNode
+                key={node.id}
+                node={node}
+                expandedCategories={expandedCategories}
+                selectedCategory={selectedCategory}
+                toggleExpand={toggleExpand}
+                setSelectedCategory={setSelectedCategory}
+                setEditingCategory={setEditingCategory}
+                setShowCategoryModal={setShowCategoryModal}
+                handleDeleteCategory={handleDeleteCategory}
+              />
             ))}
           </div>
         </div>
@@ -1045,316 +1348,6 @@ export default function AdminItems() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-// Bulk Update Modal
-function BulkUpdateModal({ categories, selectedCount, onSave, onClose }) {
-  const toast = useToast();
-  const [form, setForm] = useState({
-    category_id: "",
-    item_type: "",
-    procurement_type: "",
-    is_active: "",
-  });
-
-  // Reset form when modal closes
-  useEffect(() => {
-    return () => {
-      setForm({
-        category_id: "",
-        item_type: "",
-        procurement_type: "",
-        is_active: "",
-      });
-    };
-  }, []);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    // Build update data with only non-empty fields
-    const updateData = {};
-    // Handle category_id - must explicitly check for empty string
-    // "0" means clear category, empty string means don't update
-    if (form.category_id !== "") {
-      const categoryId = parseInt(form.category_id);
-      if (!isNaN(categoryId)) {
-        updateData.category_id = categoryId;
-      }
-    }
-    if (form.item_type) updateData.item_type = form.item_type;
-    if (form.procurement_type)
-      updateData.procurement_type = form.procurement_type;
-    if (form.is_active !== "") updateData.is_active = form.is_active === "true";
-
-    // Check if at least one field is being updated
-    if (Object.keys(updateData).length === 0) {
-      toast.warning("Please select at least one field to update");
-      return;
-    }
-
-    onSave(updateData);
-    // Reset form after submit
-    setForm({
-      category_id: "",
-      item_type: "",
-      procurement_type: "",
-      is_active: "",
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold text-white mb-4">
-          Bulk Update {selectedCount} Item{selectedCount !== 1 ? "s" : ""}
-        </h2>
-        <p className="text-gray-400 text-sm mb-6">
-          Update the selected items. Leave fields empty to keep current values.
-        </p>
-
-        <form onSubmit={handleSubmit}>
-          {/* Category */}
-          <div className="mb-4">
-            <label className="block text-gray-400 text-sm mb-2">Category</label>
-            <select
-              value={form.category_id}
-              onChange={(e) =>
-                setForm({ ...form, category_id: e.target.value })
-              }
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-            >
-              <option value="">-- Keep Current --</option>
-              <option value="0">-- No Category --</option>
-              {categories
-                .filter((cat) => cat.is_active)
-                .map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          {/* Item Type */}
-          <div className="mb-4">
-            <label className="block text-gray-400 text-sm mb-2">
-              Item Type
-            </label>
-            <select
-              value={form.item_type}
-              onChange={(e) => setForm({ ...form, item_type: e.target.value })}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-            >
-              <option value="">-- Keep Current --</option>
-              {/* Filter out "filament" - it's a virtual type for display only.
-                  In the DB, filaments are supplies with material_type_id set.
-                  Use Material Import to create filaments. */}
-              {ITEM_TYPES.filter((type) => type.value !== "filament").map(
-                (type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                )
-              )}
-            </select>
-          </div>
-
-          {/* Procurement Type */}
-          <div className="mb-4">
-            <label className="block text-gray-400 text-sm mb-2">
-              Procurement Type
-            </label>
-            <select
-              value={form.procurement_type}
-              onChange={(e) =>
-                setForm({ ...form, procurement_type: e.target.value })
-              }
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-            >
-              <option value="">-- Keep Current --</option>
-              <option value="make">Make</option>
-              <option value="buy">Buy</option>
-              <option value="make_or_buy">Make or Buy</option>
-            </select>
-          </div>
-
-          {/* Active Status */}
-          <div className="mb-6">
-            <label className="block text-gray-400 text-sm mb-2">Status</label>
-            <select
-              value={form.is_active}
-              onChange={(e) => setForm({ ...form, is_active: e.target.value })}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-            >
-              <option value="">-- Keep Current --</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
-            </select>
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-400 hover:text-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-500 hover:to-purple-500"
-            >
-              Update {selectedCount} Item{selectedCount !== 1 ? "s" : ""}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// Category Create/Edit Modal
-function CategoryModal({ category, categories, onSave, onClose }) {
-  const [form, setForm] = useState({
-    code: category?.code || "",
-    name: category?.name || "",
-    parent_id: category?.parent_id || "",
-    description: category?.description || "",
-    sort_order: category?.sort_order || 0,
-    is_active: category?.is_active ?? true,
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const data = { ...form };
-    if (data.parent_id === "") data.parent_id = null;
-    else if (data.parent_id) data.parent_id = parseInt(data.parent_id);
-    data.sort_order = parseInt(data.sort_order) || 0;
-    onSave(data);
-  };
-
-  // Filter out current category and its children for parent selection
-  const availableParents = categories.filter((c) => c.id !== category?.id);
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md">
-        <div className="p-6 border-b border-gray-800">
-          <h2 className="text-xl font-bold text-white">
-            {category ? "Edit Category" : "Add New Category"}
-          </h2>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Code *</label>
-            <input
-              type="text"
-              value={form.code}
-              onChange={(e) =>
-                setForm({ ...form, code: e.target.value.toUpperCase() })
-              }
-              required
-              placeholder="e.g. FILAMENT"
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">Name *</label>
-            <input
-              type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              required
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">
-              Parent Category
-            </label>
-            <select
-              value={form.parent_id}
-              onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-            >
-              <option value="">-- Root Level --</option>
-              {availableParents.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.full_path || c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-400 mb-1">
-              Description
-            </label>
-            <textarea
-              value={form.description}
-              onChange={(e) =>
-                setForm({ ...form, description: e.target.value })
-              }
-              rows={2}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">
-                Sort Order
-              </label>
-              <input
-                type="number"
-                value={form.sort_order}
-                onChange={(e) =>
-                  setForm({ ...form, sort_order: e.target.value })
-                }
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-            <div className="flex items-center pt-6">
-              <input
-                type="checkbox"
-                id="cat_active"
-                checked={form.is_active}
-                onChange={(e) =>
-                  setForm({ ...form, is_active: e.target.checked })
-                }
-                className="rounded"
-              />
-              <label htmlFor="cat_active" className="text-gray-400 ml-2">
-                Active
-              </label>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-4 pt-4 border-t border-gray-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-400 hover:text-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-500 hover:to-purple-500"
-            >
-              {category ? "Save Changes" : "Create Category"}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

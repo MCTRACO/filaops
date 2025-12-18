@@ -165,7 +165,7 @@ def determine_best_box(quote: Quote, db: Session) -> Optional[Product]:
     # 2. Products in packaging/shipping categories
     box_products = db.query(Product).filter(
         and_(
-            Product.active== True,
+            Product.active == True,  # noqa: E712
             Product.name.like('%box%')  # Match boxes by name
         )
     ).all()

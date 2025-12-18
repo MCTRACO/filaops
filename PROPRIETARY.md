@@ -242,6 +242,31 @@ Details available to Pro/Enterprise customers.
 
 ---
 
+## ⚠️ Production Deployment Requirements
+
+**For commercial/SaaS hosting**, the following technical requirements must be met before deploying to production:
+
+### Frontend Build Configuration
+
+**Current Status**: Community edition uses **development mode builds** (unminified) which is:
+- ✅ Acceptable for self-hosted/community deployments
+- ❌ **NOT acceptable for SaaS/public hosting**
+
+**Reason**: ~30 React components have temporal dead zone errors that only manifest in production builds. Development builds work around this but expose:
+- Full source code and business logic
+- Unobfuscated API patterns
+- 2x larger bundle size
+
+**Required Before SaaS Launch:**
+1. Fix all useCallback/useEffect timing issues (6-8 hours)
+2. Enable production minification
+3. Disable source maps in production
+4. Add build validation to CI/CD
+
+See: `frontend/PRODUCTION_BUILD_BLOCKED.md` and `docs/SAAS_TIERING_PLAN.md`
+
+---
+
 **Questions?** Open a [Discussion](https://github.com/Blb3D/filaops/discussions) or email hello@blb3dprinting.com
 
 ---

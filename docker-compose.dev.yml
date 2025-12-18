@@ -112,8 +112,9 @@ services:
     volumes:
       - ./backend/app:/app/app:ro
       - ./backend/migrations:/app/migrations:ro
+      - ./backend/scripts:/app/scripts:ro
       - filaops-dev-uploads:/app/uploads
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "python scripts/seed_test_data.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

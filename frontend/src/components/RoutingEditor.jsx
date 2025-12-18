@@ -4,7 +4,7 @@
  * Simple, focused editor for managing manufacturing routings.
  * Can be used from item detail pages or standalone.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API_URL } from "../config/api";
 
 export default function RoutingEditor({
@@ -41,20 +41,7 @@ export default function RoutingEditor({
     is_active: true,
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      if (routingId) {
-        fetchRouting();
-      } else if (productId) {
-        fetchRoutingByProduct();
-      }
-      fetchWorkCenters();
-      fetchTemplates();
-      setError(null);
-    }
-  }, [isOpen, routingId, productId]);
-
-  const fetchRouting = async () => {
+  const fetchRouting = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/api/v1/routings/${routingId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -67,9 +54,9 @@ export default function RoutingEditor({
     } catch (err) {
       // Routing fetch failure - will show empty editor
     }
-  };
+  }, [routingId, token]);
 
-  const fetchRoutingByProduct = async () => {
+  const fetchRoutingByProduct = useCallback(async () => {
     const finalProductId = selectedProductId || productId;
     if (!finalProductId) return;
     try {
@@ -91,9 +78,9 @@ export default function RoutingEditor({
     } catch (err) {
       // Routing fetch failure - will show empty editor
     }
-  };
+  }, [selectedProductId, productId, token]);
 
-  const fetchWorkCenters = async () => {
+  const fetchWorkCenters = useCallback(async () => {
     try {
       const res = await fetch(
         `${API_URL}/api/v1/work-centers?active_only=true`,
@@ -108,9 +95,9 @@ export default function RoutingEditor({
     } catch (err) {
       // Work centers fetch failure is non-critical - work center selector will be empty
     }
-  };
+  }, [token]);
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     try {
       const res = await fetch(
         `${API_URL}/api/v1/routings?templates_only=true&active_only=true`,
@@ -125,7 +112,28 @@ export default function RoutingEditor({
     } catch (err) {
       // Templates fetch failure is non-critical - templates list will be empty
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (routingId) {
+        fetchRouting();
+      } else if (productId) {
+        fetchRoutingByProduct();
+      }
+      fetchWorkCenters();
+      fetchTemplates();
+      setError(null);
+    }
+  }, [
+    isOpen,
+    routingId,
+    productId,
+    fetchRouting,
+    fetchRoutingByProduct,
+    fetchWorkCenters,
+    fetchTemplates,
+  ]);
 
   const handleApplyTemplate = async () => {
     if (!selectedTemplate) return;
@@ -354,8 +362,11 @@ export default function RoutingEditor({
   );
   const totalCost = operations.reduce((sum, op) => {
     const setupCost =
-      ((parseFloat(op.setup_time_minutes) || 0) / 60) * (parseFloat(op.labor_rate) || 0);
-    const runCost = ((parseFloat(op.run_time_minutes) || 0) / 60) * (parseFloat(op.labor_rate) || 0);
+      ((parseFloat(op.setup_time_minutes) || 0) / 60) *
+      (parseFloat(op.labor_rate) || 0);
+    const runCost =
+      ((parseFloat(op.run_time_minutes) || 0) / 60) *
+      (parseFloat(op.labor_rate) || 0);
     return sum + setupCost + runCost;
   }, 0);
 

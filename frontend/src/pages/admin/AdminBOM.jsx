@@ -128,6 +128,22 @@ function SearchableSelect({
 
 // Modal Component
 function Modal({ isOpen, onClose, title, children }) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -593,6 +609,8 @@ function WorkOrderRequestModal({ line, onClose, token, onSuccess }) {
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
+          min="2000-01-01"
+          max="2099-12-31"
         />
       </div>
 

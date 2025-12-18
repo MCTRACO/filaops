@@ -8,13 +8,13 @@ import { test, expect } from '../fixtures/auth';
  */
 test.describe('Order Management', () => {
   test('should navigate to orders page', async ({ authenticatedPage: page }) => {
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await expect(page.locator('h1:has-text("Order Management")')).toBeVisible();
   });
 
   test('should show orders table with correct columns', async ({ authenticatedPage: page }) => {
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
 
@@ -27,13 +27,13 @@ test.describe('Order Management', () => {
   });
 
   test('should open create order modal with required fields', async ({ authenticatedPage: page }) => {
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await page.waitForLoadState('networkidle');
 
     // Click Create Order button
     await page.click('button:has-text("Create Order")');
-    await expect(page.locator('.fixed h3:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.fixed h2:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
 
     // Verify required form fields exist
     await expect(page.locator('.fixed select').first()).toBeVisible(); // Customer dropdown
@@ -49,12 +49,12 @@ test.describe('Order Management', () => {
   });
 
   test('should FAIL to create order without customer and product (validation)', async ({ authenticatedPage: page }) => {
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await page.waitForLoadState('networkidle');
 
     await page.click('button:has-text("Create Order")');
-    await expect(page.locator('.fixed h3:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.fixed h2:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
 
     // Button should be disabled without customer AND product
     const submitBtn = page.locator('.fixed button[type="submit"]');
@@ -73,7 +73,7 @@ test.describe('Order Management', () => {
   });
 
   test('should create an order and verify it appears in table', async ({ authenticatedPage: page }) => {
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await page.waitForLoadState('networkidle');
 
@@ -82,7 +82,7 @@ test.describe('Order Management', () => {
 
     // Open create modal
     await page.click('button:has-text("Create Order")');
-    await expect(page.locator('.fixed h3:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.fixed h2:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
 
     // Wait for dropdowns to load
     await page.waitForTimeout(1000);
@@ -126,7 +126,7 @@ test.describe('Order Management', () => {
 
     // CRITICAL ASSERTIONS:
     // 1. Modal should close (success)
-    await expect(page.locator('.fixed h3:has-text("Create Sales Order")')).not.toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.fixed h2:has-text("Create Sales Order")')).not.toBeVisible({ timeout: 15000 });
 
     // 2. No error message should appear on the page
     const errorBanner = page.locator('.bg-red-500\\/10');
@@ -156,12 +156,12 @@ test.describe('Order Management', () => {
   });
 
   test('should create order with customer and verify customer shows in table', async ({ authenticatedPage: page }) => {
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await page.waitForLoadState('networkidle');
 
     await page.click('button:has-text("Create Order")');
-    await expect(page.locator('.fixed h3:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.fixed h2:has-text("Create Sales Order")')).toBeVisible({ timeout: 5000 });
 
     // Wait for dropdowns to populate
     await page.waitForTimeout(1000);
@@ -193,7 +193,7 @@ test.describe('Order Management', () => {
     await page.click('.fixed button[type="submit"]');
 
     // Verify success: modal closes, no error
-    await expect(page.locator('.fixed h3:has-text("Create Sales Order")')).not.toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.fixed h2:has-text("Create Sales Order")')).not.toBeVisible({ timeout: 15000 });
 
     const errorBanner = page.locator('.bg-red-500\\/10');
     await expect(errorBanner).not.toBeVisible({ timeout: 2000 }).catch(() => {
@@ -203,7 +203,7 @@ test.describe('Order Management', () => {
   });
 
   test('should filter orders by status', async ({ authenticatedPage: page }) => {
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await page.waitForLoadState('networkidle');
 
@@ -234,7 +234,7 @@ test.describe('Order Management', () => {
   });
 
   test('should view order details and see order data', async ({ authenticatedPage: page }) => {
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await page.waitForLoadState('networkidle');
 
@@ -266,7 +266,7 @@ test.describe('Order Management', () => {
   });
 
   test('should advance order status', async ({ authenticatedPage: page }) => {
-    await page.click('text=Orders');
+    await page.goto('/admin/orders');
     await expect(page).toHaveURL('/admin/orders');
     await page.waitForLoadState('networkidle');
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+import { API_URL } from "../../config/api";
 
 export default function AdminInventoryTransactions() {
   const [transactions, setTransactions] = useState([]);
@@ -43,8 +42,10 @@ export default function AdminInventoryTransactions() {
       setLoading(true);
       const params = new URLSearchParams();
       if (filters.product_id) params.append("product_id", filters.product_id);
-      if (filters.transaction_type) params.append("transaction_type", filters.transaction_type);
-      if (filters.location_id) params.append("location_id", filters.location_id);
+      if (filters.transaction_type)
+        params.append("transaction_type", filters.transaction_type);
+      if (filters.location_id)
+        params.append("location_id", filters.location_id);
 
       const res = await fetch(
         `${API_URL}/api/v1/admin/inventory/transactions?${params.toString()}`,
@@ -83,9 +84,12 @@ export default function AdminInventoryTransactions() {
     if (!token) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/v1/admin/inventory/transactions/locations`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/admin/inventory/transactions/locations`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       if (res.ok) {
         const data = await res.json();
@@ -105,23 +109,33 @@ export default function AdminInventoryTransactions() {
       const payload = {
         ...formData,
         product_id: parseInt(formData.product_id),
-        location_id: formData.location_id ? parseInt(formData.location_id) : null,
-        quantity: parseFloat(formData.quantity),
-        cost_per_unit: formData.cost_per_unit ? parseFloat(formData.cost_per_unit) : null,
-        reference_id: formData.reference_id ? parseInt(formData.reference_id) : null,
-        to_location_id: formData.transaction_type === "transfer" && formData.to_location_id
-          ? parseInt(formData.to_location_id)
+        location_id: formData.location_id
+          ? parseInt(formData.location_id)
           : null,
+        quantity: parseFloat(formData.quantity),
+        cost_per_unit: formData.cost_per_unit
+          ? parseFloat(formData.cost_per_unit)
+          : null,
+        reference_id: formData.reference_id
+          ? parseInt(formData.reference_id)
+          : null,
+        to_location_id:
+          formData.transaction_type === "transfer" && formData.to_location_id
+            ? parseInt(formData.to_location_id)
+            : null,
       };
 
-      const res = await fetch(`${API_URL}/api/v1/admin/inventory/transactions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `${API_URL}/api/v1/admin/inventory/transactions`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       if (!res.ok) {
         const error = await res.json();
@@ -174,8 +188,12 @@ export default function AdminInventoryTransactions() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-white">Inventory Transactions</h1>
-          <p className="text-gray-400 mt-1">Manage receipts, issues, transfers, and adjustments</p>
+          <h1 className="text-2xl font-bold text-white">
+            Inventory Transactions
+          </h1>
+          <p className="text-gray-400 mt-1">
+            Manage receipts, issues, transfers, and adjustments
+          </p>
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
@@ -195,7 +213,9 @@ export default function AdminInventoryTransactions() {
       {/* Transaction Form */}
       {showForm && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Create Transaction</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">
+            Create Transaction
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -205,7 +225,9 @@ export default function AdminInventoryTransactions() {
                 <select
                   required
                   value={formData.product_id}
-                  onChange={(e) => setFormData({ ...formData, product_id: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, product_id: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 >
                   <option value="">Select product</option>
@@ -224,7 +246,12 @@ export default function AdminInventoryTransactions() {
                 <select
                   required
                   value={formData.transaction_type}
-                  onChange={(e) => setFormData({ ...formData, transaction_type: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      transaction_type: e.target.value,
+                    })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 >
                   <option value="receipt">Receipt</option>
@@ -242,7 +269,9 @@ export default function AdminInventoryTransactions() {
                 </label>
                 <select
                   value={formData.location_id}
-                  onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, location_id: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 >
                   <option value="">Default (Main Warehouse)</option>
@@ -262,7 +291,12 @@ export default function AdminInventoryTransactions() {
                   <select
                     required={formData.transaction_type === "transfer"}
                     value={formData.to_location_id}
-                    onChange={(e) => setFormData({ ...formData, to_location_id: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        to_location_id: e.target.value,
+                      })
+                    }
                     className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                   >
                     <option value="">Select destination</option>
@@ -284,7 +318,9 @@ export default function AdminInventoryTransactions() {
                   step="0.01"
                   required
                   value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, quantity: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
@@ -297,7 +333,9 @@ export default function AdminInventoryTransactions() {
                   type="number"
                   step="0.01"
                   value={formData.cost_per_unit}
-                  onChange={(e) => setFormData({ ...formData, cost_per_unit: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cost_per_unit: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
@@ -308,7 +346,9 @@ export default function AdminInventoryTransactions() {
                 </label>
                 <select
                   value={formData.reference_type}
-                  onChange={(e) => setFormData({ ...formData, reference_type: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, reference_type: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 >
                   <option value="">None</option>
@@ -326,7 +366,9 @@ export default function AdminInventoryTransactions() {
                 <input
                   type="number"
                   value={formData.reference_id}
-                  onChange={(e) => setFormData({ ...formData, reference_id: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, reference_id: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
@@ -338,7 +380,9 @@ export default function AdminInventoryTransactions() {
                 <input
                   type="text"
                   value={formData.lot_number}
-                  onChange={(e) => setFormData({ ...formData, lot_number: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, lot_number: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
@@ -350,17 +394,23 @@ export default function AdminInventoryTransactions() {
                 <input
                   type="text"
                   value={formData.serial_number}
-                  onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, serial_number: e.target.value })
+                  }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">Notes</label>
+              <label className="block text-sm font-medium text-gray-400 mb-1">
+                Notes
+              </label>
               <textarea
                 value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, notes: e.target.value })
+                }
                 rows={3}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
               />
@@ -389,10 +439,14 @@ export default function AdminInventoryTransactions() {
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Product</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Product
+            </label>
             <select
               value={filters.product_id}
-              onChange={(e) => setFilters({ ...filters, product_id: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, product_id: e.target.value })
+              }
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
             >
               <option value="">All Products</option>
@@ -405,10 +459,14 @@ export default function AdminInventoryTransactions() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Type</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Type
+            </label>
             <select
               value={filters.transaction_type}
-              onChange={(e) => setFilters({ ...filters, transaction_type: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, transaction_type: e.target.value })
+              }
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
             >
               <option value="">All Types</option>
@@ -422,10 +480,14 @@ export default function AdminInventoryTransactions() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Location</label>
+            <label className="block text-sm font-medium text-gray-400 mb-1">
+              Location
+            </label>
             <select
               value={filters.location_id}
-              onChange={(e) => setFilters({ ...filters, location_id: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, location_id: e.target.value })
+              }
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
             >
               <option value="">All Locations</option>
@@ -474,13 +536,20 @@ export default function AdminInventoryTransactions() {
             <tbody>
               {transactions.length > 0 ? (
                 transactions.map((txn) => (
-                  <tr key={txn.id} className="border-b border-gray-800 hover:bg-gray-800/50">
+                  <tr
+                    key={txn.id}
+                    className="border-b border-gray-800 hover:bg-gray-800/50"
+                  >
                     <td className="py-3 px-4 text-gray-400 text-sm">
                       {new Date(txn.created_at).toLocaleDateString()}
                     </td>
                     <td className="py-3 px-4">
-                      <div className="text-white font-medium">{txn.product_sku}</div>
-                      <div className="text-gray-500 text-xs">{txn.product_name}</div>
+                      <div className="text-white font-medium">
+                        {txn.product_sku}
+                      </div>
+                      <div className="text-gray-500 text-xs">
+                        {txn.product_name}
+                      </div>
                     </td>
                     <td className="py-3 px-4">
                       <span
@@ -497,14 +566,18 @@ export default function AdminInventoryTransactions() {
                       )}
                     </td>
                     <td className="py-3 px-4 text-white">{txn.quantity}</td>
-                    <td className="py-3 px-4 text-gray-400">{txn.location_name || "N/A"}</td>
+                    <td className="py-3 px-4 text-gray-400">
+                      {txn.location_name || "N/A"}
+                    </td>
                     <td className="py-3 px-4 text-gray-400 text-sm">
                       {txn.reference_type && txn.reference_id
                         ? `${txn.reference_type} #${txn.reference_id}`
                         : "-"}
                     </td>
                     <td className="py-3 px-4 text-gray-400">
-                      {txn.total_cost ? `$${parseFloat(txn.total_cost).toFixed(2)}` : "-"}
+                      {txn.total_cost
+                        ? `$${parseFloat(txn.total_cost).toFixed(2)}`
+                        : "-"}
                     </td>
                     <td className="py-3 px-4 text-gray-500 text-sm max-w-xs truncate">
                       {txn.notes || "-"}
@@ -525,4 +598,3 @@ export default function AdminInventoryTransactions() {
     </div>
   );
 }
-

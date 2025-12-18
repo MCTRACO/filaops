@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from "react";
 import { API_URL } from "../../config/api";
 
@@ -275,6 +276,8 @@ function SalesJournalTab({ token }) {
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
             className="bg-gray-800 border border-gray-700 text-white rounded px-3 py-1.5 text-sm"
+            min="2000-01-01"
+            max="2099-12-31"
           />
         </div>
         <div>
@@ -284,6 +287,8 @@ function SalesJournalTab({ token }) {
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
             className="bg-gray-800 border border-gray-700 text-white rounded px-3 py-1.5 text-sm"
+            min="2000-01-01"
+            max="2099-12-31"
           />
         </div>
         <div className="flex-1"></div>
@@ -460,7 +465,7 @@ function PaymentsTab({ token }) {
 
   useEffect(() => {
     fetchPayments();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, fetchPayments]);
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -540,6 +545,8 @@ function PaymentsTab({ token }) {
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
+            min="2000-01-01"
+            max="2099-12-31"
             className="bg-gray-800 border border-gray-700 text-white rounded px-3 py-1.5 text-sm"
           />
         </div>
@@ -549,6 +556,8 @@ function PaymentsTab({ token }) {
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
+            min="2000-01-01"
+            max="2099-12-31"
             className="bg-gray-800 border border-gray-700 text-white rounded px-3 py-1.5 text-sm"
           />
         </div>

@@ -65,7 +65,7 @@ let adminCreated = false;
 // Custom test fixture with authentication - uses UI login for each test
 const test = baseTest.extend<{ authPage: Page }>({
   authPage: async ({ page, request }, use) => {
-    const baseUrl = 'http://localhost:8000';
+    const baseUrl = 'http://127.0.0.1:8001';
 
     // Check if we need to create admin first
     if (!adminCreated) {

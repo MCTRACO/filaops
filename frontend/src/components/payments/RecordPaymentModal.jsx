@@ -8,7 +8,7 @@
  * - Transaction ID and check number
  * - Shows order balance due
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API_URL } from "../../config/api";
 import { useToast } from "../Toast";
 
@@ -49,28 +49,7 @@ export default function RecordPaymentModal({
     payment_date: new Date().toISOString().split("T")[0],
   });
 
-  // Fetch orders for selection
-  useEffect(() => {
-    fetchOrders();
-  }, []);
-
-  // If orderId is provided, fetch that order
-  useEffect(() => {
-    if (orderId) {
-      fetchOrderDetails(orderId);
-    }
-  }, [orderId]);
-
-  // Fetch payment summary when order is selected
-  useEffect(() => {
-    if (form.sales_order_id) {
-      fetchPaymentSummary(form.sales_order_id);
-    } else {
-      setPaymentSummary(null);
-    }
-  }, [form.sales_order_id]);
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
       // Fetch orders that might need payment (not cancelled, not fully paid for payments)
       const res = await fetch(`${API_URL}/api/v1/sales-orders?page_size=100`, {
@@ -83,42 +62,69 @@ export default function RecordPaymentModal({
     } catch (err) {
       // Non-critical: Order list fetch failure doesn't block user - they can still search
     }
-  };
+  }, [token]);
 
-  const fetchOrderDetails = async (id) => {
-    try {
-      const res = await fetch(`${API_URL}/api/v1/sales-orders/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const order = await res.json();
-        setSelectedOrder(order);
-        setForm({ ...form, sales_order_id: id });
-      }
-    } catch (err) {
-      // Non-critical: Pre-selected order fetch failure - user can select manually
-    }
-  };
-
-  const fetchPaymentSummary = async (orderId) => {
-    try {
-      const res = await fetch(
-        `${API_URL}/api/v1/payments/order/${orderId}/summary`,
-        {
+  const fetchOrderDetails = useCallback(
+    async (id) => {
+      try {
+        const res = await fetch(`${API_URL}/api/v1/sales-orders/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const order = await res.json();
+          setSelectedOrder(order);
+          setForm((prev) => ({ ...prev, sales_order_id: id }));
         }
-      );
-      if (res.ok) {
-        setPaymentSummary(await res.json());
+      } catch (err) {
+        // Non-critical: Pre-selected order fetch failure - user can select manually
       }
-    } catch (err) {
-      // Non-critical: Payment summary fetch failure - form still works without it
+    },
+    [token]
+  );
+
+  const fetchPaymentSummary = useCallback(
+    async (orderId) => {
+      try {
+        const res = await fetch(
+          `${API_URL}/api/v1/payments/order/${orderId}/summary`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (res.ok) {
+          setPaymentSummary(await res.json());
+        }
+      } catch (err) {
+        // Non-critical: Payment summary fetch failure - form still works without it
+      }
+    },
+    [token]
+  );
+
+  // Fetch orders for selection
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // If orderId is provided, fetch that order
+  useEffect(() => {
+    if (orderId) {
+      fetchOrderDetails(orderId);
     }
-  };
+  }, [orderId, fetchOrderDetails]);
+
+  // Fetch payment summary when order is selected
+  useEffect(() => {
+    if (form.sales_order_id) {
+      fetchPaymentSummary(form.sales_order_id);
+    } else {
+      setPaymentSummary(null);
+    }
+  }, [form.sales_order_id, fetchPaymentSummary]);
 
   const handleOrderSelect = (order) => {
     setSelectedOrder(order);
-    setForm({ ...form, sales_order_id: order.id });
+    setForm((prev) => ({ ...prev, sales_order_id: order.id }));
     setSearchQuery("");
   };
 
@@ -149,7 +155,8 @@ export default function RecordPaymentModal({
           ? new Date(form.payment_date).toISOString()
           : null,
         transaction_id: form.transaction_id || null,
-        check_number: form.payment_method === "check" ? form.check_number : null,
+        check_number:
+          form.payment_method === "check" ? form.check_number : null,
         notes: form.notes || null,
       };
 
@@ -204,9 +211,22 @@ export default function RecordPaymentModal({
             <h3 className="text-xl font-semibold text-white">
               {isRefund ? "Record Refund" : "Record Payment"}
             </h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -215,18 +235,24 @@ export default function RecordPaymentModal({
             {/* Order Selection */}
             {!orderId && (
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Order *</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Order *
+                </label>
                 {selectedOrder ? (
                   <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex justify-between items-center">
                     <div>
-                      <div className="text-white font-medium">{selectedOrder.order_number}</div>
-                      <div className="text-sm text-gray-400">{selectedOrder.product_name}</div>
+                      <div className="text-white font-medium">
+                        {selectedOrder.order_number}
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        {selectedOrder.product_name}
+                      </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedOrder(null);
-                        setForm({ ...form, sales_order_id: "" });
+                        setForm((prev) => ({ ...prev, sales_order_id: "" }));
                       }}
                       className="text-gray-400 hover:text-white"
                     >
@@ -250,15 +276,22 @@ export default function RecordPaymentModal({
                             onClick={() => handleOrderSelect(order)}
                             className="px-3 py-2 hover:bg-gray-700 cursor-pointer"
                           >
-                            <div className="text-white">{order.order_number}</div>
+                            <div className="text-white">
+                              {order.order_number}
+                            </div>
                             <div className="text-xs text-gray-400 flex justify-between">
                               <span>{order.product_name}</span>
-                              <span className={
-                                order.payment_status === "paid" ? "text-green-400" :
-                                order.payment_status === "partial" ? "text-yellow-400" :
-                                "text-gray-400"
-                              }>
-                                {formatCurrency(order.grand_total)} - {order.payment_status}
+                              <span
+                                className={
+                                  order.payment_status === "paid"
+                                    ? "text-green-400"
+                                    : order.payment_status === "partial"
+                                    ? "text-yellow-400"
+                                    : "text-gray-400"
+                                }
+                              >
+                                {formatCurrency(order.grand_total)} -{" "}
+                                {order.payment_status}
                               </span>
                             </div>
                           </div>
@@ -275,19 +308,31 @@ export default function RecordPaymentModal({
               <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-sm">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="text-gray-400">Order Total:</div>
-                  <div className="text-white text-right">{formatCurrency(paymentSummary.order_total)}</div>
+                  <div className="text-white text-right">
+                    {formatCurrency(paymentSummary.order_total)}
+                  </div>
                   <div className="text-gray-400">Already Paid:</div>
-                  <div className="text-green-400 text-right">{formatCurrency(paymentSummary.total_paid)}</div>
+                  <div className="text-green-400 text-right">
+                    {formatCurrency(paymentSummary.total_paid)}
+                  </div>
                   {paymentSummary.total_refunded > 0 && (
                     <>
                       <div className="text-gray-400">Refunded:</div>
-                      <div className="text-red-400 text-right">{formatCurrency(paymentSummary.total_refunded)}</div>
+                      <div className="text-red-400 text-right">
+                        {formatCurrency(paymentSummary.total_refunded)}
+                      </div>
                     </>
                   )}
-                  <div className="text-gray-400 font-medium border-t border-gray-700 pt-2">Balance Due:</div>
-                  <div className={`text-right font-medium border-t border-gray-700 pt-2 ${
-                    paymentSummary.balance_due > 0 ? "text-yellow-400" : "text-green-400"
-                  }`}>
+                  <div className="text-gray-400 font-medium border-t border-gray-700 pt-2">
+                    Balance Due:
+                  </div>
+                  <div
+                    className={`text-right font-medium border-t border-gray-700 pt-2 ${
+                      paymentSummary.balance_due > 0
+                        ? "text-yellow-400"
+                        : "text-green-400"
+                    }`}
+                  >
                     {formatCurrency(paymentSummary.balance_due)}
                   </div>
                 </div>
@@ -300,7 +345,9 @@ export default function RecordPaymentModal({
                 {isRefund ? "Refund Amount *" : "Payment Amount *"}
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  $
+                </span>
                 <input
                   type="number"
                   value={form.amount}
@@ -312,23 +359,35 @@ export default function RecordPaymentModal({
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-3 py-2 text-white"
                 />
               </div>
-              {paymentSummary && !isRefund && paymentSummary.balance_due > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, amount: paymentSummary.balance_due.toString() })}
-                  className="text-xs text-blue-400 hover:text-blue-300 mt-1"
-                >
-                  Pay full balance ({formatCurrency(paymentSummary.balance_due)})
-                </button>
-              )}
+              {paymentSummary &&
+                !isRefund &&
+                paymentSummary.balance_due > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((prev) => ({
+                        ...prev,
+                        amount: paymentSummary.balance_due.toString(),
+                      }))
+                    }
+                    className="text-xs text-blue-400 hover:text-blue-300 mt-1"
+                  >
+                    Pay full balance (
+                    {formatCurrency(paymentSummary.balance_due)})
+                  </button>
+                )}
             </div>
 
             {/* Payment Method */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Payment Method *</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Payment Method *
+              </label>
               <select
                 value={form.payment_method}
-                onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, payment_method: e.target.value })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
               >
                 {paymentMethods.map((method) => (
@@ -342,11 +401,15 @@ export default function RecordPaymentModal({
             {/* Check Number (for check payments) */}
             {form.payment_method === "check" && (
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Check Number</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Check Number
+                </label>
                 <input
                   type="text"
                   value={form.check_number}
-                  onChange={(e) => setForm({ ...form, check_number: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, check_number: e.target.value })
+                  }
                   placeholder="1234"
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
                 />
@@ -355,11 +418,15 @@ export default function RecordPaymentModal({
 
             {/* Transaction ID */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Transaction ID (optional)</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Transaction ID (optional)
+              </label>
               <input
                 type="text"
                 value={form.transaction_id}
-                onChange={(e) => setForm({ ...form, transaction_id: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, transaction_id: e.target.value })
+                }
                 placeholder="Stripe, PayPal, or other reference"
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
               />
@@ -367,12 +434,18 @@ export default function RecordPaymentModal({
 
             {/* Payment Date */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Payment Date</label>
+              <label className="block text-sm text-gray-400 mb-1">
+                Payment Date
+              </label>
               <input
                 type="date"
                 value={form.payment_date}
-                onChange={(e) => setForm({ ...form, payment_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, payment_date: e.target.value })
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
+                min="2000-01-01"
+                max="2099-12-31"
               />
             </div>
 
@@ -383,7 +456,9 @@ export default function RecordPaymentModal({
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 rows={2}
-                placeholder={isRefund ? "Reason for refund..." : "Additional notes..."}
+                placeholder={
+                  isRefund ? "Reason for refund..." : "Additional notes..."
+                }
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white"
               />
             </div>
@@ -408,9 +483,24 @@ export default function RecordPaymentModal({
               >
                 {loading ? (
                   <>
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <svg
+                      className="animate-spin h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     Recording...
                   </>

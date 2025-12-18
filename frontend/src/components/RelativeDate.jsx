@@ -18,6 +18,12 @@ const YEAR = 365 * DAY;
 function formatRelative(date) {
   const now = new Date();
   const then = new Date(date);
+
+  // Validate date before formatting
+  if (isNaN(then.getTime())) {
+    return "";
+  }
+
   const diff = now - then;
 
   // Future dates
@@ -70,6 +76,12 @@ function formatRelative(date) {
 
 function formatAbsolute(date, options = {}) {
   const then = new Date(date);
+
+  // Validate date before formatting
+  if (isNaN(then.getTime())) {
+    return "";
+  }
+
   const { includeTime = true, short = false } = options;
 
   if (short) {

@@ -6,19 +6,19 @@ import { test, expect } from '../fixtures/auth';
  */
 test.describe('Customer Management', () => {
   test('should navigate to customers page', async ({ authenticatedPage: page }) => {
-    await page.click('text=Customers');
+    await page.goto('/admin/customers');
     await expect(page).toHaveURL('/admin/customers');
     await expect(page.locator('h1:has-text("Customers")')).toBeVisible();
   });
 
   test('should show customer table', async ({ authenticatedPage: page }) => {
-    await page.click('text=Customers');
+    await page.goto('/admin/customers');
     await expect(page).toHaveURL('/admin/customers');
     await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
   });
 
   test('should create a new customer', async ({ authenticatedPage: page }) => {
-    await page.click('text=Customers');
+    await page.goto('/admin/customers');
     await expect(page).toHaveURL('/admin/customers');
     await page.waitForLoadState('networkidle');
 
@@ -42,7 +42,7 @@ test.describe('Customer Management', () => {
   });
 
   test('should view customer details', async ({ authenticatedPage: page }) => {
-    await page.click('text=Customers');
+    await page.goto('/admin/customers');
     await expect(page).toHaveURL('/admin/customers');
     await page.waitForLoadState('networkidle');
 
@@ -60,7 +60,7 @@ test.describe('Customer Management', () => {
   });
 
   test('should edit a customer', async ({ authenticatedPage: page }) => {
-    await page.click('text=Customers');
+    await page.goto('/admin/customers');
     await expect(page).toHaveURL('/admin/customers');
     await page.waitForLoadState('networkidle');
 

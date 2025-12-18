@@ -4,7 +4,7 @@
  * Simple, focused editor for managing Bill of Materials.
  * Can be used from item detail pages or standalone.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API_URL } from "../config/api";
 
 export default function BOMEditor({
@@ -35,21 +35,7 @@ export default function BOMEditor({
     notes: "",
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      if (bomId) {
-        fetchBOM();
-      } else if (productId) {
-        fetchBOMByProduct();
-      }
-      fetchComponents();
-      fetchMaterials();
-      fetchUomClasses();
-      setError(null);
-    }
-  }, [isOpen, bomId, productId]);
-
-  const fetchBOM = async () => {
+  const fetchBOM = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/api/v1/admin/bom/${bomId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -62,9 +48,9 @@ export default function BOMEditor({
     } catch (err) {
       // BOM fetch failure - will show empty editor
     }
-  };
+  }, [bomId, token]);
 
-  const fetchBOMByProduct = async () => {
+  const fetchBOMByProduct = useCallback(async () => {
     try {
       const res = await fetch(
         `${API_URL}/api/v1/admin/bom/product/${productId}`,
@@ -84,9 +70,9 @@ export default function BOMEditor({
     } catch (err) {
       // BOM fetch failure - will show empty editor
     }
-  };
+  }, [productId, token]);
 
-  const fetchComponents = async () => {
+  const fetchComponents = useCallback(async () => {
     try {
       const res = await fetch(
         `${API_URL}/api/v1/items?limit=500&active_only=true`,
@@ -101,9 +87,9 @@ export default function BOMEditor({
     } catch (err) {
       // Components fetch failure is non-critical
     }
-  };
+  }, [token]);
 
-  const fetchMaterials = async () => {
+  const fetchMaterials = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/api/v1/materials/for-bom`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -115,9 +101,9 @@ export default function BOMEditor({
     } catch (err) {
       // Materials fetch failure is non-critical
     }
-  };
+  }, [token]);
 
-  const fetchUomClasses = async () => {
+  const fetchUomClasses = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/api/v1/admin/uom/classes`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -129,7 +115,30 @@ export default function BOMEditor({
     } catch (err) {
       setUomClasses([]);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (bomId) {
+        fetchBOM();
+      } else if (productId) {
+        fetchBOMByProduct();
+      }
+      fetchComponents();
+      fetchMaterials();
+      fetchUomClasses();
+      setError(null);
+    }
+  }, [
+    isOpen,
+    bomId,
+    productId,
+    fetchBOM,
+    fetchBOMByProduct,
+    fetchComponents,
+    fetchMaterials,
+    fetchUomClasses,
+  ]);
 
   const allComponents = [...components, ...materials];
 

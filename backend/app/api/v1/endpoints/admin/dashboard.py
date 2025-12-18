@@ -125,7 +125,7 @@ async def get_dashboard(
         .join(Product)
         .filter(
             Product.type == "custom",
-            BOM.active== True,
+            BOM.active == True,  # noqa: E712
         )
         .count()
     )
@@ -251,7 +251,7 @@ async def get_dashboard(
         .join(Product)
         .filter(
             Product.type == "custom",
-            BOM.active== True,
+            BOM.active == True,  # noqa: E712
         )
         .order_by(desc(BOM.created_at))
         .limit(10)
@@ -324,10 +324,10 @@ async def get_dashboard_summary(
     boms_needing_review = (
         db.query(BOM)
         .join(Product)
-        .filter(BOM.active== True)
+        .filter(BOM.active == True)  # noqa: E712
         .count()
     )
-    active_boms = db.query(BOM).filter(BOM.active== True).count()
+    active_boms = db.query(BOM).filter(BOM.active == True)  # noqa: E712.count()
 
     # Low Stock Items (below reorder point + MRP shortages)
     # Use the same logic as /items/low-stock endpoint - just get the count
@@ -342,7 +342,7 @@ async def get_dashboard_summary(
     
     # Get all products with reorder points
     products_with_reorder = db.query(Product).filter(
-        Product.active== True,
+        Product.active == True,  # noqa: E712
         Product.reorder_point.isnot(None),
         Product.reorder_point > 0
     ).all()
@@ -523,7 +523,7 @@ async def get_pending_bom_reviews(
     """
     boms = (
         db.query(BOM)
-        .filter(BOM.active== True)
+        .filter(BOM.active == True)  # noqa: E712
         .order_by(desc(BOM.created_at))
         .limit(limit)
         .all()

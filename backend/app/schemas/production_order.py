@@ -18,8 +18,12 @@ class ProductionOrderStatus(str, Enum):
     """Production order status"""
     DRAFT = "draft"
     RELEASED = "released"
+    SCHEDULED = "scheduled"
     IN_PROGRESS = "in_progress"
-    COMPLETE = "complete"
+    COMPLETED = "completed"
+    QC_HOLD = "qc_hold"
+    SCRAPPED = "scrapped"
+    CLOSED = "closed"
     CANCELLED = "cancelled"
     ON_HOLD = "on_hold"
 
@@ -44,8 +48,10 @@ class QCStatus(str, Enum):
     """Quality Control status"""
     NOT_REQUIRED = "not_required"
     PENDING = "pending"
+    IN_PROGRESS = "in_progress"
     PASSED = "passed"
     FAILED = "failed"
+    WAIVED = "waived"
 
 
 # ============================================================================

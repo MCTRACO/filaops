@@ -16,6 +16,7 @@ from app.api.v1.endpoints.auth import get_current_user
 from app.models.user import User
 from app.models.payment import Payment
 from app.models.sales_order import SalesOrder
+from app.models.order_event import OrderEvent
 from app.schemas.payment import (
     PaymentCreate,
     RefundCreate,
@@ -140,6 +141,18 @@ async def record_payment(
     # Update order payment status
     update_order_payment_status(db, order)
 
+    # Record order event for activity timeline
+    event = OrderEvent(
+        sales_order_id=order.id,
+        user_id=current_user.id,
+        event_type="payment_received",
+        title="Payment received",
+        description=f"{payment.payment_number}: ${payment.amount:.2f} via {payment.payment_method}",
+        metadata_key="payment_number",
+        metadata_value=payment.payment_number,
+    )
+    db.add(event)
+
     db.commit()
     db.refresh(payment)
 
@@ -186,6 +199,18 @@ async def record_refund(
 
     # Update order payment status
     update_order_payment_status(db, order)
+
+    # Record order event for activity timeline
+    event = OrderEvent(
+        sales_order_id=order.id,
+        user_id=current_user.id,
+        event_type="payment_refunded",
+        title="Payment refunded",
+        description=f"{payment.payment_number}: ${abs(payment.amount):.2f} via {payment.payment_method}",
+        metadata_key="payment_number",
+        metadata_value=payment.payment_number,
+    )
+    db.add(event)
 
     db.commit()
     db.refresh(payment)

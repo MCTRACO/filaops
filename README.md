@@ -97,12 +97,28 @@ The core ERP is fully functional and free to self-host. Pro and Enterprise tiers
 
 ---
 
+## ⚙️ Build Configuration (Community Edition)
+
+The community version uses **development mode builds** for the frontend to maximize debuggability and contributor experience:
+
+- ✅ **Unminified code** - Easy to debug and understand
+- ✅ **Source maps included** - Full stack traces with real line numbers
+- ✅ **Readable variable names** - Contributing PRs is easier
+- ⚠️ **Larger bundle size** (~2MB vs ~1MB minified)
+
+**This is intentional for self-hosted deployments** where source code is already visible and performance impact is negligible on local networks.
+
+> 📝 **For SaaS/Production hosting:** Production builds require refactoring ~30 components to fix React hook timing issues. See `frontend/PRODUCTION_BUILD_BLOCKED.md` for details. This only affects public-facing deployments; self-hosted users are unaffected.
+
+---
+
 ## Documentation
 
 | | |
 |---|---|
 | **[INSTALL.md](INSTALL.md)** | Installation guide (Docker & manual) |
 | **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** | System overview and workflows |
+| **[KNOWN_ISSUES.md](KNOWN_ISSUES.md)** | Known issues and workarounds |
 | **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | Common issues and fixes |
 | **[FAQ.md](FAQ.md)** | Frequently asked questions |
 | **[CONTRIBUTING.md](CONTRIBUTING.md)** | For contributors |

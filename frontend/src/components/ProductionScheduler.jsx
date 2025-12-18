@@ -54,12 +54,7 @@ export default function ProductionScheduler({ onScheduleUpdate }) {
     })
   );
 
-  useEffect(() => {
-    fetchMachines();
-    fetchProductionOrders();
-  }, [selectedDate, viewMode]);
-
-  const fetchMachines = async () => {
+  const fetchMachines = useCallback(async () => {
     try {
       // Get machine work centers
       const wcRes = await fetch(
@@ -92,9 +87,9 @@ export default function ProductionScheduler({ onScheduleUpdate }) {
     } catch (err) {
       setError(err.message);
     }
-  };
+  }, [token]);
 
-  const fetchProductionOrders = async () => {
+  const fetchProductionOrders = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(
@@ -121,7 +116,12 @@ export default function ProductionScheduler({ onScheduleUpdate }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchMachines();
+    fetchProductionOrders();
+  }, [selectedDate, viewMode, fetchMachines, fetchProductionOrders]);
 
   const getTimeSlots = () => {
     const slots = [];
@@ -194,21 +194,18 @@ export default function ProductionScheduler({ onScheduleUpdate }) {
       (o) => o.id === orderId
     );
 
-    // Parse drop target (format: "machine-{index}-slot-{hour}")
+    // Parse drop target (format: "machine-{index}-slot-{timestamp}")
     const [machinePart, slotPart] = overId.split("-slot-");
     const machineIndex = parseInt(machinePart.replace("machine-", ""));
-    const slotHour = parseInt(slotPart);
+    const slotTimestamp = parseInt(slotPart);
 
-    if (isNaN(machineIndex) || isNaN(slotHour)) return;
+    if (isNaN(machineIndex) || isNaN(slotTimestamp)) return;
 
     const machine = machines[machineIndex];
     if (!machine) return;
 
-    // Calculate scheduled times
-    const viewStart = new Date(selectedDate);
-    viewStart.setHours(0, 0, 0, 0);
-    const scheduledStart = new Date(viewStart);
-    scheduledStart.setHours(scheduledStart.getHours() + slotHour);
+    // Calculate scheduled times using the slot's actual timestamp
+    const scheduledStart = new Date(slotTimestamp);
 
     // Estimate duration (default 2 hours, or use order's estimated time)
     const estimatedHours = order.estimated_time_minutes
@@ -408,6 +405,8 @@ export default function ProductionScheduler({ onScheduleUpdate }) {
               value={selectedDate.toISOString().split("T")[0]}
               onChange={(e) => setSelectedDate(new Date(e.target.value))}
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1 text-white text-sm"
+              min="2000-01-01"
+              max="2099-12-31"
             />
             <button
               onClick={() => {
@@ -528,7 +527,7 @@ export default function ProductionScheduler({ onScheduleUpdate }) {
                               0
                           )
                           .map((slot, slotIndex) => {
-                            const slotId = `machine-${machineIndex}-slot-${slot.getHours()}`;
+                            const slotId = `machine-${machineIndex}-slot-${slot.getTime()}`;
                             const isHovered = hoveredSlot === slotId;
                             const hasOrder = machineOrders.some((o) => {
                               const pos = getOrderPosition(o);

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { useToast } from './Toast';
+import React, { useState } from "react";
+import { useToast } from "./Toast";
+import { API_URL } from "../config/api";
 
 const ExportImport = ({ type }) => {
   const toast = useToast();
@@ -9,26 +10,30 @@ const ExportImport = ({ type }) => {
 
   const handleExport = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/admin/export/${type}`, {
+      const token = localStorage.getItem("access_token");
+      const response = await fetch(`${API_URL}/api/v1/admin/export/${type}`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = `${type}_export_${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `${type}_export_${
+          new Date().toISOString().split("T")[0]
+        }.csv`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
       }
     } catch (error) {
-      toast.error(`Export failed: ${error.message || "Unknown error. Please try again."}`);
+      toast.error(
+        `Export failed: ${error.message || "Unknown error. Please try again."}`
+      );
     }
   };
 
@@ -40,16 +45,16 @@ const ExportImport = ({ type }) => {
     setFile(selectedFile);
 
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem("access_token");
       const formData = new FormData();
-      formData.append('file', selectedFile);
+      formData.append("file", selectedFile);
 
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/admin/import/${type}`, {
-        method: 'POST',
+      const response = await fetch(`${API_URL}/api/v1/admin/import/${type}`, {
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: formData
+        body: formData,
       });
 
       const data = await response.json();
@@ -70,9 +75,9 @@ const ExportImport = ({ type }) => {
         >
           Export {type} to CSV
         </button>
-        
+
         <label className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded cursor-pointer inline-block">
-          {importing ? 'Importing...' : `Import ${type} from CSV`}
+          {importing ? "Importing..." : `Import ${type} from CSV`}
           <input
             type="file"
             accept=".csv"
@@ -84,7 +89,11 @@ const ExportImport = ({ type }) => {
       </div>
 
       {result && (
-        <div className={`p-4 rounded ${result.errors?.length > 0 ? 'bg-red-900' : 'bg-green-900'}`}>
+        <div
+          className={`p-4 rounded ${
+            result.errors?.length > 0 ? "bg-red-900" : "bg-green-900"
+          }`}
+        >
           <div className="text-white">
             <div>Created: {result.created || 0}</div>
             <div>Updated: {result.updated || 0}</div>
@@ -93,7 +102,9 @@ const ExportImport = ({ type }) => {
                 <div className="font-bold">Errors:</div>
                 <ul className="list-disc list-inside">
                   {result.errors.map((error, idx) => (
-                    <li key={idx} className="text-sm">{error}</li>
+                    <li key={idx} className="text-sm">
+                      {error}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -106,4 +117,3 @@ const ExportImport = ({ type }) => {
 };
 
 export default ExportImport;
-

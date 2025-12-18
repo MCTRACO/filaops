@@ -54,10 +54,31 @@ class ProductionOrder(Base):
     # Source: manual, sales_order, mrp_planned
     source = Column(String(50), default='manual', nullable=False)
 
-    # Status: draft, released, in_progress, complete, cancelled, on_hold
+    # Status (Manufacturing Workflow)
+    # Lifecycle: draft → released → scheduled → in_progress → completed → closed
+    # QC paths: completed → qc_hold → (scrapped | rework | closed)
+    # Status meanings:
+    #   - draft: Created but not ready for production
+    #   - released: Materials allocated, ready to schedule
+    #   - scheduled: Assigned to work center/printer, queued
+    #   - in_progress: Job actively running
+    #   - completed: Job finished, awaiting QC
+    #   - qc_hold: QC inspection failed, awaiting decision
+    #   - scrapped: Parts rejected, needs remake
+    #   - closed: Parts accepted, inventory updated, WO complete
+    #   - cancelled: WO terminated
+    #   - on_hold: Production paused
     status = Column(String(50), default='draft', nullable=False, index=True)
 
-    # QC Status: not_required, pending, passed, failed
+    # QC Status (Quality Control)
+    # Values: not_required, pending, in_progress, passed, failed, waived
+    # Workflow: completed → pending → in_progress → (passed | failed)
+    #   - not_required: Auto-pass for trusted products
+    #   - pending: Awaiting QC inspector assignment
+    #   - in_progress: Inspector reviewing parts
+    #   - passed: Parts accepted, ready for inventory
+    #   - failed: Parts rejected, WO moves to qc_hold status
+    #   - waived: Failed but accepted anyway (document reason in notes)
     qc_status = Column(String(50), default='not_required', nullable=False)
     qc_notes = Column(Text, nullable=True)
     qc_inspected_by = Column(String(100), nullable=True)
@@ -145,6 +166,30 @@ class ProductionOrder(Base):
     def is_remake(self):
         """True if this WO is a remake of a failed WO"""
         return self.remake_of_id is not None
+    
+    @property
+    def is_qc_required(self):
+        """True if QC inspection is required"""
+        return self.qc_status != 'not_required'
+    
+    @property
+    def is_ready_for_qc(self):
+        """True if WO is ready for quality inspection"""
+        return self.status == 'completed' and self.qc_status == 'pending'
+    
+    @property
+    def can_close(self):
+        """True if WO can be closed (all checks passed)"""
+        return (
+            self.status == 'completed' and
+            self.qc_status in ['passed', 'not_required', 'waived'] and
+            self.quantity_completed >= self.quantity_ordered
+        )
+    
+    @property
+    def needs_remake(self):
+        """True if WO was scrapped and needs remake"""
+        return self.is_scrapped and self.quantity_scrapped > 0
 
 
 class ProductionOrderOperation(Base):
@@ -160,7 +205,7 @@ class ProductionOrderOperation(Base):
     production_order_id = Column(Integer, ForeignKey('production_orders.id', ondelete='CASCADE'), nullable=False)
     routing_operation_id = Column(Integer, ForeignKey('routing_operations.id'), nullable=True)
     work_center_id = Column(Integer, ForeignKey('work_centers.id'), nullable=False)
-    resource_id = Column(Integer, ForeignKey('resources.id'), nullable=True)  # Specific machine assigned
+    resource_id = Column(Integer, ForeignKey('machines.id'), nullable=True)  # Specific machine assigned
 
     # Sequence and identification
     sequence = Column(Integer, nullable=False)
@@ -207,7 +252,7 @@ class ProductionOrderOperation(Base):
     production_order = relationship("ProductionOrder", back_populates="operations")
     routing_operation = relationship("RoutingOperation")
     work_center = relationship("WorkCenter")
-    resource = relationship("Resource")
+    resource = relationship("Machine", foreign_keys=[resource_id])
 
     def __repr__(self):
         return f"<ProductionOrderOperation {self.sequence}: {self.operation_name} ({self.status})>"

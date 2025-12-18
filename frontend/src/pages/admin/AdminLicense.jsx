@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useFeatureFlags } from "../../hooks/useFeatureFlags";
-
+import { API_URL } from "../../config/api";
 const AdminLicense = () => {
   const {
     tier,
@@ -21,14 +21,11 @@ const AdminLicense = () => {
   const fetchLicenseInfo = async () => {
     try {
       const token = localStorage.getItem("access_token");
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/v1/license/info",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/api/v1/license/info`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -47,17 +44,14 @@ const AdminLicense = () => {
 
     try {
       const token = localStorage.getItem("access_token");
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/v1/license/activate",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ license_key: licenseKey }),
-        }
-      );
+      const response = await fetch(`${API_URL}/api/v1/license/activate`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ license_key: licenseKey }),
+      });
 
       const data = await response.json();
 
@@ -89,15 +83,12 @@ const AdminLicense = () => {
 
     try {
       const token = localStorage.getItem("access_token");
-      const response = await fetch(
-        "http://127.0.0.1:8000/api/v1/license/deactivate",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_URL}/api/v1/license/deactivate`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (response.ok) {
         setSuccess("License deactivated. You are now on the Open tier.");

@@ -13,7 +13,14 @@ import { useToast } from "../Toast";
 import ProductSearchSelect from "./ProductSearchSelect";
 import QuickCreateItemModal from "./QuickCreateItemModal";
 
-export default function POCreateModal({ po, vendors, products, onClose, onSave, onProductsRefresh }) {
+export default function POCreateModal({
+  po,
+  vendors,
+  products,
+  onClose,
+  onSave,
+  onProductsRefresh,
+}) {
   const toast = useToast();
   const [showCreateItemModal, setShowCreateItemModal] = useState(false);
   const [createItemInitialName, setCreateItemInitialName] = useState("");
@@ -22,7 +29,7 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
 
   const [form, setForm] = useState({
     vendor_id: po?.vendor_id || "",
-    order_date: po?.order_date || new Date().toISOString().split('T')[0], // Default to today
+    order_date: po?.order_date || new Date().toISOString().split("T")[0], // Default to today
     expected_date: po?.expected_date || "",
     tracking_number: po?.tracking_number || "",
     carrier: po?.carrier || "",
@@ -48,7 +55,14 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
       ...form,
       lines: [
         ...form.lines,
-        { product_id: "", product_sku: "", product_name: "", quantity_ordered: 1, unit_cost: 0, notes: "" },
+        {
+          product_id: "",
+          product_sku: "",
+          product_name: "",
+          quantity_ordered: 1,
+          unit_cost: 0,
+          notes: "",
+        },
       ],
     });
   };
@@ -75,7 +89,8 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
         product_sku: product.sku,
         product_name: product.name,
         // Auto-populate unit_cost from product's last_cost if available
-        unit_cost: product.last_cost || product.cost || newLines[index].unit_cost,
+        unit_cost:
+          product.last_cost || product.cost || newLines[index].unit_cost,
       };
     } else {
       newLines[index] = {
@@ -108,7 +123,11 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
         product_id: newItem.id,
         product_sku: newItem.sku,
         product_name: newItem.name,
-        unit_cost: newItem.last_cost || newItem.cost || newLines[pendingLineIndex].unit_cost || 0,
+        unit_cost:
+          newItem.last_cost ||
+          newItem.cost ||
+          newLines[pendingLineIndex].unit_cost ||
+          0,
       };
       setForm({ ...form, lines: newLines });
     }
@@ -136,7 +155,7 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
     }
 
     // Validate all lines have products selected
-    const invalidLines = form.lines.filter(l => !l.product_id);
+    const invalidLines = form.lines.filter((l) => !l.product_id);
     if (invalidLines.length > 0) {
       toast.warning("Please select a product for all line items");
       return;
@@ -181,7 +200,9 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
     (parseFloat(form.shipping_cost) || 0);
 
   // Get selected vendor for display
-  const selectedVendor = vendors.find(v => String(v.id) === String(form.vendor_id));
+  const selectedVendor = vendors.find(
+    (v) => String(v.id) === String(form.vendor_id)
+  );
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -255,6 +276,8 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                     setForm({ ...form, order_date: e.target.value })
                   }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white"
+                  min="2000-01-01"
+                  max="2099-12-31"
                 />
               </div>
               <div>
@@ -268,6 +291,8 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                     setForm({ ...form, expected_date: e.target.value })
                   }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-white"
+                  min="2000-01-01"
+                  max="2099-12-31"
                 />
               </div>
             </div>
@@ -277,8 +302,18 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
               <div className="border-t border-gray-800 pt-4">
                 <div className="flex justify-between items-center mb-3">
                   <h4 className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                      />
                     </svg>
                     Line Items ({form.lines.length})
                   </h4>
@@ -287,8 +322,18 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                     onClick={addLine}
                     className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
                     </svg>
                     Add Line
                   </button>
@@ -316,8 +361,12 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                         <ProductSearchSelect
                           value={line.product_id}
                           products={localProducts}
-                          onChange={(productId, product) => handleProductSelect(index, productId, product)}
-                          onCreateNew={(searchText) => handleCreateNewItem(index, searchText)}
+                          onChange={(productId, product) =>
+                            handleProductSelect(index, productId, product)
+                          }
+                          onCreateNew={(searchText) =>
+                            handleCreateNewItem(index, searchText)
+                          }
                           placeholder="Search products..."
                         />
                       </div>
@@ -328,7 +377,11 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                           type="number"
                           value={line.quantity_ordered}
                           onChange={(e) =>
-                            updateLine(index, "quantity_ordered", e.target.value)
+                            updateLine(
+                              index,
+                              "quantity_ordered",
+                              e.target.value
+                            )
                           }
                           placeholder="Qty"
                           min="0.01"
@@ -341,7 +394,9 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                       {/* Unit Cost */}
                       <div className="col-span-2">
                         <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                            $
+                          </span>
                           <input
                             type="number"
                             value={line.unit_cost}
@@ -360,7 +415,8 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                       {/* Line Total */}
                       <div className="col-span-2 text-right">
                         <span className="text-white font-medium">
-                          ${(
+                          $
+                          {(
                             (parseFloat(line.quantity_ordered) || 0) *
                             (parseFloat(line.unit_cost) || 0)
                           ).toFixed(2)}
@@ -374,8 +430,18 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                           onClick={() => removeLine(index)}
                           className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-600/10 rounded transition-colors opacity-0 group-hover:opacity-100"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
                           </svg>
                         </button>
                       </div>
@@ -384,8 +450,18 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
 
                   {form.lines.length === 0 && (
                     <div className="text-center py-8 bg-gray-800/20 rounded-lg border-2 border-dashed border-gray-700">
-                      <svg className="w-12 h-12 mx-auto text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      <svg
+                        className="w-12 h-12 mx-auto text-gray-600 mb-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                        />
                       </svg>
                       <p className="text-gray-400 mb-2">No line items yet</p>
                       <button
@@ -408,7 +484,9 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                   Tax Amount
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    $
+                  </span>
                   <input
                     type="number"
                     value={form.tax_amount}
@@ -426,7 +504,9 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                   Shipping Cost
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    $
+                  </span>
                   <input
                     type="number"
                     value={form.shipping_cost}
@@ -531,16 +611,25 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                 <div className="flex justify-end">
                   <div className="text-right space-y-1">
                     <div className="text-sm text-gray-400">
-                      Subtotal ({form.lines.length} items): <span className="text-white">${lineTotal.toFixed(2)}</span>
+                      Subtotal ({form.lines.length} items):{" "}
+                      <span className="text-white">
+                        ${lineTotal.toFixed(2)}
+                      </span>
                     </div>
                     {parseFloat(form.tax_amount) > 0 && (
                       <div className="text-sm text-gray-400">
-                        Tax: <span className="text-white">${parseFloat(form.tax_amount).toFixed(2)}</span>
+                        Tax:{" "}
+                        <span className="text-white">
+                          ${parseFloat(form.tax_amount).toFixed(2)}
+                        </span>
                       </div>
                     )}
                     {parseFloat(form.shipping_cost) > 0 && (
                       <div className="text-sm text-gray-400">
-                        Shipping: <span className="text-white">${parseFloat(form.shipping_cost).toFixed(2)}</span>
+                        Shipping:{" "}
+                        <span className="text-white">
+                          ${parseFloat(form.shipping_cost).toFixed(2)}
+                        </span>
                       </div>
                     )}
                     <div className="text-lg font-semibold text-white pt-1 border-t border-gray-700">
@@ -555,7 +644,10 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
             <div className="flex justify-between items-center pt-4 border-t border-gray-800">
               <div className="text-sm text-gray-400">
                 {!po && form.lines.length > 0 && (
-                  <>{form.lines.length} item{form.lines.length !== 1 ? 's' : ''} in order</>
+                  <>
+                    {form.lines.length} item{form.lines.length !== 1 ? "s" : ""}{" "}
+                    in order
+                  </>
                 )}
               </div>
               <div className="flex gap-3">
@@ -572,15 +664,35 @@ export default function POCreateModal({ po, vendors, products, onClose, onSave, 
                 >
                   {po ? (
                     <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
                       </svg>
                       Save Changes
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 4v16m8-8H4"
+                        />
                       </svg>
                       Create PO
                     </>

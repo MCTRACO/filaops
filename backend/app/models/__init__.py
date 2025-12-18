@@ -13,13 +13,15 @@ from app.models.user import User, RefreshToken
 from app.models.material import MaterialType, Color, MaterialColor, MaterialInventory
 from app.models.vendor import Vendor
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
-from app.models.manufacturing import WorkCenter, Resource, Routing, RoutingOperation
+from app.models.work_center import WorkCenter, Machine
+from app.models.manufacturing import Routing, RoutingOperation, Resource
 from app.models.mrp import MRPRun, PlannedOrder
 from app.models.traceability import (
     SerialNumber, MaterialLot, ProductionLotConsumption, CustomerTraceabilityProfile
 )
 from app.models.company_settings import CompanySettings
 from app.models.uom import UnitOfMeasure
+from app.models.uom import UnitOfMeasure as UOM
 from app.models.scrap_reason import ScrapReason
 from app.models.order_event import OrderEvent
 # from app.models.license import License  # Disabled until ready for production
@@ -62,6 +64,7 @@ __all__ = [
     "PurchaseOrderLine",
     # Manufacturing Routes
     "WorkCenter",
+    "Machine", 
     "Resource",
     "Routing",
     "RoutingOperation",
@@ -77,6 +80,7 @@ __all__ = [
     "CompanySettings",
     # Units of Measure
     "UnitOfMeasure",
+    "UOM",
     # Scrap Reasons
     "ScrapReason",
     # Order Events (Activity Timeline)

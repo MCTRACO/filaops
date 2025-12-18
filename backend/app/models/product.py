@@ -95,6 +95,7 @@ class Product(Base):
     production_orders = relationship("ProductionOrder", back_populates="product")
     quotes = relationship("Quote", back_populates="product")  # For auto-created custom products
     item_category = relationship("ItemCategory", back_populates="products")
+    routings = relationship("Routing", back_populates="product")
 
     # Material relationships (for supply items that are materials)
     material_type = relationship("MaterialType", foreign_keys=[material_type_id])

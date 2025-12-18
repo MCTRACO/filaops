@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { E2E_CONFIG } from '../config';
 import * as fs from 'fs';
 
 /**
@@ -14,11 +15,6 @@ const SCREENSHOT_DIR = 'docs/screenshots/sop';
 if (!fs.existsSync(SCREENSHOT_DIR)) {
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
 }
-
-// Test credentials
-const TEST_EMAIL = 'admin@test.com';
-const TEST_PASSWORD = 'Admin123!';
-const TEST_NAME = 'Admin User';
 
 // Helper to dismiss any modal that appears
 async function dismissModals(page: Page) {
@@ -69,7 +65,7 @@ const PAGES = [
 
 test.describe('Screenshot Capture', () => {
   test('Capture all admin page screenshots', async ({ page, request }) => {
-    const baseUrl = 'http://localhost:8000';
+    const baseUrl = 'http://127.0.0.1:8001';
 
     // Step 1: Ensure admin exists
     const setupStatus = await request.get(`${baseUrl}/api/v1/setup/status`);
@@ -79,9 +75,9 @@ test.describe('Screenshot Capture', () => {
       console.log('Creating admin account...');
       await request.post(`${baseUrl}/api/v1/setup/initial-admin`, {
         data: {
-          email: TEST_EMAIL,
-          password: TEST_PASSWORD,
-          full_name: TEST_NAME,
+          email: E2E_CONFIG.email,
+          password: E2E_CONFIG.password,
+          full_name: E2E_CONFIG.name,
           company_name: 'Test Company'
         }
       });
@@ -91,8 +87,8 @@ test.describe('Screenshot Capture', () => {
     await page.goto('/admin/login');
     await page.waitForLoadState('networkidle');
 
-    await page.fill('input[type="email"]', TEST_EMAIL);
-    await page.fill('input[type="password"]', TEST_PASSWORD);
+    await page.fill('input[type="email"]', E2E_CONFIG.email);
+    await page.fill('input[type="password"]', E2E_CONFIG.password);
     await page.click('button[type="submit"]');
 
     // Wait for redirect away from login

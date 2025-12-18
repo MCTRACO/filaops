@@ -2,6 +2,15 @@
 
 Thanks for your interest in contributing to FilaOps! This guide will help you get started.
 
+## 🎯 Build Configuration Note
+
+The community edition uses **development mode builds** (unminified) to make contributing easier:
+- Full source maps and readable code
+- Easier debugging with real function/variable names
+- Larger bundle size (~2MB) is fine for self-hosted deployments
+
+**You do NOT need to worry about production builds** - the community version intentionally uses dev mode. See `frontend/PRODUCTION_BUILD_BLOCKED.md` for technical details.
+
 ## Quick Start
 
 1. **Fork the repository** on GitHub

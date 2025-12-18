@@ -5,14 +5,10 @@
  * Pre-filled for material creation with material type and color selection.
  * Allows creating new colors on-the-fly if none exist for the material type.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API_URL } from "../config/api";
 
-export default function MaterialForm({
-  isOpen,
-  onClose,
-  onSuccess
-}) {
+export default function MaterialForm({ isOpen, onClose, onSuccess }) {
   const token = localStorage.getItem("adminToken");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -35,6 +31,43 @@ export default function MaterialForm({
     selling_price: "",
   });
 
+  const fetchMaterialTypes = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `${API_URL}/api/v1/materials/types?customer_visible_only=false`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setMaterialTypes(data.materials || []);
+      }
+    } catch (err) {
+      // Material types fetch failure is non-critical
+    }
+  }, [token]);
+
+  const fetchColors = useCallback(
+    async (materialTypeCode) => {
+      try {
+        const res = await fetch(
+          `${API_URL}/api/v1/materials/types/${materialTypeCode}/colors?in_stock_only=false&customer_visible_only=false`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setColors(data.colors || []);
+        }
+      } catch (err) {
+        setColors([]);
+      }
+    },
+    [token]
+  );
+
   useEffect(() => {
     if (isOpen) {
       fetchMaterialTypes();
@@ -51,7 +84,7 @@ export default function MaterialForm({
       setNewColorName("");
       setNewColorHex("#000000");
     }
-  }, [isOpen]);
+  }, [isOpen, fetchMaterialTypes]);
 
   useEffect(() => {
     if (selectedMaterialType) {
@@ -59,38 +92,7 @@ export default function MaterialForm({
     } else {
       setColors([]);
     }
-  }, [selectedMaterialType]);
-
-  const fetchMaterialTypes = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/v1/materials/types?customer_visible_only=false`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMaterialTypes(data.materials || []);
-      }
-    } catch (err) {
-      // Material types fetch failure is non-critical
-    }
-  };
-
-  const fetchColors = async (materialTypeCode) => {
-    try {
-      const res = await fetch(
-        `${API_URL}/api/v1/materials/types/${materialTypeCode}/colors?in_stock_only=false&customer_visible_only=false`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setColors(data.colors || []);
-      }
-    } catch (err) {
-      setColors([]);
-    }
-  };
+  }, [selectedMaterialType, fetchColors]);
 
   const handleCreateColor = async () => {
     if (!newColorName.trim()) {
@@ -147,8 +149,12 @@ export default function MaterialForm({
         material_type_code: formData.material_type_code,
         color_code: formData.color_code,
         initial_qty_kg: parseFloat(formData.initial_qty_kg) || 0,
-        cost_per_kg: formData.cost_per_kg ? parseFloat(formData.cost_per_kg) : null,
-        selling_price: formData.selling_price ? parseFloat(formData.selling_price) : null,
+        cost_per_kg: formData.cost_per_kg
+          ? parseFloat(formData.cost_per_kg)
+          : null,
+        selling_price: formData.selling_price
+          ? parseFloat(formData.selling_price)
+          : null,
       };
 
       const res = await fetch(`${API_URL}/api/v1/items/material`, {
@@ -177,14 +183,18 @@ export default function MaterialForm({
 
   if (!isOpen) return null;
 
-  const selectedMaterial = materialTypes.find(m => m.code === formData.material_type_code);
+  const selectedMaterial = materialTypes.find(
+    (m) => m.code === formData.material_type_code
+  );
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-xl w-full max-w-lg">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-white">Create New Material</h2>
+            <h2 className="text-2xl font-bold text-white">
+              Create New Material
+            </h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white"
@@ -209,7 +219,11 @@ export default function MaterialForm({
                 required
                 value={formData.material_type_code}
                 onChange={(e) => {
-                  setFormData({ ...formData, material_type_code: e.target.value, color_code: "" });
+                  setFormData({
+                    ...formData,
+                    material_type_code: e.target.value,
+                    color_code: "",
+                  });
                   setSelectedMaterialType(e.target.value);
                 }}
                 className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
@@ -222,7 +236,9 @@ export default function MaterialForm({
                 ))}
               </select>
               {selectedMaterial && (
-                <p className="mt-1 text-sm text-gray-400">{selectedMaterial.description}</p>
+                <p className="mt-1 text-sm text-gray-400">
+                  {selectedMaterial.description}
+                </p>
               )}
             </div>
 
@@ -237,7 +253,9 @@ export default function MaterialForm({
                   <select
                     required={!showColorForm}
                     value={formData.color_code}
-                    onChange={(e) => setFormData({ ...formData, color_code: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, color_code: e.target.value })
+                    }
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:border-blue-500 focus:outline-none"
                     disabled={!formData.material_type_code}
                   >
@@ -268,7 +286,9 @@ export default function MaterialForm({
               ) : (
                 <div className="border border-gray-700 rounded-xl p-3 bg-gray-800 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-gray-300">New Color</span>
+                    <span className="text-sm font-medium text-gray-300">
+                      New Color
+                    </span>
                     <button
                       type="button"
                       onClick={() => {
@@ -283,7 +303,9 @@ export default function MaterialForm({
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Color Name *</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Color Name *
+                    </label>
                     <input
                       type="text"
                       value={newColorName}
@@ -294,7 +316,9 @@ export default function MaterialForm({
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">Hex Color (optional)</label>
+                    <label className="block text-xs text-gray-400 mb-1">
+                      Hex Color (optional)
+                    </label>
                     <div className="flex gap-2 items-center">
                       <input
                         type="color"
@@ -334,7 +358,9 @@ export default function MaterialForm({
                 step="0.001"
                 min="0"
                 value={formData.initial_qty_kg}
-                onChange={(e) => setFormData({ ...formData, initial_qty_kg: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, initial_qty_kg: e.target.value })
+                }
                 className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                 placeholder="0.000"
               />
@@ -351,7 +377,9 @@ export default function MaterialForm({
                   step="0.01"
                   min="0"
                   value={formData.cost_per_kg}
-                  onChange={(e) => setFormData({ ...formData, cost_per_kg: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cost_per_kg: e.target.value })
+                  }
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                   placeholder="0.00"
                 />
@@ -366,7 +394,9 @@ export default function MaterialForm({
                   step="0.01"
                   min="0"
                   value={formData.selling_price}
-                  onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, selling_price: e.target.value })
+                  }
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
                   placeholder="0.00"
                 />
@@ -386,7 +416,11 @@ export default function MaterialForm({
               <button
                 type="submit"
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
-                disabled={loading || !formData.material_type_code || !formData.color_code}
+                disabled={
+                  loading ||
+                  !formData.material_type_code ||
+                  !formData.color_code
+                }
               >
                 {loading ? "Creating..." : "Create Material"}
               </button>
@@ -395,7 +429,8 @@ export default function MaterialForm({
 
           <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-sm text-blue-300">
             <strong>Note:</strong> This will create a Product with SKU format:
-            MAT-{formData.material_type_code || "TYPE"}-{formData.color_code || "COLOR"}
+            MAT-{formData.material_type_code || "TYPE"}-
+            {formData.color_code || "COLOR"}
           </div>
         </div>
       </div>

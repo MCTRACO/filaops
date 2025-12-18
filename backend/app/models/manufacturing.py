@@ -10,61 +10,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 
 from app.db.base import Base
-
-
-class WorkCenter(Base):
-    """
-    A work center is where work happens - machine pool, station, or labor pool.
-
-    Examples:
-    - FDM Printer Pool (10 printers, 200 hrs/day capacity)
-    - QC Station (8 hrs/day, $25/hr labor)
-    - Assembly Station
-    - Packing/Shipping
-    """
-    __tablename__ = "work_centers"
-
-    id = Column(Integer, primary_key=True, index=True)
-    code = Column(String(50), unique=True, nullable=False, index=True)
-    name = Column(String(200), nullable=False)
-    description = Column(Text, nullable=True)
-
-    # Type: 'machine', 'station', 'labor'
-    center_type = Column(String(50), nullable=False, default="station")
-
-    # Capacity (per day)
-    capacity_hours_per_day = Column(Numeric(10, 2), nullable=True)
-    capacity_units_per_hour = Column(Numeric(10, 2), nullable=True)
-
-    # Costing ($/hr)
-    machine_rate_per_hour = Column(Numeric(18, 4), nullable=True)
-    labor_rate_per_hour = Column(Numeric(18, 4), nullable=True)
-    overhead_rate_per_hour = Column(Numeric(18, 4), nullable=True)
-
-    # Scheduling
-    is_bottleneck = Column(Boolean, default=False, nullable=False)
-    scheduling_priority = Column(Integer, default=50, nullable=False)
-
-    # Status
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    # Relationships
-    resources = relationship("Resource", back_populates="work_center", cascade="all, delete-orphan")
-    routing_operations = relationship("RoutingOperation", back_populates="work_center")
-    printers = relationship("Printer", back_populates="work_center")
-
-    def __repr__(self):
-        return f"<WorkCenter {self.code}: {self.name}>"
-
-    @property
-    def total_rate_per_hour(self):
-        """Combined hourly rate (machine + labor + overhead)"""
-        machine = float(self.machine_rate_per_hour or 0)
-        labor = float(self.labor_rate_per_hour or 0)
-        overhead = float(self.overhead_rate_per_hour or 0)
-        return machine + labor + overhead
+from app.models.work_center import WorkCenter, Machine  # Import from dedicated module
 
 
 class Resource(Base):
@@ -138,7 +84,7 @@ class Routing(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
-    product = relationship("Product", backref="routings")
+    product = relationship("Product", back_populates="routings")
     operations = relationship("RoutingOperation", back_populates="routing",
                               cascade="all, delete-orphan", order_by="RoutingOperation.sequence")
 

@@ -11,7 +11,7 @@ import { useToast } from "../../components/Toast";
 
 export default function AdminProduction() {
   const toast = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [productionOrders, setProductionOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -98,7 +98,7 @@ export default function AdminProduction() {
         const data = await res.json();
         setProducts(data.items || data || []);
       }
-    } catch (err) {
+    } catch {
       // Products fetch failure is non-critical - product selector will just be empty
     }
   }, [token]);
@@ -648,7 +648,8 @@ export default function AdminProduction() {
                         </p>
                       )}
                       {/* QC Action Button */}
-                      {(order.qc_status === "pending" || order.qc_status === "failed") && (
+                      {(order.qc_status === "pending" ||
+                        order.qc_status === "failed") && (
                         <button
                           onClick={() => {
                             setSelectedOrderForQC(order);
@@ -656,7 +657,9 @@ export default function AdminProduction() {
                           }}
                           className="w-full mt-3 py-1.5 bg-yellow-600/20 text-yellow-400 rounded text-sm hover:bg-yellow-600/30"
                         >
-                          {order.qc_status === "pending" ? "Perform QC Inspection" : "Re-inspect"}
+                          {order.qc_status === "pending"
+                            ? "Perform QC Inspection"
+                            : "Re-inspect"}
                         </button>
                       )}
                     </div>
@@ -844,6 +847,8 @@ export default function AdminProduction() {
                     setCreateForm({ ...createForm, due_date: e.target.value })
                   }
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  min={new Date().toISOString().split("T")[0]}
+                  max="2099-12-31"
                 />
               </div>
 

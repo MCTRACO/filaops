@@ -53,10 +53,23 @@ class SalesOrder(Base):
     shipping_cost = Column(Numeric(10, 2), nullable=True, default=0.00)
     grand_total = Column(Numeric(10, 2), nullable=False)  # total + tax + shipping
 
-    # Order Status
-    # Lifecycle: pending → confirmed → in_production → quality_check → shipped → delivered → completed
-    # Can also be: cancelled, on_hold
-    status = Column(String(50), nullable=False, default="pending", index=True)
+    # Order Status (Customer-Facing)
+    # Lifecycle: draft → pending_payment → confirmed → in_production → ready_to_ship → shipped → delivered → completed
+    # Alternative paths: payment_failed, partially_shipped, on_hold, cancelled
+    # Status meanings:
+    #   - draft: Order being created/edited
+    #   - pending_payment: Submitted, awaiting payment
+    #   - payment_failed: Payment declined, needs retry
+    #   - confirmed: Payment received, ready for production planning
+    #   - in_production: At least one WO is in progress
+    #   - ready_to_ship: All WOs complete and QC passed, awaiting shipment
+    #   - partially_shipped: Multi-line order with some items shipped
+    #   - shipped: All items shipped
+    #   - delivered: Carrier confirmed delivery
+    #   - completed: Order fully closed
+    #   - on_hold: Production/shipment paused
+    #   - cancelled: Order terminated
+    status = Column(String(50), nullable=False, default="draft", index=True)
 
     # Payment Status
     payment_status = Column(String(50), nullable=False, default="pending", index=True)
@@ -64,6 +77,11 @@ class SalesOrder(Base):
     payment_method = Column(String(50), nullable=True)  # credit_card, paypal, stripe, manual
     payment_transaction_id = Column(String(255), nullable=True)
     paid_at = Column(DateTime, nullable=True)
+
+    # Fulfillment Status (Internal - Shipping/Logistics)
+    # Decouples production completion from shipping readiness
+    # Values: pending, ready, picking, packing, shipped, delivered
+    fulfillment_status = Column(String(50), nullable=False, default="pending", index=True)
 
     # Production Information
     rush_level = Column(String(20), nullable=False, default="standard")
@@ -118,7 +136,7 @@ class SalesOrder(Base):
     @property
     def is_cancellable(self) -> bool:
         """Check if order can be cancelled"""
-        return self.status in ["pending", "confirmed", "on_hold"]
+        return self.status in ["draft", "pending_payment", "payment_failed", "confirmed", "on_hold"]
 
     @property
     def is_paid(self) -> bool:
@@ -132,6 +150,16 @@ class SalesOrder(Base):
             self.status == "confirmed" and
             self.payment_status in ["paid", "partial"]
         )
+    
+    @property
+    def is_ready_to_ship(self) -> bool:
+        """Check if order is ready for shipping"""
+        return self.fulfillment_status == "ready" and self.status == "ready_to_ship"
+    
+    @property
+    def is_complete(self) -> bool:
+        """Check if order is fully complete"""
+        return self.status in ["completed", "delivered"]
 
 
 class SalesOrderLine(Base):

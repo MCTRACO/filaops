@@ -325,14 +325,14 @@ async def create_production_order(
     # Find default BOM if not specified
     bom_id = request.bom_id
     if not bom_id:
-        default_bom = db.query(BOM).filter(BOM.product_id == request.product_id, BOM.active == True).first()  # noqa: E712 - SQL Server requires == True
+        default_bom = db.query(BOM).filter(BOM.product_id == request.product_id, BOM.active == True)  # noqa: E712.first()  # noqa: E712 - SQL Server requires == True
         if default_bom:
             bom_id = default_bom.id
 
     # Find default routing if not specified
     routing_id = request.routing_id
     if not routing_id:
-        default_routing = db.query(Routing).filter(Routing.product_id == request.product_id, Routing.is_active == True).first()  # noqa: E712 - SQL Server requires == True
+        default_routing = db.query(Routing).filter(Routing.product_id == request.product_id, Routing.is_active == True)  # noqa: E712.first()  # noqa: E712 - SQL Server requires == True
         if default_routing:
             routing_id = default_routing.id
 
@@ -1489,7 +1489,7 @@ async def get_queue_by_work_center(
     current_user: User = Depends(get_current_user),
 ) -> List[WorkCenterQueue]:
     """Get operations queued at each work center"""
-    work_centers = db.query(WorkCenter).filter(WorkCenter.active == True).all()  # noqa: E712 - SQL Server requires == True
+    work_centers = db.query(WorkCenter).filter(WorkCenter.active == True)  # noqa: E712.all()  # noqa: E712 - SQL Server requires == True
 
     result = []
     for wc in work_centers:
