@@ -1,9 +1,9 @@
 """
 Payment Pydantic Schemas
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 
@@ -21,6 +21,24 @@ class PaymentCreate(BaseModel):
     check_number: Optional[str] = Field(None, max_length=50, description="Check number (for check payments)")
     notes: Optional[str] = Field(None, max_length=1000, description="Payment notes")
 
+    @field_validator('payment_date')
+    @classmethod
+    def validate_payment_date(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """Validate payment date is reasonable (between 2000-2099) and not in future"""
+        if v is not None:
+            if v.year < 2000 or v.year > 2099:
+                raise ValueError('Payment date must be between year 2000 and 2099')
+
+            # Payments shouldn't be dated more than 1 day in the future
+            # (allow 1 day grace period for timezone differences)
+            future_limit = datetime.utcnow() + timedelta(days=1)
+            if v > future_limit:
+                raise ValueError(
+                    f'Payment date cannot be more than 1 day in the future. '
+                    f'Provided: {v.date()}, Maximum allowed: {future_limit.date()}'
+                )
+        return v
+
 
 class RefundCreate(BaseModel):
     """Record a refund"""
@@ -30,6 +48,15 @@ class RefundCreate(BaseModel):
     payment_date: Optional[datetime] = Field(None, description="Refund date (defaults to now)")
     transaction_id: Optional[str] = Field(None, max_length=255, description="Refund transaction ID")
     notes: Optional[str] = Field(None, max_length=1000, description="Refund reason/notes")
+
+    @field_validator('payment_date')
+    @classmethod
+    def validate_payment_date(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """Validate refund date is reasonable (between 2000-2099)"""
+        if v is not None:
+            if v.year < 2000 or v.year > 2099:
+                raise ValueError('Refund date must be between year 2000 and 2099')
+        return v
 
 
 class PaymentUpdate(BaseModel):

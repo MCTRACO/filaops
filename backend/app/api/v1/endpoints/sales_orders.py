@@ -54,7 +54,7 @@ router = APIRouter(prefix="/sales-orders", tags=["Sales Orders"])
 # HELPER: Create Production Orders for Sales Order
 # ============================================================================
 
-def _create_production_orders_for_so(order: SalesOrder, db: Session, created_by: str) -> list:
+def _create_production_orders_for_so(order: SalesOrder, db: Session, created_by: str) -> List[str]:
     """
     Create production orders for a sales order.
 
@@ -93,7 +93,7 @@ def _create_production_orders_for_so(order: SalesOrder, db: Session, created_by:
             next_num = 1
         return f"PO-{year}-{next_num:04d}"
 
-    if order.order_type == "line_item":
+    if order.order_type == "line_item": # pyright: ignore[reportGeneralTypeIssues]
         lines = db.query(SalesOrderLine).filter(
             SalesOrderLine.sales_order_id == order.id
         ).order_by(SalesOrderLine.id).all()
@@ -104,17 +104,17 @@ def _create_production_orders_for_so(order: SalesOrder, db: Session, created_by:
                 continue
 
             # Only create WO for products with BOMs (make items)
-            if not product.has_bom:
+            if not product.has_bom: # pyright: ignore[reportGeneralTypeIssues]
                 continue
 
             bom = db.query(BOM).filter(
                 BOM.product_id == line.product_id,
-                BOM.active == True  # noqa: E712
+                BOM.active == True  # noqa: E712 - SQL Server requires == True
             ).first()
 
             routing = db.query(Routing).filter(
                 Routing.product_id == line.product_id,
-                Routing.is_active == True  # noqa: E712
+                Routing.is_active == True  # noqa: E712 - SQL Server requires == True
             ).first()
 
             # Retry logic to handle race condition if locking fails
@@ -145,17 +145,24 @@ def _create_production_orders_for_so(order: SalesOrder, db: Session, created_by:
                     break  # Success, exit retry loop
                 except IntegrityError as e:
                     db.rollback()
+                    logger.warning(
+                        f"PO code generation attempt {attempt + 1}/{max_retries} failed due to duplicate: {str(e)}"
+                    )
                     if attempt < max_retries - 1:
                         # Retry with a new code
                         continue
                     else:
                         # Final attempt failed, raise error
+                        logger.error(
+                            f"Failed to generate unique PO code after {max_retries} attempts for SO {order.order_number}",
+                            exc_info=True
+                        )
                         raise HTTPException(
                             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f"Failed to generate unique PO code after {max_retries} attempts: {str(e)}"
                         )
 
-    elif order.order_type == "quote_based" and order.product_id:
+    elif order.order_type == "quote_based" and order.product_id: # pyright: ignore[reportGeneralTypeIssues]
         product = db.query(Product).filter(Product.id == order.product_id).first()
         if product and product.has_bom:
             bom = db.query(BOM).filter(
@@ -195,11 +202,18 @@ def _create_production_orders_for_so(order: SalesOrder, db: Session, created_by:
                     break  # Success, exit retry loop
                 except IntegrityError as e:
                     db.rollback()
+                    logger.warning(
+                        f"PO code generation attempt {attempt + 1}/{max_retries} failed due to duplicate: {str(e)}"
+                    )
                     if attempt < max_retries - 1:
                         # Retry with a new code
                         continue
                     else:
                         # Final attempt failed, raise error
+                        logger.error(
+                            f"Failed to generate unique PO code after {max_retries} attempts for SO {order.order_number}",
+                            exc_info=True
+                        )
                         raise HTTPException(
                             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f"Failed to generate unique PO code after {max_retries} attempts: {str(e)}"
@@ -416,6 +430,16 @@ async def create_sales_order(
         )
         db.add(order_line)
 
+    # Record order creation event
+    record_order_event(
+        db=db,
+        order_id=sales_order.id,
+        event_type="created",
+        title="Order created",
+        description=f"Sales order {order_number} created from {request.source or 'manual'} source",
+        user_id=current_user.id,
+    )
+
     db.commit()
     db.refresh(sales_order)
 
@@ -424,7 +448,7 @@ async def create_sales_order(
         from app.services.mrp_trigger_service import trigger_mrp_check
         from app.core.settings import get_settings
         settings = get_settings()
-        
+
         if settings.AUTO_MRP_ON_ORDER_CREATE:
             trigger_mrp_check(db, sales_order.id)
     except Exception as e:
@@ -577,7 +601,7 @@ async def convert_quote_to_sales_order(
     # Find the BOM for this product
     bom = db.query(BOM).filter(
         BOM.product_id == quote.product_id,
-        BOM.active== True
+        BOM.active == True  # noqa: E712
     ).first()
 
     # Generate production order code
@@ -624,6 +648,16 @@ async def convert_quote_to_sales_order(
             "product_id": quote.product_id,
             "quote_id": quote.id
         }
+    )
+
+    # Record order creation event
+    record_order_event(
+        db=db,
+        order_id=sales_order.id,
+        event_type="created",
+        title="Order created from quote",
+        description=f"Sales order {order_number} created from quote {quote.quote_number}",
+        user_id=current_user.id,
     )
 
     db.commit()
@@ -766,7 +800,7 @@ async def get_required_orders_for_sales_order(
     purchase_orders_needed = []
     top_level_products = []
 
-    def explode_requirements(product_id: int, quantity: Decimal, level: int = 0, parent_sku: str = None, visited_bom_ids: set = None):
+    def explode_requirements(product_id: int, quantity: Decimal, level: int = 0, parent_sku: Optional[str] = None, visited_bom_ids: Optional[set] = None) -> None:
         """
         Recursively explode BOM to find all requirements
         
@@ -784,7 +818,7 @@ async def get_required_orders_for_sales_order(
         # Find active BOM for this product
         bom = db.query(BOM).filter(
             BOM.product_id == product_id,
-            BOM.active == True  # noqa: E712 - SQL Server compatibility
+            BOM.active == True  # noqa: E712 - SQL Server requires == True
         ).first()
 
         if not bom:
@@ -1024,6 +1058,18 @@ async def update_order_status(
     if update.production_notes:
         order.production_notes = update.production_notes
 
+    # Record status change event
+    if old_status != order.status:
+        record_order_event(
+            db=db,
+            order_id=order_id,
+            event_type="status_change",
+            title=f"Status changed to {order.status.replace('_', ' ').title()}",
+            old_value=old_status,
+            new_value=order.status,
+            user_id=current_user.id,
+        )
+
     db.commit()
     db.refresh(order)
 
@@ -1063,6 +1109,9 @@ async def update_payment_info(
             detail="Sales order not found"
         )
 
+    # Track old status for event recording
+    old_payment_status = order.payment_status
+
     # Update payment info
     order.payment_status = update.payment_status
 
@@ -1074,6 +1123,23 @@ async def update_payment_info(
 
     if update.payment_status == "paid":
         order.paid_at = datetime.utcnow()
+
+    # Record payment event
+    if old_payment_status != update.payment_status:
+        event_type = "payment_received" if update.payment_status == "paid" else "payment_refunded" if update.payment_status == "refunded" else "status_change"
+        title = "Payment received" if update.payment_status == "paid" else "Payment refunded" if update.payment_status == "refunded" else f"Payment status changed to {update.payment_status}"
+
+        record_order_event(
+            db=db,
+            order_id=order_id,
+            event_type=event_type,
+            title=title,
+            old_value=old_payment_status,
+            new_value=update.payment_status,
+            user_id=current_user.id,
+            metadata_key="payment_method" if update.payment_method else None,
+            metadata_value=update.payment_method,
+        )
 
     db.commit()
     db.refresh(order)
@@ -1114,6 +1180,9 @@ async def update_shipping_info(
             detail="Sales order not found"
         )
 
+    # Track if we're marking as shipped (transition from not-shipped to shipped)
+    is_shipping = order.shipped_at is None and update.shipped_at is not None
+
     # Update shipping info
     if update.tracking_number:
         order.tracking_number = update.tracking_number
@@ -1124,6 +1193,19 @@ async def update_shipping_info(
     if update.shipped_at:
         order.shipped_at = update.shipped_at
         order.status = "shipped"
+
+    # Record shipping event
+    if is_shipping:
+        record_order_event(
+            db=db,
+            order_id=order_id,
+            event_type="shipped",
+            title="Order shipped",
+            description=f"Shipped via {update.carrier or 'carrier'}" + (f", tracking: {update.tracking_number}" if update.tracking_number else ""),
+            user_id=current_user.id,
+            metadata_key="tracking_number" if update.tracking_number else None,
+            metadata_value=update.tracking_number,
+        )
 
     db.commit()
     db.refresh(order)
@@ -1156,20 +1238,40 @@ async def update_shipping_address(
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sales order not found")
 
+    # Track if any changes were made
+    address_changed = False
+
     if update.shipping_address_line1 is not None:
         order.shipping_address_line1 = update.shipping_address_line1
+        address_changed = True
     if update.shipping_address_line2 is not None:
         order.shipping_address_line2 = update.shipping_address_line2
+        address_changed = True
     if update.shipping_city is not None:
         order.shipping_city = update.shipping_city
+        address_changed = True
     if update.shipping_state is not None:
         order.shipping_state = update.shipping_state
+        address_changed = True
     if update.shipping_zip is not None:
         order.shipping_zip = update.shipping_zip
+        address_changed = True
     if update.shipping_country is not None:
         order.shipping_country = update.shipping_country
+        address_changed = True
 
     order.updated_at = datetime.utcnow()
+
+    # Record address change event
+    if address_changed:
+        record_order_event(
+            db=db,
+            order_id=order_id,
+            event_type="address_updated",
+            title="Shipping address updated",
+            user_id=current_user.id,
+        )
+
     db.commit()
     db.refresh(order)
     return order
@@ -1220,9 +1322,22 @@ async def cancel_sales_order(
         )
 
     # Cancel order
+    old_status = order.status
     order.status = "cancelled"
     order.cancelled_at = datetime.utcnow()
     order.cancellation_reason = cancel_request.cancellation_reason
+
+    # Record cancellation event
+    record_order_event(
+        db=db,
+        order_id=order_id,
+        event_type="cancelled",
+        title="Order cancelled",
+        description=cancel_request.cancellation_reason,
+        old_value=old_status,
+        new_value="cancelled",
+        user_id=current_user.id,
+    )
 
     db.commit()
     db.refresh(order)
@@ -1370,6 +1485,18 @@ async def ship_order(
         created_by=current_user.email if current_user else None,
     )
 
+    # Record shipping event
+    record_order_event(
+        db=db,
+        order_id=order_id,
+        event_type="shipped",
+        title="Order shipped",
+        description=f"Shipped via {request.carrier}" + (f" ({request.service})" if request.service else ""),
+        user_id=current_user.id,
+        metadata_key="tracking_number",
+        metadata_value=tracking_number,
+    )
+
     db.commit()
     db.refresh(order)
 
@@ -1506,12 +1633,12 @@ async def generate_production_orders(
             # Find BOM for product (first active one)
             bom = db.query(BOM).filter(
                 BOM.product_id == line.product_id,
-                BOM.active== True
+                BOM.active == True  # noqa: E712
             ).first()
 
             routing = db.query(Routing).filter(
                 Routing.product_id == line.product_id,
-                Routing.is_active== True
+                Routing.is_active == True  # noqa: E712
             ).first()
 
             po_code = get_next_po_code()
@@ -1549,12 +1676,12 @@ async def generate_production_orders(
 
                 bom = db.query(BOM).filter(
                     BOM.product_id == product_id,
-                    BOM.active== True
+                    BOM.active == True  # noqa: E712
                 ).first()
 
                 routing = db.query(Routing).filter(
                     Routing.product_id == product_id,
-                    Routing.is_active== True
+                    Routing.is_active == True  # noqa: E712
                 ).first()
 
                 po_code = get_next_po_code()
@@ -1587,6 +1714,17 @@ async def generate_production_orders(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Quote-based order has no associated quote"
             )
+
+    # Record event for production order creation
+    if created_orders:
+        record_order_event(
+            db=db,
+            order_id=order_id,
+            event_type="production_started",
+            title=f"Created {len(created_orders)} work order(s)",
+            description=f"Work orders: {', '.join(created_orders)}",
+            user_id=current_user.id,
+        )
 
     db.commit()
 
@@ -1827,13 +1965,13 @@ def record_order_event(
     order_id: int,
     event_type: str,
     title: str,
-    description: str = None,
-    old_value: str = None,
-    new_value: str = None,
-    user_id: int = None,
-    metadata_key: str = None,
-    metadata_value: str = None,
-):
+    description: Optional[str] = None,
+    old_value: Optional[str] = None,
+    new_value: Optional[str] = None,
+    user_id: Optional[int] = None,
+    metadata_key: Optional[str] = None,
+    metadata_value: Optional[str] = None,
+) -> None:
     """
     Helper function to record an order event.
 

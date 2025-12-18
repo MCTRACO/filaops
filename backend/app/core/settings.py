@@ -73,12 +73,25 @@ class Settings(BaseSettings):
     @field_validator("SECRET_KEY")
     @classmethod
     def warn_default_secret(cls, v: str) -> str:
-        """Warn if using default secret key."""
+        """Validate SECRET_KEY is not using default value."""
         if "change-this" in v.lower():
             import warnings
+            import os
+
+            # Fail hard in production
+            if os.getenv("ENVIRONMENT", "development").lower() == "production":
+                raise ValueError(
+                    "CRITICAL SECURITY ERROR: Default SECRET_KEY detected in production! "
+                    "You MUST set a secure SECRET_KEY environment variable. "
+                    "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+                )
+
+            # Warn in development
             warnings.warn(
-                "Using default SECRET_KEY - this is insecure for production!",
-                UserWarning
+                "⚠️  Using default SECRET_KEY - this is insecure for production! "
+                "Set SECRET_KEY environment variable before deploying.",
+                UserWarning,
+                stacklevel=2
             )
         return v
 
@@ -89,8 +102,12 @@ class Settings(BaseSettings):
         default=[
             "http://localhost:5173",
             "http://127.0.0.1:5173",
+            "http://localhost:5174",  # Dev frontend
+            "http://127.0.0.1:5174",  # Dev frontend
             "http://localhost:3000",
             "http://127.0.0.1:3000",
+            "http://localhost:8001",  # Backend itself
+            "http://127.0.0.1:8001",  # Backend itself
         ],
         description="Allowed CORS origins"
     )

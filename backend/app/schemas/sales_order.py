@@ -1,7 +1,7 @@
 """
 Sales Order Pydantic Schemas
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
@@ -75,6 +75,15 @@ class SalesOrderUpdateShipping(BaseModel):
     carrier: Optional[str] = Field(None, max_length=100)
     shipped_at: Optional[datetime] = None
 
+    @field_validator('shipped_at')
+    @classmethod
+    def validate_shipped_at(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """Validate shipped date is reasonable (between 2000-2099)"""
+        if v is not None:
+            if v.year < 2000 or v.year > 2099:
+                raise ValueError('Shipped date must be between year 2000 and 2099')
+        return v
+
 
 class SalesOrderUpdateAddress(BaseModel):
     """Update shipping address on an order"""
@@ -98,6 +107,8 @@ class SalesOrderCancel(BaseModel):
 class SalesOrderBase(BaseModel):
     """Base sales order fields"""
     order_number: str
+    status: str
+    fulfillment_status: str
     product_name: Optional[str]
     quantity: int
     material_type: str
@@ -107,7 +118,6 @@ class SalesOrderBase(BaseModel):
     tax_amount: Decimal
     shipping_cost: Decimal
     grand_total: Decimal
-    status: str
     payment_status: str
     rush_level: str
 
@@ -160,6 +170,9 @@ class SalesOrderResponse(SalesOrderBase):
     order_type: Optional[str] = None  # 'quote_based' or 'line_item'
     source: Optional[str] = None  # 'portal', 'manual', 'squarespace', 'woocommerce'
     source_order_id: Optional[str] = None
+    
+    # Order status (two-tier model: order status + fulfillment status)
+    fulfillment_status: Optional[str] = None  # Shipping workflow status
 
     # Line items (for line_item type orders)
     lines: List[SalesOrderLineResponse] = []

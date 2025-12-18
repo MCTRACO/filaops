@@ -4,7 +4,7 @@
  * Replaces the complex ItemWizard with a clean, focused form.
  * BOM and Routing are managed separately via dedicated editors.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API_URL } from "../config/api";
 
 const ITEM_TYPES = [
@@ -44,6 +44,47 @@ export default function ItemForm({
     selling_price: editingItem?.selling_price || "",
   });
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/items/categories`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data);
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error("ItemForm: fetchCategories failed", {
+          endpoint: `${API_URL}/api/v1/items/categories`,
+          message: err?.message,
+          stack: err?.stack,
+        });
+      }
+    }
+  }, [token]);
+
+  const fetchUomClasses = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/admin/uom/classes`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUomClasses(data);
+      }
+    } catch (err) {
+      if (import.meta.env.DEV) {
+        console.error("ItemForm: fetchUomClasses failed", {
+          endpoint: `${API_URL}/api/v1/admin/uom/classes`,
+          message: err?.message,
+          stack: err?.stack,
+        });
+      }
+      setUomClasses([]);
+    }
+  }, [token]);
+
   useEffect(() => {
     if (isOpen) {
       fetchCategories();
@@ -76,46 +117,7 @@ export default function ItemForm({
       }
       setError(null);
     }
-  }, [isOpen, editingItem]);
-
-  const fetchCategories = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/v1/items/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setCategories(data);
-      }
-    } catch (err) {
-      // Categories fetch failure is non-critical; log for troubleshooting
-      console.error("ItemForm: fetchCategories failed", {
-        endpoint: `${API_URL}/api/v1/items/categories`,
-        message: err?.message,
-        stack: err?.stack,
-      });
-    }
-  };
-
-  const fetchUomClasses = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/v1/admin/uom/classes`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUomClasses(data);
-      }
-    } catch (err) {
-      // UOM fetch failure - use default list; log for troubleshooting
-      console.error("ItemForm: fetchUomClasses failed", {
-        endpoint: `${API_URL}/api/v1/admin/uom/classes`,
-        message: err?.message,
-        stack: err?.stack,
-      });
-      setUomClasses([]);
-    }
-  };
+  }, [isOpen, editingItem, fetchCategories, fetchUomClasses]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
