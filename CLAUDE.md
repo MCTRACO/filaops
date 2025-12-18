@@ -33,10 +33,10 @@ docker-compose up     # ❌ NO!
 
 | Service | Port | Container |
 |---------|------|-----------|
-| Frontend | http://localhost:10000 | filaops-frontend |
-| Backend | http://localhost:7000 | filaops-backend |
-| Database | localhost:1433 | filaops-db |
-| Redis | localhost:6379 | filaops-redis |
+| Frontend | http://localhost:7000 | filaops-prod-frontend |
+| Backend | http://localhost:10000 | filaops-prod-backend |
+| Database | localhost:1435 | filaops-prod-db |
+| Redis | localhost:6381 | filaops-prod-redis |
 
 ### Why This Matters
 

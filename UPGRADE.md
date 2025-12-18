@@ -75,14 +75,14 @@ docker-compose -f docker-compose.dev.yml ps
 Visit the application and verify it loads:
 
 - **Development**: <http://localhost:5174>
-- **Production**: <http://localhost:10000>
+- **Production**: <http://localhost:7000>
 
 ---
 
 ## Production Deployment Upgrade
 
 **Production Location**: `C:\BLB3D_Production`
-**Ports**: Frontend: 10000, Backend: 7000
+**Ports**: Frontend: 7000, Backend: 10000
 
 ### ⚠️ Important: Test in Development First
 
@@ -122,7 +122,7 @@ docker-compose logs -f backend
 
 ### Production Verification
 
-Visit <http://localhost:10000> and verify:
+Visit <http://localhost:7000> and verify:
 
 - Application loads successfully
 - Can log in
@@ -133,10 +133,10 @@ Visit <http://localhost:10000> and verify:
 
 | Service | Port | Container |
 |---------|------|-----------|
-| Frontend | 10000 | filaops-frontend |
-| Backend | 7000 | filaops-backend |
-| Database | 1433 | filaops-db |
-| Redis | 6379 | filaops-redis |
+| Frontend | 7000 | filaops-prod-frontend |
+| Backend | 10000 | filaops-prod-backend |
+| Database | 1435 | filaops-prod-db |
+| Redis | 6381 | filaops-prod-redis |
 
 ### Production Troubleshooting
 
@@ -155,8 +155,8 @@ cat .env | grep ENVIRONMENT
 
 ```bash
 # Check what's using ports
-netstat -ano | findstr :10000
 netstat -ano | findstr :7000
+netstat -ano | findstr :10000
 ```
 
 ---
