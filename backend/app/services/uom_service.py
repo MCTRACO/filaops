@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Optional, Tuple
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from typing import Optional, Tuple
 
 from app.models.uom import UnitOfMeasure
 
@@ -120,7 +121,7 @@ def get_conversion_factor(db: Session, from_unit: str, to_unit: str) -> Decimal:
     if not to_uom:
         raise UOMConversionError(f"Unknown unit: {to_unit}")
 
-    if from_uom.uom_class != to_uom.uom_class:
+    if from_uom.uom_class != to_uom.uom_class:  # type: ignore[comparison-overlap]
         raise UOMConversionError(
             f"Cannot convert between {from_uom.uom_class} ({from_unit}) and {to_uom.uom_class} ({to_unit})"
         )
@@ -269,7 +270,7 @@ def validate_units_compatible(db: Session, unit1: str, unit2: str) -> bool:
     if not uom1 or not uom2:
         return False
 
-    return uom1.uom_class == uom2.uom_class
+    return uom1.uom_class == uom2.uom_class  # type: ignore[return-value]
 
 
 def get_all_uom_classes(db: Session) -> list:
@@ -358,3 +359,40 @@ def format_conversion_note(
         note += f" of {product_name}"
 
     return note
+
+def get_product_consumption_uom(db: Session, product_id: int, default_unit: str = "KG") -> str:
+    """
+    Get the consumption UOM for a product.
+    
+    For materials (is_raw_material=True), this is the unit used when consuming
+    from inventory. For other products, returns the product's unit or default.
+    
+    Args:
+        db: Database session
+        product_id: Product ID
+        default_unit: Default unit if product not found or unit is missing
+    
+    Returns:
+        Unit code (e.g., 'KG', 'G', 'EA')
+    
+    Note:
+        This function is safe to call even if product doesn't exist.
+        It will return the default_unit in that case.
+    """
+    from app.models.product import Product
+    
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        return default_unit
+    
+    # Normalize unit (handle None, empty string, or default "EA")
+    unit = (product.unit or "").strip().upper()
+    
+    # For raw materials: if unit is missing/empty/default "EA", use KG
+    if product.is_raw_material:  # type: ignore[truthy-bool]
+        if not unit or unit == "EA":  # EA is the default, treat as "no unit set"
+            return "KG"
+        return unit
+    
+    # For other products, use their unit or default
+    return unit if unit else default_unit

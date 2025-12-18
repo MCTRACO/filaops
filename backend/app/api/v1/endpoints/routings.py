@@ -3,6 +3,9 @@ Routings API Endpoints
 
 CRUD operations for routings and routing operations.
 """
+# pyright: reportArgumentType=false
+# pyright: reportAssignmentType=false
+# SQLAlchemy Column types resolve to actual values at runtime
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from typing import List, Optional
 from datetime import datetime
@@ -79,7 +82,7 @@ async def list_routings(
 
     result = []
     for r in routings:
-        result.append(RoutingListResponse(
+        result.append(RoutingListResponse(  # type: ignore[arg-type]
             id=r.id,
             product_id=r.product_id,
             product_sku=r.product.sku if r.product else None,
@@ -186,7 +189,7 @@ async def create_routing(
     if data.is_template:
         logger.info(f"Created template routing: {routing.code}")
     else:
-        logger.info(f"Created routing: {routing.code} for product {product.sku}")
+        logger.info(f"Created routing: {routing.code} for product {product.sku if product else 'N/A'}")
 
     return _build_routing_response(routing, db)
 
@@ -212,7 +215,7 @@ async def seed_routing_templates(
 
     # Get work centers by code
     work_centers = {}
-    for wc in db.query(WorkCenter).filter(WorkCenter.is_active == True)  # noqa: E712.all():
+    for wc in db.query(WorkCenter).filter(WorkCenter.is_active == True).all():  # noqa: E712
         work_centers[wc.code] = wc
 
     # Verify required work centers exist
@@ -421,9 +424,9 @@ async def apply_template_to_product(
         db.flush()
 
         routing = existing
-        routing.name = f"{template.name} - {product.sku}"
-        routing.notes = f"Applied from template {template.code}"
-        routing.updated_at = datetime.utcnow()
+        routing.name = f"{template.name} - {product.sku}"  # type: ignore[assignment]
+        routing.notes = f"Applied from template {template.code}"  # type: ignore[assignment]
+        routing.updated_at = datetime.utcnow()  # type: ignore[assignment]
         message = f"Updated routing for {product.sku}"
     else:
         # Create new routing for this product
@@ -536,7 +539,7 @@ async def apply_template_to_product(
             updated_at=op.updated_at,
         ))
 
-    return ApplyTemplateResponse(
+    return ApplyTemplateResponse(  # type: ignore[arg-type]
         routing_id=routing.id,
         routing_code=routing.code,
         product_sku=product.sku,
@@ -606,7 +609,7 @@ async def update_routing(
     for field, value in update_data.items():
         setattr(routing, field, value)
 
-    routing.updated_at = datetime.utcnow()
+    routing.updated_at = datetime.utcnow()  # type: ignore[assignment]
     db.commit()
     db.refresh(routing)
 
@@ -626,8 +629,8 @@ async def delete_routing(
     if not routing:
         raise HTTPException(status_code=404, detail="Routing not found")
 
-    routing.is_active = False
-    routing.updated_at = datetime.utcnow()
+    routing.is_active = False  # type: ignore[assignment]
+    routing.updated_at = datetime.utcnow()  # type: ignore[assignment]
     db.commit()
 
     logger.info(f"Deactivated routing: {routing.code}")
@@ -741,7 +744,7 @@ async def update_routing_operation(
             value = value.value
         setattr(operation, field, value)
 
-    operation.updated_at = datetime.utcnow()
+    operation.updated_at = datetime.utcnow()  # type: ignore[assignment]
 
     # Recalculate routing totals
     _recalculate_routing_totals(operation.routing, db)
@@ -768,8 +771,8 @@ async def delete_routing_operation(
     if not operation:
         raise HTTPException(status_code=404, detail="Operation not found")
 
-    operation.is_active = False
-    operation.updated_at = datetime.utcnow()
+    operation.is_active = False  # type: ignore[assignment]
+    operation.updated_at = datetime.utcnow()  # type: ignore[assignment]
 
     # Recalculate routing totals
     _recalculate_routing_totals(operation.routing, db)
@@ -803,10 +806,10 @@ def _recalculate_routing_totals(routing: Routing, db: Session):
                      (op.move_time_minutes or Decimal("0"))
 
         # Calculate operation cost (includes setup + run time)
-        total_costed_minutes = float(op.setup_time_minutes or 0) + float(op.run_time_minutes or 0)
+        total_costed_minutes = float(op.setup_time_minutes or 0) + float(op.run_time_minutes or 0)  # type: ignore[arg-type]
         costed_hours = total_costed_minutes / 60
         rate = op.labor_rate_override or op.machine_rate_override
-        if not rate and op.work_center:
+        if not rate and op.work_center:  # type: ignore[truthy-bool]
             rate = (
                 (op.work_center.machine_rate_per_hour or Decimal("0")) +
                 (op.work_center.labor_rate_per_hour or Decimal("0")) +
@@ -814,10 +817,10 @@ def _recalculate_routing_totals(routing: Routing, db: Session):
             )
         total_cost += Decimal(str(costed_hours)) * (rate or Decimal("0"))
 
-    routing.total_setup_time_minutes = total_setup
-    routing.total_run_time_minutes = total_run
-    routing.total_cost = total_cost
-    routing.updated_at = datetime.utcnow()
+    routing.total_setup_time_minutes = total_setup  # type: ignore[assignment]
+    routing.total_run_time_minutes = total_run  # type: ignore[assignment]
+    routing.total_cost = total_cost  # type: ignore[assignment]
+    routing.updated_at = datetime.utcnow()  # type: ignore[assignment]
 
 
 def _build_routing_response(routing: Routing, db: Session) -> RoutingResponse:
@@ -827,7 +830,7 @@ def _build_routing_response(routing: Routing, db: Session) -> RoutingResponse:
         if op.is_active:
             operations.append(_build_operation_response(op))
 
-    return RoutingResponse(
+    return RoutingResponse(  # type: ignore[arg-type]
         id=routing.id,
         product_id=routing.product_id,
         product_sku=routing.product.sku if routing.product else None,
@@ -859,10 +862,10 @@ def _build_operation_response(op: RoutingOperation) -> RoutingOperationResponse:
     )
 
     # Calculate cost (includes setup + run time)
-    total_costed_minutes = float(op.setup_time_minutes or 0) + float(op.run_time_minutes or 0)
+    total_costed_minutes = float(op.setup_time_minutes or 0) + float(op.run_time_minutes or 0)  # type: ignore[arg-type]
     costed_hours = total_costed_minutes / 60
     rate = op.labor_rate_override or op.machine_rate_override
-    if not rate and op.work_center:
+    if not rate and op.work_center:  # type: ignore[truthy-bool]
         rate = (
             (op.work_center.machine_rate_per_hour or Decimal("0")) +
             (op.work_center.labor_rate_per_hour or Decimal("0")) +
@@ -870,7 +873,7 @@ def _build_operation_response(op: RoutingOperation) -> RoutingOperationResponse:
         )
     calculated_cost = Decimal(str(costed_hours)) * (rate or Decimal("0"))
 
-    return RoutingOperationResponse(
+    return RoutingOperationResponse(  # type: ignore[arg-type]
         id=op.id,
         routing_id=op.routing_id,
         work_center_id=op.work_center_id,
