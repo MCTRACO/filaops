@@ -1,6 +1,8 @@
 import { Outlet, Link, NavLink, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import ProFeaturesAnnouncement from "./ProFeaturesAnnouncement";
+import UpdateNotification from "./UpdateNotification";
+import { getCurrentVersion, getCurrentVersionSync, formatVersion } from "../utils/version";
 
 const DashboardIcon = () => (
   <svg
@@ -431,6 +433,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState(getCurrentVersionSync());
   const [user] = useState(() => {
     const userData = localStorage.getItem("adminUser");
     if (!userData) return null;
@@ -462,6 +465,18 @@ export default function AdminLayout() {
       navigate("/admin/login");
     }
   }, [navigate]);
+
+  useEffect(() => {
+    const fetchVersion = async () => {
+      try {
+        const version = await getCurrentVersion();
+        setCurrentVersion(version);
+      } catch (error) {
+        console.error('Failed to fetch version:', error);
+      }
+    };
+    fetchVersion();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
@@ -609,9 +624,17 @@ export default function AdminLayout() {
           </nav>
         </aside>
         <div className="flex-1 flex flex-col">
+          {user && localStorage.getItem("adminToken") && <UpdateNotification />}
           <header className="bg-gray-900/50 backdrop-blur-md border-b border-gray-800 px-6 py-4">
             <div className="flex justify-between items-center">
-              <h1 className="text-lg font-semibold text-white">FilaOps ERP</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-lg font-semibold text-white">
+                  FilaOps ERP
+                </h1>
+                <span className="text-xs text-gray-500">
+                  v{formatVersion(currentVersion)}
+                </span>
+              </div>
               <div className="flex items-center gap-4">
                 {user && (
                   <span className="text-sm text-gray-400">

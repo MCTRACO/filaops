@@ -1,7 +1,10 @@
-# Development Environment - STANDALONE
-# =====================================
-# Use: docker-compose -f docker-compose.dev.yml up -d
-#
+# ⚠️ DEVELOPERS ONLY - NOT FOR END USERS ⚠️
+# ==========================================
+# 
+# This file is ONLY for developers working on FilaOps code.
+# 
+# END USERS: Use docker-compose.yml instead (see INSTALL.md)
+# 
 # This is a COMPLETE STANDALONE compose file (not an override).
 # Production and Dev can run SIMULTANEOUSLY without conflict.
 #
@@ -10,6 +13,8 @@
 # - Backend:  http://localhost:8001
 # - DB Port:  1434
 # - Redis:    6380
+#
+# Use: docker-compose -f docker-compose.dev.yml up -d
 
 name: filaops-dev
 
@@ -87,6 +92,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        VERSION: ${FILAOPS_VERSION:-1.5.0-dev}
+        COMMIT: ${FILAOPS_COMMIT:-dev}
+        BUILD_DATE: ${FILAOPS_BUILD_DATE}
     container_name: filaops-dev-backend
     depends_on:
       db:

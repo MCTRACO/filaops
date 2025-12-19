@@ -1,3 +1,5 @@
+# pyright: reportArgumentType=false
+# pyright: reportAssignmentType=false
 """
 BOM Auto-Creation Service
 
@@ -21,14 +23,19 @@ from app.services.material_service import (
     MaterialNotFoundError,
     ColorNotFoundError,
 )
+from app.services.uom_service import (
+    get_product_consumption_uom,
+    convert_quantity,
+)
 
-# Machine time costing constants
-# These can be moved to system_settings table later for runtime configuration
-MACHINE_TIME_SKU = "MFG-MACHINE-TIME"  # Manufacturing overhead cost
-MACHINE_HOURLY_RATE = Decimal("1.50")  # $1.50/hr fully-burdened rate (depreciation + electricity + maintenance)
+# Machine time costing constants - Loaded from Settings
+from app.core.settings import settings
+
+MACHINE_TIME_SKU = settings.MACHINE_TIME_SKU  # Manufacturing overhead cost
+MACHINE_HOURLY_RATE = Decimal(str(settings.MACHINE_HOURLY_RATE))  # Fully-burdened rate from settings
 
 # Legacy SKU for migration
-LEGACY_MACHINE_TIME_SKU = "SVC-MACHINE-TIME"
+LEGACY_MACHINE_TIME_SKU = settings.LEGACY_MACHINE_TIME_SKU
 
 
 def get_or_create_machine_time_product(db: Session) -> Product:
@@ -386,20 +393,30 @@ def auto_create_product_and_bom(quote: Quote, db: Session) -> Tuple[Product, BOM
         slot = entry["slot"]
         color_name = entry["color_name"]
 
-        # Material quantity = weight in KG (converted from grams)
-        material_quantity_per_part = mat_grams / 1000.0
-        total_material_quantity = material_quantity_per_part * quote.quantity
+        # Get the material's consumption UOM (e.g., KG, G, LB)
+        material_uom = get_product_consumption_uom(db, int(mat_product.id), default_unit="KG")
+        
+        # Convert material quantity from grams to the material's UOM
+        # Material is always provided in grams from the quote
+        material_quantity_per_part_grams = Decimal(str(mat_grams))
+        material_quantity_per_part = convert_quantity(
+            db,
+            material_quantity_per_part_grams,
+            from_unit="G",
+            to_unit=material_uom
+        )
+        total_material_quantity = float(material_quantity_per_part) * quote.quantity
 
         slot_info = f" (Slot {slot})" if len(material_entries) > 1 else ""
         bom_line_material = BOMLine(
             bom_id=bom.id,
             component_id=mat_product.id,
             sequence=line_sequence,
-            quantity=total_material_quantity,  # Total material for all parts (in KG)
-            unit="KG",
+            quantity=total_material_quantity,  # Total material for all parts (in material's UOM)
+            unit=material_uom,  # Use material's actual UOM instead of hardcoded KG
             consume_stage="production",
             notes=f"Material{slot_info}: {mat_product.name}. "
-                  f"{quote.quantity} parts @ {material_quantity_per_part:.3f}KG each. "
+                  f"{quote.quantity} parts @ {material_quantity_per_part:.3f}{material_uom} each. "
                   f"Color: {color_name}. SKU: {mat_product.sku}"
         )
 
