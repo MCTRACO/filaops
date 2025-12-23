@@ -55,13 +55,13 @@ class VersionManager:
         if not version:
             version = os.getenv('FILAOPS_VERSION')
 
+        # Priority 3: Fallback to hardcoded version
+        if not version:
+            version = VersionManager.FALLBACK_VERSION
+
         # Clean up git tag (remove 'v' prefix if present)
         if version and version.startswith('v'):
-                    version = version[1:]
-
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                # Priority 3: Fallback to hardcoded version
-                version = VersionManager.FALLBACK_VERSION
+            version = version[1:]
 
         # Get commit hash (only works in dev mode with git)
         commit_hash = "unknown"
