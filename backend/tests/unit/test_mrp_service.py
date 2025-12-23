@@ -1172,6 +1172,7 @@ class TestFullMRPRun:
             quantity_completed=Decimal("0"),
             status="released",
             due_date=date.today() + timedelta(days=14),
+            qc_status="not_required",  # Explicitly set to avoid SQLite schema issues
         )
         db.add(prod_order)
         db.commit()
