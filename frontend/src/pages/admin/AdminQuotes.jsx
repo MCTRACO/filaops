@@ -660,6 +660,7 @@ export default function AdminQuotes() {
 // Quote Form Modal Component - Now with Product Selection, Customer, and Tax
 function QuoteFormModal({ quote, onSave, onClose, token }) {
   const navigate = useNavigate();
+  const toast = useToast();
   const [step, setStep] = useState(1); // 1=product, 2=customer+details
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);

@@ -159,7 +159,7 @@ export default function ShippingTimeline({ orderId, className = "" }) {
 
         const data = await res.json();
         setEvents(data.items || []);
-      } catch {
+      } catch (err) {
         setError(err.message);
       } finally {
         setLoading(false);

@@ -171,7 +171,7 @@ export default function SalesOrderWizard({ isOpen, onClose, onSuccess }) {
           setLineItems(data.lineItems || []);
           setCurrentStep(data.currentStep || 1);
           sessionStorage.removeItem("pendingOrderData");
-        } catch (e) {
+        } catch {
           // Session storage failure is non-critical - order creation will proceed
         }
       }
@@ -496,7 +496,7 @@ export default function SalesOrderWizard({ isOpen, onClose, onSuccess }) {
         in_stock: true,
       });
       setShowMaterialWizard(false);
-    } catch {
+    } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
@@ -625,7 +625,7 @@ export default function SalesOrderWizard({ isOpen, onClose, onSuccess }) {
       // Refresh components list and close wizard
       await fetchComponents();
       setShowSubComponentWizard(false);
-    } catch {
+    } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
@@ -882,7 +882,7 @@ export default function SalesOrderWizard({ isOpen, onClose, onSuccess }) {
 
       // 7. Close wizard
       setShowItemWizard(false);
-    } catch {
+    } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
@@ -975,7 +975,7 @@ export default function SalesOrderWizard({ isOpen, onClose, onSuccess }) {
       const order = await res.json();
       onSuccess?.(order);
       handleClose();
-    } catch {
+    } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);

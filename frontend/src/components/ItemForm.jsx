@@ -69,7 +69,7 @@ export default function ItemForm({
         const data = await res.json();
         setCategories(data);
       }
-    } catch {
+    } catch (err) {
       if (import.meta.env.DEV) {
         console.error("ItemForm: fetchCategories failed", {
           endpoint: `${API_URL}/api/v1/items/categories`,
@@ -89,7 +89,7 @@ export default function ItemForm({
         const data = await res.json();
         setUomClasses(data);
       }
-    } catch {
+    } catch (err) {
       if (import.meta.env.DEV) {
         console.error("ItemForm: fetchUomClasses failed", {
           endpoint: `${API_URL}/api/v1/admin/uom/classes`,

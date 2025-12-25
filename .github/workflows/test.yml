@@ -57,14 +57,14 @@ jobs:
 
       - name: Run database migrations
         env:
-          DATABASE_URL: postgresql://filaops:testpassword@localhost:5432/filaops_test
+          DATABASE_URL: postgresql+psycopg://filaops:testpassword@localhost:5432/filaops_test
         run: |
           cd backend
           alembic upgrade head
 
       - name: Run backend tests with coverage
         env:
-          DATABASE_URL: postgresql://filaops:testpassword@localhost:5432/filaops_test
+          DATABASE_URL: postgresql+psycopg://filaops:testpassword@localhost:5432/filaops_test
           REDIS_URL: redis://localhost:6379
           TESTING: true
         run: |
@@ -176,21 +176,21 @@ jobs:
 
       - name: Run database migrations
         env:
-          DATABASE_URL: postgresql://filaops:testpassword@localhost:5432/filaops_test
+          DATABASE_URL: postgresql+psycopg://filaops:testpassword@localhost:5432/filaops_test
         run: |
           cd backend
           alembic upgrade head
 
       - name: Seed test database
         env:
-          DATABASE_URL: postgresql://filaops:testpassword@localhost:5432/filaops_test
+          DATABASE_URL: postgresql+psycopg://filaops:testpassword@localhost:5432/filaops_test
         run: |
           cd backend
           python scripts/seed_test_data.py || echo "No seed script, skipping"
 
       - name: Start backend server
         env:
-          DATABASE_URL: postgresql://filaops:testpassword@localhost:5432/filaops_test
+          DATABASE_URL: postgresql+psycopg://filaops:testpassword@localhost:5432/filaops_test
           TESTING: true
         run: |
           cd backend
@@ -281,14 +281,14 @@ jobs:
 
       - name: Run migrations
         env:
-          DATABASE_URL: postgresql://filaops:testpassword@localhost:5432/filaops_test
+          DATABASE_URL: postgresql+psycopg://filaops:testpassword@localhost:5432/filaops_test
         run: |
           cd backend
           alembic upgrade head
 
       - name: Start servers
         env:
-          DATABASE_URL: postgresql://filaops:testpassword@localhost:5432/filaops_test
+          DATABASE_URL: postgresql+psycopg://filaops:testpassword@localhost:5432/filaops_test
         run: |
           cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8001 &
           cd frontend && npm run dev &

@@ -784,8 +784,8 @@ function CustomerDetailsModal({ customer, onClose, onEdit }) {
         // API returns array directly
         setOrders(Array.isArray(data) ? data : []);
       }
-    } catch (err) {
-      setError("Failed to load orders. Please refresh the page.");
+    } catch {
+      console.error("Failed to load customer orders");
     } finally {
       setLoadingOrders(false);
     }

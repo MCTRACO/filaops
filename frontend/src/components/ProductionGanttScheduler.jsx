@@ -467,7 +467,7 @@ export default function ProductionGanttScheduler({
       const settled = await Promise.all(resourceFetches);
       const allResources = settled.flat();
       setMachines(allResources);
-    } catch {
+    } catch (err) {
       const msg = err?.message || "Failed to load machines";
       setError(msg);
       console.error("Failed to fetch machines:", err);
@@ -673,12 +673,12 @@ export default function ProductionGanttScheduler({
             next.set(orderId, full);
             return next;
           });
-        } catch {
-          console.warn(`Failed to refresh order ${orderId} details:`, err);
+        } catch (refreshErr) {
+          console.warn(`Failed to refresh order ${orderId} details:`, refreshErr);
         }
-      } catch {
-        console.error(`Failed to schedule order ${orderId}:`, err);
-        throw err; // Re-throw so caller can show toast
+      } catch (scheduleErr) {
+        console.error(`Failed to schedule order ${orderId}:`, scheduleErr);
+        throw scheduleErr; // Re-throw so caller can show toast
       }
     },
     [api]
@@ -711,8 +711,8 @@ export default function ProductionGanttScheduler({
             await scheduleOrder(o.id, machineId, startMs, endMs);
             cursorEnd = endMs;
             changed++;
-          } catch {
-            console.error("Auto-push failed", o.id, err);
+          } catch (pushErr) {
+            console.error("Auto-push failed", o.id, pushErr);
             cursorEnd = e; // continue
           }
         } else if (s >= cursorEnd) break;
@@ -758,8 +758,8 @@ export default function ProductionGanttScheduler({
             await scheduleOrder(o.id, machineId, startMs, endMs);
             cursor = endMs;
             moved++;
-          } catch {
-            console.error("Auto-pull failed", o.id, err);
+          } catch (pullErr) {
+            console.error("Auto-pull failed", o.id, pullErr);
             cursor = e;
           }
         } else {

@@ -1,3 +1,4 @@
+/* global process */
 import { test, expect } from "@playwright/test";
 
 const PAGE = process.env.E2E_PAGE_PATH || "/admin/production";
