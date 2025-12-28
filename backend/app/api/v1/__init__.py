@@ -1,6 +1,7 @@
 """
 API v1 Router - FilaOps Open Source
 """
+import os
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     scheduling,
@@ -170,3 +171,9 @@ router.include_router(
 
 # License activation (disabled until ready for production)
 # router.include_router(license.router)
+
+# Test endpoints - only enabled in non-production environments
+# These endpoints allow E2E tests to seed test data
+if os.getenv("ENVIRONMENT", "development").lower() != "production":
+    from app.api.v1.endpoints import test as test_endpoints
+    router.include_router(test_endpoints.router)

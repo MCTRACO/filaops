@@ -8,6 +8,9 @@ import { E2E_CONFIG } from '../config';
  * Use these in test files to maintain consistency across all E2E tests.
  */
 
+// API base URL for test endpoints
+const API_BASE_URL = process.env.API_URL || 'http://localhost:8000';
+
 /**
  * Login to the application
  *
@@ -95,15 +98,24 @@ export async function waitForApiResponse(
  * Each scenario sets up the database in a known state for testing.
  */
 export type TestScenario =
-  | 'empty'                       // Clean slate - no data
-  | 'basic'                       // Basic sample data
+  | 'empty'                       // Clean slate - just test user
+  | 'basic'                       // Basic sample data (users, products, vendors)
   | 'low-stock-with-allocations'  // For demand pegging tests
   | 'production-in-progress'      // Production orders in various states
-  | 'production-mto'              // Make-to-order production
-  | 'production-with-shortage'    // Production blocked by materials
+  | 'production-mto'              // Make-to-order production (alias)
+  | 'production-with-shortage'    // Production blocked by materials (alias)
   | 'so-with-blocking-issues'     // Sales order with fulfillment problems
-  | 'full-demand-chain'           // Complete SO->PO->Materials chain
-  | 'full-production-context';    // Complete production with all context
+  | 'full-demand-chain'           // Complete SO->WO->PO chain
+  | 'full-production-context';    // Complete production with all context (alias)
+
+/**
+ * Response from the seed endpoint
+ */
+export interface SeedResponse {
+  success: boolean;
+  scenario: string;
+  data: Record<string, unknown>;
+}
 
 /**
  * Seed test data for a specific scenario
@@ -112,22 +124,30 @@ export type TestScenario =
  * in a known state for the given scenario.
  *
  * @param scenario - The test scenario to seed
+ * @returns SeedResponse with created object IDs
+ * @throws Error if seeding fails
+ *
+ * @example
+ * test('demand pegging', async ({ page }) => {
+ *   const result = await seedTestScenario('full-demand-chain');
+ *   console.log('Created SO:', result.data.sales_order.order_number);
+ *   await login(page);
+ *   // ... test with real data
+ * });
  */
-export async function seedTestScenario(scenario: TestScenario): Promise<void> {
-  // TODO: Implement when backend seeding endpoint is ready
-  // This will call: POST /api/v1/test/seed?scenario={scenario}
-  console.log(`[test-utils] Seeding scenario: ${scenario}`);
-  console.log('[test-utils] NOTE: Backend seeding endpoint not yet implemented');
+export async function seedTestScenario(scenario: TestScenario): Promise<SeedResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/test/seed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scenario }),
+  });
 
-  // Placeholder - will be implemented in INFRA-002/003
-  // const response = await fetch(`${E2E_CONFIG.baseUrl}/api/v1/test/seed`, {
-  //   method: 'POST',
-  //   headers: { 'Content-Type': 'application/json' },
-  //   body: JSON.stringify({ scenario }),
-  // });
-  // if (!response.ok) {
-  //   throw new Error(`Failed to seed scenario: ${scenario}`);
-  // }
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to seed scenario '${scenario}': ${errorText}`);
+  }
+
+  return response.json();
 }
 
 /**
@@ -135,13 +155,35 @@ export async function seedTestScenario(scenario: TestScenario): Promise<void> {
  *
  * Calls the backend cleanup endpoint to remove test data.
  * Use in afterEach hooks to ensure clean state between tests.
+ *
+ * @example
+ * test.afterEach(async () => {
+ *   await cleanupTestData();
+ * });
  */
 export async function cleanupTestData(): Promise<void> {
-  // TODO: Implement when backend cleanup endpoint is ready
-  console.log('[test-utils] Cleanup placeholder - implement when backend ready');
+  const response = await fetch(`${API_BASE_URL}/api/v1/test/cleanup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
 
-  // Placeholder - will be implemented in INFRA-002/003
-  // await fetch(`${E2E_CONFIG.baseUrl}/api/v1/test/cleanup`, { method: 'POST' });
+  if (!response.ok) {
+    console.warn('[test-utils] Cleanup failed:', await response.text());
+  }
+}
+
+/**
+ * List available test scenarios from the backend
+ *
+ * @returns Array of scenario names
+ */
+export async function listScenarios(): Promise<string[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/test/scenarios`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch scenarios');
+  }
+  const data = await response.json();
+  return data.scenarios;
 }
 
 /**
