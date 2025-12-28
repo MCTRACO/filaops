@@ -4,6 +4,7 @@ import MaterialForm from "../../components/MaterialForm";
 import BOMEditor from "../../components/BOMEditor";
 import RoutingEditor from "../../components/RoutingEditor";
 import StatCard from "../../components/StatCard";
+import { ItemCard } from "../../components/inventory/ItemCard";
 import { API_URL } from "../../config/api";
 import { useToast } from "../../components/Toast";
 import {
@@ -519,6 +520,7 @@ export default function AdminItems() {
   const [error, setError] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [expandedCategories, setExpandedCategories] = useState(new Set());
+  const [viewMode, setViewMode] = useState("table"); // "table" | "cards"
   const [filters, setFilters] = useState({
     search: "",
     itemType: "all",
@@ -963,7 +965,7 @@ export default function AdminItems() {
   };
 
   return (
-    <div className="flex gap-6 h-full">
+    <div data-testid="items-page" className="flex gap-6 h-full">
       {/* Left Sidebar - Categories */}
       <div className="w-64 flex-shrink-0">
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -1020,6 +1022,31 @@ export default function AdminItems() {
             </p>
           </div>
           <div className="flex gap-2">
+            {/* View Toggle */}
+            <div className="flex bg-gray-800 rounded-lg p-1 border border-gray-700">
+              <button
+                data-testid="view-toggle-table"
+                onClick={() => setViewMode("table")}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  viewMode === "table"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                Table
+              </button>
+              <button
+                data-testid="view-toggle-cards"
+                onClick={() => setViewMode("cards")}
+                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                  viewMode === "cards"
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                Cards
+              </button>
+            </div>
             <button
               onClick={fetchItems}
               disabled={loading}
@@ -1208,8 +1235,27 @@ export default function AdminItems() {
           </div>
         )}
 
+        {/* Items Card View */}
+        {!loading && viewMode === "cards" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredItems.length === 0 ? (
+              <div className="col-span-full py-12 text-center text-gray-500">
+                No items found
+              </div>
+            ) : (
+              filteredItems.map((item) => (
+                <ItemCard
+                  key={item.id}
+                  itemId={item.id}
+                  onClick={() => setEditingItem(item)}
+                />
+              ))
+            )}
+          </div>
+        )}
+
         {/* Items Table */}
-        {!loading && (
+        {!loading && viewMode === "table" && (
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-800/50">

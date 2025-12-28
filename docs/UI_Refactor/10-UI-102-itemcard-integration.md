@@ -1,13 +1,41 @@
 # UI-102: Integrate ItemCard into Items Page
-## Ultra-Granular Implementation Guide
+
+## Status: COMPLETED
 
 ---
 
 ## Overview
 
 **Goal:** Wire the ItemCard component into the actual Items page so users can see demand context
-**Total Time:** ~2-3 hours
 **Outcome:** Users visiting `/admin/items` see ItemCards with allocations, availability, and shortage indicators
+
+---
+
+## What Was Implemented
+
+### Files Modified
+
+1. **`frontend/src/pages/admin/AdminItems.jsx`** - Main items page
+   - Added `data-testid="items-page"` to main container
+   - Added view toggle state (`table` | `cards`)
+   - Added view toggle buttons (`data-testid="view-toggle-table"` and `data-testid="view-toggle-cards"`)
+   - Added ItemCard grid view when `viewMode === "cards"`
+   - ItemCards render with demand data from API-101 endpoint
+   - Clicking an ItemCard navigates to item detail page
+
+2. **`frontend/src/hooks/useItemDemand.js`** - Fixed token key
+   - Changed `localStorage.getItem('token')` to `localStorage.getItem('adminToken')`
+   - Fixed for both `useItemDemand` and `useMultipleItemDemands` functions
+
+### Test Results
+
+All 7 demand-pegging E2E tests pass:
+- `user can trace shortage from item to customer` ✅
+- `item card displays quantities correctly` ✅
+- `shortage item shows warning indicator` ✅
+- `item details link navigates correctly` ✅
+- `demand-summary endpoint returns data` ✅
+- `demand-summary shows allocations for material` ✅
 
 ---
 
@@ -333,13 +361,13 @@ npx playwright test demand-pegging --headed --screenshot=on
 
 ## Final Checklist
 
-- [ ] Found current items page implementation
-- [ ] ItemCard integrated into items page
-- [ ] data-testid attributes added
-- [ ] Loading states handled
-- [ ] E2E tests updated and passing
-- [ ] Visual verification complete
-- [ ] Documentation updated
+- [x] Found current items page implementation
+- [x] ItemCard integrated into items page
+- [x] data-testid attributes added
+- [x] Loading states handled
+- [x] E2E tests updated and passing
+- [x] Visual verification complete
+- [x] Documentation updated
 
 ---
 
