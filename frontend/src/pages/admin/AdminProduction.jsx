@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import ProductionSchedulingModal from "../../components/ProductionSchedulingModal";
 import ProductionScheduler from "../../components/ProductionScheduler";
 import SplitOrderModal from "../../components/SplitOrderModal";
@@ -235,6 +235,7 @@ const SoLinkBadge = ({ order }) => {
 
 export default function AdminProduction() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [productionOrders, setProductionOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -657,7 +658,8 @@ export default function AdminProduction() {
                   {groupedOrders.draft.map((order) => (
                     <div
                       key={order.id}
-                      className="bg-gray-800 border border-gray-700 rounded-lg p-4"
+                      className="bg-gray-800 border border-gray-700 rounded-lg p-4 cursor-pointer hover:border-gray-600 transition-colors"
+                      onClick={() => navigate(`/admin/production/${order.id}`)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-white font-medium">
@@ -674,7 +676,7 @@ export default function AdminProduction() {
                         {order.product_name || "N/A"}
                       </p>
                       <button
-                        onClick={() => handleStatusUpdate(order.id, "released")}
+                        onClick={(e) => { e.stopPropagation(); handleStatusUpdate(order.id, "released"); }}
                         className="w-full py-1.5 bg-blue-600/20 text-blue-400 rounded text-sm hover:bg-blue-600/30"
                       >
                         Release
@@ -702,7 +704,8 @@ export default function AdminProduction() {
                   {groupedOrders.released.map((order) => (
                     <div
                       key={order.id}
-                      className="bg-gray-800 border border-gray-700 rounded-lg p-4"
+                      className="bg-gray-800 border border-gray-700 rounded-lg p-4 cursor-pointer hover:border-gray-600 transition-colors"
+                      onClick={() => navigate(`/admin/production/${order.id}`)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-white font-medium">
@@ -725,7 +728,8 @@ export default function AdminProduction() {
                       )}
                       <div className="flex gap-2">
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedOrderForScheduling(order);
                             setShowSchedulingModal(true);
                           }}
@@ -735,9 +739,10 @@ export default function AdminProduction() {
                           Schedule
                         </button>
                         <button
-                          onClick={() =>
-                            handleStatusUpdate(order.id, "in_progress")
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStatusUpdate(order.id, "in_progress");
+                          }}
                           className="flex-1 py-1.5 bg-purple-600/20 text-purple-400 rounded text-sm hover:bg-purple-600/30"
                           title="Start immediately without scheduling"
                         >
@@ -747,7 +752,8 @@ export default function AdminProduction() {
                       <div className="flex gap-2 mt-2">
                         {order.quantity_ordered > 1 && (
                           <button
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSelectedOrderForSplit(order);
                               setShowSplitModal(true);
                             }}
@@ -771,7 +777,8 @@ export default function AdminProduction() {
                           </button>
                         )}
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedOrderForScrap(order);
                             setShowScrapModal(true);
                           }}
@@ -806,7 +813,8 @@ export default function AdminProduction() {
                   {groupedOrders.in_progress.map((order) => (
                     <div
                       key={order.id}
-                      className="bg-gray-800 border border-gray-700 rounded-lg p-4"
+                      className="bg-gray-800 border border-gray-700 rounded-lg p-4 cursor-pointer hover:border-gray-600 transition-colors"
+                      onClick={() => navigate(`/admin/production/${order.id}`)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-white font-medium">
@@ -832,7 +840,8 @@ export default function AdminProduction() {
                       )}
                       <div className="flex gap-2">
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedOrderForComplete(order);
                             setShowCompleteModal(true);
                           }}
@@ -841,7 +850,8 @@ export default function AdminProduction() {
                           Complete
                         </button>
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedOrderForScrap(order);
                             setShowScrapModal(true);
                           }}
@@ -874,7 +884,7 @@ export default function AdminProduction() {
                   {groupedOrders.complete.slice(0, 10).map((order) => (
                     <div
                       key={order.id}
-                      className={`bg-gray-800 border rounded-lg p-4 ${
+                      className={`bg-gray-800 border rounded-lg p-4 cursor-pointer hover:border-gray-600 transition-colors ${
                         order.qc_status === "pending"
                           ? "border-yellow-500/50"
                           : order.qc_status === "passed"
@@ -883,6 +893,7 @@ export default function AdminProduction() {
                           ? "border-red-500/50"
                           : "border-gray-700 opacity-75"
                       }`}
+                      onClick={() => navigate(`/admin/production/${order.id}`)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-white font-medium">
@@ -925,7 +936,8 @@ export default function AdminProduction() {
                       {(order.qc_status === "pending" ||
                         order.qc_status === "failed") && (
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedOrderForQC(order);
                             setShowQCModal(true);
                           }}

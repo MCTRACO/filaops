@@ -1247,7 +1247,10 @@ export default function AdminItems() {
                 <ItemCard
                   key={item.id}
                   itemId={item.id}
-                  onClick={() => setEditingItem(item)}
+                  onClick={() => {
+                    setEditingItem(item);
+                    setShowItemModal(true);
+                  }}
                 />
               ))
             )}

@@ -30,8 +30,21 @@ export async function login(
     password: E2E_CONFIG.password,
   };
 
-  // Navigate to login page
+  // Navigate to login page first (needed to clear localStorage on same origin)
   await page.goto('/admin/login');
+  await page.waitForLoadState('networkidle');
+
+  // Clear any stale auth tokens before logging in fresh
+  // This prevents conflicts when user was deleted and recreated
+  await page.context().clearCookies();
+  await page.evaluate(() => {
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('token');
+    sessionStorage.clear();
+  });
+
+  // Reload to ensure clean state
+  await page.reload();
   await page.waitForLoadState('networkidle');
 
   // Fill login form
@@ -241,4 +254,184 @@ export async function isVisible(
   text: string | RegExp
 ): Promise<boolean> {
   return page.getByText(text).isVisible().catch(() => false);
+}
+
+// ============================================================================
+// Demand Pegging Helpers (E2E-101)
+// ============================================================================
+
+/**
+ * Stock status types matching frontend ItemCard component
+ */
+export type StockStatus = 'healthy' | 'tight' | 'short' | 'critical';
+
+/**
+ * Get scenario data from test annotations
+ *
+ * Use after seedTestScenario in beforeEach to access seeded IDs.
+ *
+ * @param testInfo - Playwright test info object
+ * @returns Parsed scenario data or null
+ *
+ * @example
+ * test('demand flow', async ({ page }, testInfo) => {
+ *   const data = getScenarioData(testInfo);
+ *   expect(data?.sales_order?.order_number).toBeDefined();
+ * });
+ */
+export function getScenarioData(testInfo: { annotations: Array<{ type: string; description?: string }> }): Record<string, unknown> | null {
+  const annotation = testInfo.annotations.find(a => a.type === 'scenario-data');
+  if (!annotation?.description) return null;
+
+  try {
+    return JSON.parse(annotation.description);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Assert that an ItemCard shows the expected stock status
+ *
+ * Finds an ItemCard by SKU and verifies its visual status indicator.
+ *
+ * @param page - Playwright page
+ * @param sku - SKU text to find
+ * @param expectedStatus - Expected stock status
+ *
+ * @example
+ * await assertItemCardStatus(page, 'STEEL-001', 'critical');
+ */
+export async function assertItemCardStatus(
+  page: Page,
+  sku: string,
+  expectedStatus: StockStatus
+): Promise<void> {
+  // Find ItemCard containing the SKU
+  const itemCard = page.locator('[data-testid="item-card"]').filter({
+    hasText: sku
+  });
+
+  await expect(itemCard).toBeVisible({ timeout: E2E_CONFIG.defaultTimeout });
+
+  // Status indicators use color classes
+  const statusColors: Record<StockStatus, RegExp> = {
+    healthy: /green|emerald/i,
+    tight: /yellow|amber/i,
+    short: /orange|amber/i,
+    critical: /red/i,
+  };
+
+  // Check for status dot or background color
+  const statusDot = itemCard.locator('[aria-label*="status"]');
+  if (await statusDot.isVisible().catch(() => false)) {
+    const classList = await statusDot.getAttribute('class');
+    expect(classList).toMatch(statusColors[expectedStatus]);
+  } else {
+    // Fall back to checking card styling
+    const classList = await itemCard.getAttribute('class');
+    expect(classList).toMatch(statusColors[expectedStatus]);
+  }
+}
+
+/**
+ * Navigate through the demand chain starting from an item
+ *
+ * Follows links: Item → Work Order → Sales Order → Customer
+ *
+ * @param page - Playwright page
+ * @param startingSku - SKU to start navigation from
+ * @returns Object with visited URLs for verification
+ *
+ * @example
+ * const chain = await navigateDemandChain(page, 'STEEL-001');
+ * expect(chain.salesOrderUrl).toMatch(/\/admin\/orders\/\d+/);
+ */
+export async function navigateDemandChain(
+  page: Page,
+  startingSku: string
+): Promise<{
+  itemUrl: string;
+  workOrderUrl?: string;
+  salesOrderUrl?: string;
+  customerName?: string;
+}> {
+  const result: {
+    itemUrl: string;
+    workOrderUrl?: string;
+    salesOrderUrl?: string;
+    customerName?: string;
+  } = { itemUrl: page.url() };
+
+  // Find the ItemCard with this SKU
+  const itemCard = page.locator('[data-testid="item-card"]').filter({
+    hasText: startingSku
+  });
+
+  // Click through to item details if available
+  const detailsLink = itemCard.getByText('Details');
+  if (await detailsLink.isVisible().catch(() => false)) {
+    await detailsLink.click();
+    await waitForApi(page);
+    result.itemUrl = page.url();
+  }
+
+  // Look for work order allocation link
+  const woLink = page.locator('a[href*="/admin/production/"]').first();
+  if (await woLink.isVisible().catch(() => false)) {
+    await woLink.click();
+    await waitForApi(page);
+    result.workOrderUrl = page.url();
+
+    // On work order page, look for linked sales order
+    const soLink = page.locator('a[href*="/admin/orders/"]').first();
+    if (await soLink.isVisible().catch(() => false)) {
+      await soLink.click();
+      await waitForApi(page);
+      result.salesOrderUrl = page.url();
+
+      // On sales order page, look for customer name
+      const customerText = page.locator('[data-testid="customer-name"], .customer-name, h2:has-text("Customer")').first();
+      if (await customerText.isVisible().catch(() => false)) {
+        result.customerName = await customerText.textContent() ?? undefined;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Find all ItemCards on the page with their status
+ *
+ * Useful for bulk assertions about inventory visibility.
+ *
+ * @param page - Playwright page
+ * @returns Array of { sku, available, status } objects
+ */
+export async function getAllItemCards(
+  page: Page
+): Promise<Array<{ sku: string; available: string; hasShortage: boolean }>> {
+  const cards = page.locator('[data-testid="item-card"]');
+  const count = await cards.count();
+  const results: Array<{ sku: string; available: string; hasShortage: boolean }> = [];
+
+  for (let i = 0; i < count; i++) {
+    const card = cards.nth(i);
+
+    // Extract SKU (first bold text, typically h3 or .font-semibold)
+    const skuElement = card.locator('.font-semibold, h3').first();
+    const sku = await skuElement.textContent() ?? '';
+
+    // Extract available quantity
+    const availableElement = card.getByText('Available').locator('..').locator('p').last();
+    const available = await availableElement.textContent() ?? '0';
+
+    // Check for shortage indicator
+    const hasShortage = await card.locator('[class*="red"], .bg-red-900').isVisible().catch(() => false);
+
+    results.push({ sku: sku.trim(), available: available.trim(), hasShortage });
+  }
+
+  return results;
 }

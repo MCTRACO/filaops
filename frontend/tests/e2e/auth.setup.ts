@@ -3,6 +3,31 @@ import { E2E_CONFIG } from './config';
 import * as fs from 'fs';
 
 const authFile = './tests/e2e/.auth/user.json';
+const API_BASE_URL = process.env.API_URL || 'http://localhost:8000';
+
+/**
+ * Ensure test user exists by calling the seed endpoint.
+ * This creates the admin@filaops.test user for authentication.
+ */
+async function ensureTestUser(): Promise<void> {
+  // First cleanup any stale data
+  await fetch(`${API_BASE_URL}/api/v1/test/cleanup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  }).catch(() => { /* Ignore cleanup errors */ });
+
+  // Seed the empty scenario which creates the admin user
+  const response = await fetch(`${API_BASE_URL}/api/v1/test/seed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scenario: 'empty' }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to seed test user: ${error}`);
+  }
+}
 
 /**
  * Check if stored JWT token is expired or will expire soon
@@ -57,6 +82,9 @@ setup('authenticate', async ({ page }) => {
   }
 
   console.log('[auth] Authenticating test user...');
+
+  // Ensure test user exists before trying to login
+  await ensureTestUser();
 
   // Navigate to login page
   await page.goto('/admin/login');

@@ -9,7 +9,7 @@ from typing import Annotated, List, Optional, Dict, Any
 from datetime import datetime, date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, or_, case
 
@@ -755,6 +755,44 @@ async def check_material_availability(
         "work_orders_needed": work_orders_needed,
         "purchase_orders_needed": purchase_orders_needed
     }
+
+
+# =============================================================================
+# ENDPOINT: Blocking Issues Analysis (API-202)
+# =============================================================================
+
+from app.schemas.blocking_issues import ProductionOrderBlockingIssues
+from app.services.blocking_issues import get_production_order_blocking_issues
+
+
+@router.get("/{order_id}/blocking-issues", response_model=ProductionOrderBlockingIssues)
+async def get_po_blocking_issues(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get blocking issues analysis for a production order.
+
+    Analyzes what's preventing production completion and returns:
+    - Status summary (can_produce, blocking_count, estimated_ready_date)
+    - Linked sales order (if MTO)
+    - Material requirements with availability status
+    - Resolution actions to unblock production
+
+    Material statuses:
+    - ok: Sufficient inventory available
+    - shortage: Insufficient inventory, may have incoming PO
+    """
+    result = get_production_order_blocking_issues(db, order_id)
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Production order {order_id} not found"
+        )
+
+    return result
 
 
 @router.get("/{order_id}/required-orders")

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { API_URL } from "../../config/api";
 import { useToast } from "../../components/Toast";
 import VendorModal from "../../components/purchasing/VendorModal";
@@ -235,9 +235,16 @@ const statusColors = {
 
 export default function AdminPurchasing() {
   const toast = useToast();
-  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "orders";
   const [activeTab, setActiveTab] = useState(initialTab); // orders | vendors | import | low-stock
+
+  // Initial items for PO modal (from URL params)
+  const [initialItemsForPO, setInitialItemsForPO] = useState([]);
+
+  // Track if we've already processed the create_po URL param
+  const createPOProcessedRef = useRef(false);
 
   // Sync tab with URL
   useEffect(() => {
@@ -294,6 +301,77 @@ export default function AdminPurchasing() {
   const [trendLoading, setTrendLoading] = useState(false);
 
   const token = localStorage.getItem("adminToken");
+
+  // Handle create_po URL param - auto-open PO modal with pre-filled item
+  useEffect(() => {
+    const createPO = searchParams.get("create_po");
+    const productId = searchParams.get("product_id");
+    const quantity = searchParams.get("quantity");
+
+    // Only process if we have the create_po flag and product_id
+    if (createPO !== "true" || !productId) {
+      // Reset the ref when there's no create_po param
+      createPOProcessedRef.current = false;
+      return;
+    }
+
+    // Don't process again if we've already handled this
+    if (createPOProcessedRef.current) {
+      return;
+    }
+
+    // Wait for products to load
+    if (products.length === 0) {
+      console.log("[AdminPurchasing] Waiting for products to load...");
+      return;
+    }
+
+    // Mark as processed BEFORE doing anything else
+    createPOProcessedRef.current = true;
+
+    console.log(`[AdminPurchasing] Looking for product ID: ${productId} in ${products.length} products`);
+
+    // Find the product in the products list
+    const product = products.find(p => String(p.id) === String(productId));
+
+    if (product) {
+      console.log(`[AdminPurchasing] Found product: ${product.sku}`);
+
+      // Build initial items for the PO modal
+      const initialItems = [{
+        id: product.id,
+        sku: product.sku,
+        name: product.name,
+        unit: product.unit || "EA",
+        shortfall: quantity ? parseFloat(quantity) : 1,
+        last_cost: product.last_cost || product.cost || 0,
+      }];
+
+      setInitialItemsForPO(initialItems);
+      setSelectedPO(null);
+      setShowPOModal(true);
+
+      // Ensure we're on the orders tab
+      setActiveTab("orders");
+
+      toast.info(`Creating PO for ${product.sku}`);
+    } else {
+      console.warn(`[AdminPurchasing] Product ID ${productId} not found in products list`);
+      toast.warning(`Product not found. Opening empty PO form.`);
+
+      // Still open the modal but without pre-filled data
+      setSelectedPO(null);
+      setShowPOModal(true);
+      setActiveTab("orders");
+    }
+
+    // Clear the URL params after processing
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("create_po");
+    newParams.delete("product_id");
+    newParams.delete("quantity");
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, products, setSearchParams, toast]);
 
   // Build shortage map from lowStockItems for PO modal product enhancement
   // This includes both reorder point shortages and MRP-driven shortages
@@ -408,13 +486,19 @@ export default function AdminPurchasing() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/v1/items?limit=2000`);
+      const res = await fetch(`${API_URL}/api/v1/items?limit=2000`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.ok) {
         const data = await res.json();
+        console.log(`[AdminPurchasing] Loaded ${data.items?.length || 0} products`);
         setProducts(data.items || []);
+      } else {
+        console.warn(`[AdminPurchasing] Failed to fetch products: ${res.status}`);
       }
-    } catch {
+    } catch (err) {
       // Products fetch failure is non-critical - product selector will just be empty
+      console.error("[AdminPurchasing] Error fetching products:", err);
     }
   };
 
@@ -1890,9 +1974,11 @@ export default function AdminPurchasing() {
           vendors={vendors}
           products={enhancedProducts}
           companySettings={companySettings}
+          initialItems={initialItemsForPO}
           onClose={() => {
             setShowPOModal(false);
             setSelectedPO(null);
+            setInitialItemsForPO([]); // Clear initial items when closing
           }}
           onSave={handleSavePO}
           onProductsRefresh={fetchProducts}

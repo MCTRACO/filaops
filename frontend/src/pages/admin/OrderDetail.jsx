@@ -714,7 +714,20 @@ export default function OrderDetail() {
       <BlockingIssuesPanel
         orderType="sales"
         orderId={order.id}
-        onActionClick={(action) => console.log('Blocking issue action:', action)}
+        onActionClick={(action) => {
+          // Navigate based on action reference type
+          if (action.reference_type === 'purchase_order') {
+            navigate(`/admin/purchasing?po_id=${action.reference_id}`);
+          } else if (action.reference_type === 'product') {
+            // Navigate to purchasing with product pre-selected for new PO
+            // Extract quantity from action impact (e.g., "Need 7 units")
+            const quantityMatch = action.impact?.match(/Need\s+([\d.]+)/);
+            const quantity = quantityMatch ? quantityMatch[1] : '';
+            navigate(`/admin/purchasing?create_po=true&product_id=${action.reference_id}${quantity ? `&quantity=${quantity}` : ''}`);
+          } else if (action.reference_type === 'production_order') {
+            navigate(`/admin/production/${action.reference_id}`);
+          }
+        }}
       />
 
       {/* Order Summary */}

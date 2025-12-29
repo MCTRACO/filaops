@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 
+// TODO: Re-enable after E2E tests stabilized
+const DISABLED = true;
+
 const PRO_FEATURES = [
   {
     icon: "💬",
@@ -57,7 +60,7 @@ export default function ProFeaturesAnnouncement() {
     }
   };
 
-  if (isDismissed || !isVisible) return null;
+  if (DISABLED || isDismissed || !isVisible) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">

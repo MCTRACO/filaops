@@ -8,10 +8,10 @@
 /// <reference types="node" />
 
 export const E2E_CONFIG = {
-  // Test credentials - must match backend seeded test user
-  email: process.env.E2E_ADMIN_EMAIL || 'e2e-test@filaops.local',
+  // Test credentials - must match backend test scenarios (backend/tests/scenarios.py)
+  email: process.env.E2E_ADMIN_EMAIL || 'admin@filaops.test',
   password: process.env.E2E_ADMIN_PASSWORD || 'TestPass123!',
-  name: 'E2E Test User',
+  name: 'Admin User',
 
   // API URLs
   baseUrl: (typeof process !== 'undefined' ? process.env.VITE_API_URL : undefined) || 'http://127.0.0.1:8000',

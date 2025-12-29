@@ -12,8 +12,8 @@
 ✅ = Complete    🔄 = In Progress    ⏳ = Pending    ❌ = Blocked
 
 Week 1: Foundation                    ✅ COMPLETE
-Week 2: Demand Pegging               🔄 Backend done, UI-102 pending
-Week 3: Blocking Issues              ✅ APIs COMPLETE (API-201 + API-202)
+Week 2: Demand Pegging               ✅ COMPLETE (API-101, UI-101, UI-102, E2E-101)
+Week 3: Blocking Issues              ✅ COMPLETE (API-201/202, UI-201/202/203/204, E2E-201)
 Week 4: Sales Order Fulfillment      ⏳ Not started  
 Week 5: Smart Production Queue       ⏳ Not started
 Week 6: Command Center               ⏳ Not started
@@ -94,19 +94,28 @@ Tests: 8 passing
 
 ---
 
-### Week 3: Blocking Issues 🔄 IN PROGRESS
+### Week 3: Blocking Issues ✅ COMPLETE
 
 > **Pivot:** Original Week 3 was "Production Context". Moved to "Blocking Issues" first 
 > since it delivers more immediate user value (answers "Why can't we ship?")
 
 | Ticket | Description | Status | Notes |
 |--------|-------------|--------|-------|
-| API-201 | SO Blocking Issues | ✅ | **COMPLETE** - 7 tests, doc: `09-API-201` |
-| API-202 | PO Blocking Issues | ✅ | **COMPLETE** - 8 tests, doc: `11-API-202` |
-| UI-201 | BlockingIssuesPanel | ⏳ | |
-| E2E-201 | Blocking issues flow | ⏳ | |
+| API-201 | SO Blocking Issues | ✅ | 7 tests, doc: `09-API-201` |
+| API-202 | PO Blocking Issues | ✅ | 8 tests, doc: `11-API-202` |
+| UI-201 | BlockingIssuesPanel | ✅ | commit `407586e` |
+| UI-202 | Wire into SO page | ✅ | Integrated with suggested actions |
+| UI-203 | Wire into PO page | ✅ | Integrated with suggested actions |
+| UI-204 | Suggested Actions Navigation | ✅ | Pre-filled PO modal from shortage |
+| E2E-201 | Blocking issues flow | ✅ | 4 tests passing |
 
-**Checkpoint:** Users can see what's blocking orders ⏳
+**Checkpoint:** Users can see what's blocking orders ✅
+
+**Key Learnings (for future E2E tests):**
+- Backend rate-limits login to 5/minute - seed once, login sparingly
+- Use `beforeAll` for seeding, not per-test cleanup/seed
+- API port is 8000, not 8001
+- SO detail uses query params (`?so_id=123`), not path params
 
 **APIs:**
 ```
@@ -204,8 +213,17 @@ Tests: 8 passing
 | `07-UI-101-itemcard-component.md` | ItemCard component | ✅ Done |
 | `08-E2E-101-demand-pegging-flow.md` | E2E test guide | ✅ Done |
 | `09-API-201-so-blocking-issues.md` | SO blocking issues | ✅ Done |
-| `10-UI-102-itemcard-integration.md` | ItemCard page integration | ⏳ Ready |
+| `10-UI-102-itemcard-integration.md` | ItemCard page integration | ✅ Done |
 | `11-API-202-po-blocking-issues.md` | PO blocking issues | ✅ Done |
+| `12-E2E-201-blocking-issues.md` | Blocking issues E2E tests | ✅ Done |
+| `week4/00-week4-overview.md` | Week 4 overview & gotchas | Reference |
+| `week4/01-API-301-fulfillment-status.md` | Single order fulfillment API | ⏳ Pending |
+| `week4/02-API-302-bulk-fulfillment.md` | Bulk fulfillment in list | ⏳ Pending |
+| `week4/03-API-303-enhanced-so-list.md` | Filtering & sorting | ⏳ Pending |
+| `week4/04-UI-301-salesordercard.md` | SalesOrderCard component | ⏳ Pending |
+| `week4/05-UI-302-detail-status.md` | Detail page integration | ⏳ Pending |
+| `week4/06-UI-303-list-integration.md` | List page integration | ⏳ Pending |
+| `week4/07-E2E-301-fulfillment-tests.md` | Fulfillment E2E tests | ⏳ Pending |
 
 ---
 
@@ -225,6 +243,7 @@ Tests: 8 passing
 | TBD | E2E-101 | Demand pegging tests (7 tests) |
 | TBD | API-201 | SO blocking issues (7 tests) |
 | TBD | API-202 | PO blocking issues (8 tests) |
+| 407586e | UI-201 | BlockingIssuesPanel component |
 
 ---
 
@@ -301,26 +320,32 @@ frontend/
 
 ---
 
-## Next Steps: UI Integration Sprint
+## Next Steps: Week 4 - Sales Order Fulfillment
 
-**Backend APIs Complete for Now:**
-- ✅ API-101: Item Demand Summary
+**Week 3 Complete!**
 - ✅ API-201: SO Blocking Issues  
 - ✅ API-202: PO Blocking Issues
+- ✅ UI-201/202/203/204: BlockingIssuesPanel + suggested actions
+- ✅ E2E-201: 4 tests passing
 
-**UI Sprint Tasks (in order):**
-1. **UI-102:** Wire ItemCard into Items page (doc ready: `10-UI-102`)
-2. **UI-201:** Build BlockingIssuesPanel component
-3. **UI-202:** Wire BlockingIssuesPanel into SO detail page
-4. **UI-203:** Wire BlockingIssuesPanel into PO detail page
-5. **E2E-201:** Full blocking issues flow tests
-
-**Goal:** Make all backend work visible to users.
-
-**After UI Sprint:** 
-1. Wait for all CI tests to pass
-2. Merge to main
+**Before Starting Week 4:**
+1. Run full CI suite to verify no regressions
+2. Merge `feat/ui-redesign` → `main`
 3. Tag `v2.1.0-demand-pegging`
+4. Create fresh branch: `feat/week4-fulfillment`
+
+**Week 4 Tasks (in order):**
+1. **API-301:** Single order fulfillment status endpoint
+2. **API-302:** Bulk fulfillment in list (query param)
+3. **API-303:** Filtering & sorting by fulfillment state
+4. **UI-301:** SalesOrderCard component
+5. **UI-302:** Detail page fulfillment progress
+6. **UI-303:** List page with card grid
+7. **E2E-301:** Fulfillment flow tests
+
+**See:** `docs/UI_Refactor/week4/` for detailed specs
+
+**Goal:** Users can see fulfillment progress on SO list and detail pages.
 
 ---
 
@@ -375,9 +400,10 @@ main (stable, deployed)
     ├── E2E-101 ✅
     ├── API-201 ✅
     ├── API-202 ✅
-    ├── UI-102 🔄 ←─ NEXT
-    ├── UI-201 ⏳
-    ├── UI-202 ⏳
+    ├── UI-102 ✅
+    ├── UI-201 ✅
+    ├── UI-202 🔄 ←─ NEXT
+    ├── UI-203 🔄 ←─ NEXT
     └── E2E-201 ⏳
 ```
 

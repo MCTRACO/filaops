@@ -32,6 +32,8 @@ from app.schemas.item import (
     ItemBulkUpdateRequest,
     MaterialItemCreate,
 )
+from app.schemas.item_demand import ItemDemandSummary
+from app.services.item_demand import get_item_demand_summary
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -956,6 +958,34 @@ async def get_low_stock_items(
             "total_shortfall_value": total_shortfall_value,
         }
     }
+
+
+@router.get("/{item_id}/demand-summary", response_model=ItemDemandSummary)
+async def get_demand_summary(
+    item_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Get demand summary for an inventory item.
+
+    Returns:
+    - Current on-hand quantity
+    - Allocated quantity (from active production orders)
+    - Available quantity (on_hand - allocated)
+    - Incoming quantity (from open purchase orders)
+    - Projected quantity (available + incoming)
+    - List of allocations with linked sales orders
+    - List of incoming supply
+    - Shortage information if applicable
+
+    This endpoint provides full demand pegging visibility for supply chain planning.
+    """
+    summary = get_item_demand_summary(db, item_id)
+
+    if summary is None:
+        raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
+
+    return summary
 
 
 @router.get("/{item_id}", response_model=ItemResponse)

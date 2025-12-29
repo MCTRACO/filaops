@@ -1055,6 +1055,51 @@ async def get_required_orders_for_sales_order(
 
 
 # ============================================================================
+# ENDPOINT: Get Blocking Issues Analysis (API-201)
+# ============================================================================
+
+from app.schemas.blocking_issues import SalesOrderBlockingIssues
+from app.services.blocking_issues import get_sales_order_blocking_issues
+
+
+@router.get("/{order_id}/blocking-issues", response_model=SalesOrderBlockingIssues)
+async def get_blocking_issues(
+    order_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get blocking issues analysis for a sales order.
+
+    Analyzes what's preventing fulfillment and returns:
+    - Status summary (can_fulfill, blocking_count, estimated_ready_date)
+    - Per-line breakdown of blocking issues
+    - Prioritized resolution actions
+
+    Issue types:
+    - production_incomplete: Work order exists but not finished
+    - production_missing: No work order created for make item
+    - material_shortage: Insufficient material for production
+    - purchase_pending: PO exists but not yet received
+
+    Resolution actions are prioritized:
+    1. Expedite pending purchase orders
+    2. Create purchase orders for shortages without POs
+    3. Complete incomplete production orders
+    4. Create missing production orders
+    """
+    result = get_sales_order_blocking_issues(db, order_id)
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Sales order {order_id} not found"
+        )
+
+    return result
+
+
+# ============================================================================
 # ENDPOINT: Update Order Status (Admin)
 # ============================================================================
 
