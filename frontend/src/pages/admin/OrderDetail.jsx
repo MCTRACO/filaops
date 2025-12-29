@@ -14,6 +14,7 @@ import { useToast } from "../../components/Toast";
 import RecordPaymentModal from "../../components/payments/RecordPaymentModal";
 import ActivityTimeline from "../../components/ActivityTimeline";
 import ShippingTimeline from "../../components/ShippingTimeline";
+import BlockingIssuesPanel from "../../components/orders/BlockingIssuesPanel";
 
 export default function OrderDetail() {
   const { orderId } = useParams();
@@ -708,6 +709,13 @@ export default function OrderDetail() {
           </div>
         )}
       </div>
+
+      {/* Blocking Issues Panel */}
+      <BlockingIssuesPanel
+        orderType="sales"
+        orderId={order.id}
+        onActionClick={(action) => console.log('Blocking issue action:', action)}
+      />
 
       {/* Order Summary */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
