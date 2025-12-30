@@ -12,32 +12,53 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe.serial('E2E-201: Blocking Issues Flow', () => {
 
+  // Store auth token to reuse across tests (avoid rate limiting)
+  let authToken: string | null = null;
+
   // Seed once before all tests in this file
-  test.beforeAll(async () => {
+  test.beforeAll(async ({ request }) => {
     await cleanupTestData();
     await seedTestScenario('low-stock-with-allocations');
-  });
 
-  // Helper: login via UI
-  async function loginAsAdmin(page: any) {
-    await page.goto('http://localhost:5173/admin/login');
-    await page.getByRole('textbox', { name: 'Email Address' }).fill('admin@filaops.test');
-    await page.getByRole('textbox', { name: 'Password' }).fill('TestPass123!');
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await expect(page).toHaveURL(/\/admin(?!\/login)/);
-  }
-
-  // Helper: get token via API (no browser needed)
-  async function getApiToken(request: any): Promise<string> {
+    // Get auth token once via API to avoid rate limiting browser logins
     const response = await request.post('http://127.0.0.1:8000/api/v1/auth/login', {
       form: {
         username: 'admin@filaops.test',
         password: 'TestPass123!',
       },
     });
-    expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    return data.access_token;
+    if (response.ok()) {
+      const data = await response.json();
+      authToken = data.access_token;
+    }
+  });
+
+  // Helper: login via stored token (fast, no rate limit)
+  async function loginAsAdmin(page: any) {
+    await page.goto('http://localhost:5173/admin/login');
+
+    // Inject token directly instead of filling form
+    if (authToken) {
+      await page.evaluate((token: string) => {
+        localStorage.setItem('adminToken', token);
+      }, authToken);
+      await page.goto('http://localhost:5173/admin/orders');
+      await expect(page).toHaveURL(/\/admin\/orders/);
+    } else {
+      // Fallback to form login if token not available
+      await page.getByRole('textbox', { name: 'Email Address' }).fill('admin@filaops.test');
+      await page.getByRole('textbox', { name: 'Password' }).fill('TestPass123!');
+      await page.getByRole('button', { name: 'Sign In' }).click();
+      await expect(page).toHaveURL(/\/admin(?!\/login)/);
+    }
+  }
+
+  // Helper: get token (reuses cached token from beforeAll)
+  function getApiToken(): string {
+    if (!authToken) {
+      throw new Error('Auth token not available - beforeAll may have failed');
+    }
+    return authToken;
   }
 
   // =====================
@@ -121,8 +142,8 @@ test.describe.serial('E2E-201: Blocking Issues Flow', () => {
   // API Tests: Use direct API auth (no browser login needed)
   // =====================
   test('API-201 & API-202: blocking-issues endpoints return correct structure', async ({ request }) => {
-    // Get token directly from API
-    const token = await getApiToken(request);
+    // Get cached token (from beforeAll)
+    const token = getApiToken();
 
     // --- API-201: SO blocking-issues ---
     const soListResponse = await request.get('http://127.0.0.1:8000/api/v1/sales-orders/', {

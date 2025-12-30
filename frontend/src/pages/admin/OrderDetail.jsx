@@ -15,6 +15,8 @@ import RecordPaymentModal from "../../components/payments/RecordPaymentModal";
 import ActivityTimeline from "../../components/ActivityTimeline";
 import ShippingTimeline from "../../components/ShippingTimeline";
 import BlockingIssuesPanel from "../../components/orders/BlockingIssuesPanel";
+import FulfillmentProgress from "../../components/orders/FulfillmentProgress";
+import { useFulfillmentStatus } from "../../hooks/useFulfillmentStatus";
 
 export default function OrderDetail() {
   const { orderId } = useParams();
@@ -69,6 +71,14 @@ export default function OrderDetail() {
   // Material availability check state
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [materialAvailability, setMaterialAvailability] = useState(null);
+
+  // Fulfillment status hook (UI-302)
+  const {
+    data: fulfillmentStatus,
+    loading: fulfillmentLoading,
+    error: fulfillmentError,
+    refetch: refetchFulfillment,
+  } = useFulfillmentStatus(orderId);
 
   useEffect(() => {
     if (orderId) {
@@ -709,6 +719,15 @@ export default function OrderDetail() {
           </div>
         )}
       </div>
+
+      {/* Fulfillment Progress (UI-302) */}
+      <FulfillmentProgress
+        fulfillmentStatus={fulfillmentStatus}
+        loading={fulfillmentLoading}
+        error={fulfillmentError}
+        onRefresh={refetchFulfillment}
+        onShip={(type) => navigate(`/admin/shipping?orderId=${order.id}&mode=${type}`)}
+      />
 
       {/* Blocking Issues Panel */}
       <BlockingIssuesPanel

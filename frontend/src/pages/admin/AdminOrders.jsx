@@ -1,38 +1,26 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import SalesOrderWizard from "../../components/SalesOrderWizard";
 import { API_URL } from "../../config/api";
 import { useToast } from "../../components/Toast";
 import { validateLength } from "../../utils/validation";
-
-const statusColors = {
-  pending: "bg-yellow-500/20 text-yellow-400",
-  confirmed: "bg-blue-500/20 text-blue-400",
-  in_production: "bg-purple-500/20 text-purple-400",
-  ready_to_ship: "bg-cyan-500/20 text-cyan-400",
-  shipped: "bg-green-500/20 text-green-400",
-  completed: "bg-green-500/20 text-green-400",
-  cancelled: "bg-red-500/20 text-red-400",
-};
-
-const paymentColors = {
-  pending: "bg-yellow-500/20 text-yellow-400",
-  paid: "bg-green-500/20 text-green-400",
-  failed: "bg-red-500/20 text-red-400",
-  refunded: "bg-gray-500/20 text-gray-400",
-};
+import { SalesOrderCard } from "../../components/orders";
+import OrderFilters from "../../components/orders/OrderFilters";
 
 export default function AdminOrders() {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL-based filter/sort state (UI-303)
+  const fulfillmentFilter = searchParams.get("filter") || "";
+  const sortValue = searchParams.get("sort") || "fulfillment_priority:asc";
+  const searchQuery = searchParams.get("search") || "";
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({
-    status: "all",
-    search: "",
-  });
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   // Create order modal state
@@ -61,7 +49,8 @@ export default function AdminOrders() {
   // Fetch orders on mount, when filters change, or when navigating back to this page
   useEffect(() => {
     fetchOrders();
-  }, [filters.status, location.key]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fulfillmentFilter, sortValue, location.key]);
 
   const fetchOrders = async () => {
     if (!token) return;
@@ -69,8 +58,19 @@ export default function AdminOrders() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.status !== "all") params.set("status", filters.status);
+      // Include fulfillment status data (API-302)
+      params.set("include_fulfillment", "true");
       params.set("limit", "100");
+
+      // Fulfillment state filter (UI-303)
+      if (fulfillmentFilter) {
+        params.set("fulfillment_state", fulfillmentFilter);
+      }
+
+      // Sort by field:order (UI-303)
+      const [sortBy, sortOrder] = sortValue.split(":");
+      if (sortBy) params.set("sort_by", sortBy);
+      if (sortOrder) params.set("sort_order", sortOrder);
 
       const res = await fetch(`${API_URL}/api/v1/sales-orders/?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -165,49 +165,51 @@ export default function AdminOrders() {
     }
   };
 
+  // Client-side search filter (API handles fulfillment filter)
   const filteredOrders = orders.filter((o) => {
-    if (!filters.search) return true;
-    const search = filters.search.toLowerCase();
+    if (!searchQuery) return true;
+    const search = searchQuery.toLowerCase();
     return (
       o.order_number?.toLowerCase().includes(search) ||
       o.product_name?.toLowerCase().includes(search) ||
+      o.customer_name?.toLowerCase().includes(search) ||
       o.user?.email?.toLowerCase().includes(search)
     );
   });
 
-  const getNextStatus = (currentStatus) => {
-    // SO can only be manually advanced to "confirmed"
-    // Other transitions happen automatically based on WO status:
-    // - in_production: when WO is created
-    // - ready_to_ship: when WO completes QC
-    // - shipped: when ship action is taken
-    // - completed: after shipment
-    const flow = {
-      pending: "confirmed",
-      // Don't allow manual advancement past confirmed - these are driven by WO/shipping
-      // confirmed: "in_production",  // REMOVED - happens when WO created
-      // in_production: "ready_to_ship",  // REMOVED - happens when WO completes
-      // ready_to_ship: "shipped",  // REMOVED - happens in shipping workflow
-    };
-    return flow[currentStatus] || null;
+  // URL state handlers (UI-303)
+  const handleFilterChange = (newFilter) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (newFilter) {
+      newParams.set("filter", newFilter);
+    } else {
+      newParams.delete("filter");
+    }
+    setSearchParams(newParams);
   };
 
-  const getStatusLabel = (status) => {
-    const labels = {
-      pending: "Pending",
-      confirmed: "Confirmed",
-      in_production: "In Production",
-      ready_to_ship: "Ready to Ship",
-      shipped: "Shipped",
-      completed: "Completed",
-      cancelled: "Cancelled",
-    };
-    return labels[status] || status?.replace(/_/g, " ");
+  const handleSortChange = (newSort) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set("sort", newSort);
+    setSearchParams(newParams);
   };
 
-  // Check if order can be cancelled
-  const canCancelOrder = (order) => {
-    return ["pending", "confirmed", "on_hold"].includes(order.status);
+  const handleSearchChange = (newSearch) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (newSearch) {
+      newParams.set("search", newSearch);
+    } else {
+      newParams.delete("search");
+    }
+    setSearchParams(newParams);
+  };
+
+  const handleViewDetails = (orderId) => {
+    navigate(`/admin/orders/${orderId}`);
+  };
+
+  const handleShip = (orderId) => {
+    navigate(`/admin/shipping?orderId=${orderId}`);
   };
 
   // Handle cancel order
@@ -335,32 +337,15 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-4 bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <div className="flex-1">
-          <input
-            type="text"
-            placeholder="Search by order number, product, or customer..."
-            value={filters.search}
-            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-500"
-          />
-        </div>
-        <select
-          value={filters.status}
-          onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
-        >
-          <option value="all">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="confirmed">Confirmed</option>
-          <option value="in_production">In Production</option>
-          <option value="ready_to_ship">Ready to Ship</option>
-          <option value="shipped">Shipped</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-      </div>
+      {/* Filters (UI-303) */}
+      <OrderFilters
+        selectedFilter={fulfillmentFilter}
+        onFilterChange={handleFilterChange}
+        selectedSort={sortValue}
+        onSortChange={handleSortChange}
+        search={searchQuery}
+        onSearchChange={handleSearchChange}
+      />
 
       {/* Error */}
       {error && (
@@ -382,136 +367,44 @@ export default function AdminOrders() {
         </div>
       )}
 
-      {/* Orders Table */}
+      {/* Orders Card Grid (UI-303) */}
       {!loading && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-800/50">
-              <tr>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
-                  Order #
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
-                  Customer
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
-                  Product
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
-                  Qty
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
-                  Total
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
-                  Status
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
-                  Payment
-                </th>
-                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">
-                  Created
-                </th>
-                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+        <>
+          {filteredOrders.length === 0 ? (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center">
+              <svg
+                className="w-12 h-12 mx-auto text-gray-600 mb-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
+              <p className="text-gray-500 text-lg">No orders found</p>
+              <p className="text-gray-600 text-sm mt-1">
+                {fulfillmentFilter
+                  ? "Try adjusting your filters"
+                  : "Create a new order to get started"}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredOrders.map((order) => (
-                <tr
+                <SalesOrderCard
                   key={order.id}
-                  className="border-b border-gray-800 hover:bg-gray-800/50"
-                >
-                  <td className="py-3 px-4 text-white font-medium">
-                    {order.order_number}
-                  </td>
-                  <td className="py-3 px-4 text-gray-400">
-                    {order.user?.email || "N/A"}
-                  </td>
-                  <td className="py-3 px-4 text-gray-300">
-                    {order.product_name}
-                  </td>
-                  <td className="py-3 px-4 text-gray-400">{order.quantity}</td>
-                  <td className="py-3 px-4 text-green-400 font-medium">
-                    $
-                    {parseFloat(
-                      order.grand_total || order.total_price || 0
-                    ).toFixed(2)}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        statusColors[order.status] ||
-                        "bg-gray-500/20 text-gray-400"
-                      }`}
-                    >
-                      {order.status?.replace(/_/g, " ")}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        paymentColors[order.payment_status] ||
-                        "bg-gray-500/20 text-gray-400"
-                      }`}
-                    >
-                      {order.payment_status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-gray-500 text-sm">
-                    {new Date(order.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="py-3 px-4 text-right space-x-2">
-                    <button
-                      onClick={() => navigate(`/admin/orders/${order.id}`)}
-                      className="text-blue-400 hover:text-blue-300 text-sm"
-                    >
-                      View
-                    </button>
-                    {/* Only show advance button for non-terminal states */}
-                    {!["completed", "cancelled"].includes(order.status) &&
-                      getNextStatus(order.status) && (
-                        <button
-                          onClick={() =>
-                            handleStatusUpdate(
-                              order.id,
-                              getNextStatus(order.status)
-                            )
-                          }
-                          className="text-green-400 hover:text-green-300 text-sm"
-                          title={`Advance to: ${getStatusLabel(
-                            getNextStatus(order.status)
-                          )}`}
-                        >
-                          → {getStatusLabel(getNextStatus(order.status))}
-                        </button>
-                      )}
-                    {canCancelOrder(order) && (
-                      <button
-                        onClick={() => {
-                          setCancellingOrder(order);
-                          setShowCancelModal(true);
-                        }}
-                        className="text-yellow-400 hover:text-yellow-300 text-sm"
-                        title="Cancel order"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                  order={order}
+                  onViewDetails={handleViewDetails}
+                  onShip={handleShip}
+                />
               ))}
-              {filteredOrders.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center text-gray-500">
-                    No orders found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Create Order Wizard */}

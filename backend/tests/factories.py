@@ -56,7 +56,10 @@ def create_test_user(
     **overrides
 ) -> "User":
     """
-    Create a test user.
+    Create or get a test user (get-or-create semantics).
+
+    If user with given email already exists, returns the existing user.
+    This enables idempotent seeding for E2E tests.
 
     Args:
         db: Database session
@@ -66,14 +69,20 @@ def create_test_user(
         **overrides: Additional field overrides
 
     Returns:
-        Created User instance
+        Created or existing User instance
     """
     from app.models.user import User
 
     seq = _next("user")
+    target_email = email or f"testuser{seq}@example.com"
+
+    # Check if user already exists (idempotent for E2E tests)
+    existing = db.query(User).filter_by(email=target_email).first()
+    if existing:
+        return existing
 
     user = User(
-        email=email or f"testuser{seq}@example.com",
+        email=target_email,
         password_hash=hash_password(password),
         first_name=overrides.pop("first_name", f"Test{seq}"),
         last_name=overrides.pop("last_name", "User"),
