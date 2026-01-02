@@ -41,6 +41,27 @@ def require_test_mode():
     return True
 
 
+def require_data_wipe_allowed():
+    """
+    Dependency that requires explicit ALLOW_TEST_DATA_WIPE=true.
+
+    This is a safety mechanism to prevent accidental data loss.
+    Only set this in test/CI environments, NEVER in development with real data.
+
+    Raises HTTPException 403 if flag is not set.
+    """
+    allow_wipe = os.getenv("ALLOW_TEST_DATA_WIPE", "false").lower()
+    if allow_wipe != "true":
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Data wipe not allowed. Set ALLOW_TEST_DATA_WIPE=true to enable. "
+                "WARNING: This will delete ALL data from the database!"
+            )
+        )
+    return True
+
+
 # =============================================================================
 # SCHEMAS
 # =============================================================================
@@ -138,14 +159,16 @@ async def seed_test_data(
 @router.post("/cleanup", response_model=CleanupResponse)
 async def cleanup_data(
     db: Session = Depends(get_db),
-    _: bool = Depends(require_test_mode)
+    _test_mode: bool = Depends(require_test_mode),
+    _wipe_allowed: bool = Depends(require_data_wipe_allowed)
 ):
     """
     Remove all test data from the database.
 
-    WARNING: This truncates tables! Only use on test database.
+    WARNING: This truncates tables! Requires ALLOW_TEST_DATA_WIPE=true.
 
     Use this endpoint to clean up between E2E tests.
+    Only enable the wipe flag in test/CI environments.
     """
     from tests.scenarios import cleanup_test_data
 

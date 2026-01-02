@@ -30,6 +30,7 @@ from app.api.v1.endpoints import (
     spools,
     traceability,
     maintenance,
+    command_center,
     # license,  # Disabled until ready for production
 )
 from app.api.v1.endpoints.admin import router as admin_router
@@ -183,6 +184,13 @@ router.include_router(
     maintenance.router,
     prefix="/maintenance",
     tags=["maintenance"]
+)
+
+# Command Center (dashboard)
+router.include_router(
+    command_center.router,
+    prefix="/command-center",
+    tags=["command-center"]
 )
 
 # License activation (disabled until ready for production)
