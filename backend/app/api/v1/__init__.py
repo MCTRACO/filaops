@@ -134,12 +134,14 @@ router.include_router(
 # Vendor Items (SKU mapping for invoice parsing)
 router.include_router(
     vendor_items.router,
+    prefix="/purchase-orders",
     tags=["purchase-orders"]
 )
 
 # Invoice Import (parse invoices to create POs)
 router.include_router(
     invoice_import.router,
+    prefix="/purchase-orders",
     tags=["purchase-orders"]
 )
 
