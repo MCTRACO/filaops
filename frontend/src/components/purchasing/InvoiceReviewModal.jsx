@@ -139,13 +139,14 @@ export default function InvoiceReviewModal({
       }
 
       // Add JSON payload
+      const token = localStorage.getItem("auth_token");
       const response = await fetch(
         `${API_URL}/api/v1/purchase-orders/invoices/create-po`,
         {
           method: "POST",
-          credentials: "include",
           headers: {
             "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify(payload),
         }
