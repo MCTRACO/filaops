@@ -4,7 +4,9 @@ Test script to verify the purchase_uom fix for cost calculations.
 Run this after applying the migration to ensure costs are calculated correctly.
 """
 import sys
+import os
 sys.path.insert(0, '.')
+import pytest
 
 from decimal import Decimal
 from sqlalchemy.orm import Session
@@ -16,6 +18,10 @@ from app.services.inventory_service import (
 )
 
 
+@pytest.mark.skipif(
+    os.getenv('TESTING', '').lower() == 'true',
+    reason='Skips in CI - requires live database with migration 035 applied'
+)
 def test_cost_conversion():
     """Test that cost conversion works correctly for filaments."""
     db = SessionLocal()
