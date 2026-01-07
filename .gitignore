@@ -188,6 +188,7 @@ docs/sop/
 !start-all.ps1
 !install.ps1
 !install-frontend.ps1
+!installer/scripts/*.ps1
 
 # Temp/generated HTML files (specific paths only)
 frontend/dist/**/*.html
