@@ -19,7 +19,6 @@ from sqlalchemy import desc
 
 from app.db.session import get_db
 from app.logging_config import get_logger
-from app.services.google_drive import get_drive_service
 from app.models.purchase_order import PurchaseOrder
 from app.models.purchase_order_document import PurchaseOrderDocument
 from app.api.v1.endpoints.auth import get_current_user
