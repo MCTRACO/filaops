@@ -2726,7 +2726,7 @@ async def list_shipping_events(
     for event in events:
         user_name = None
         if event.user_id and event.user:
-            user_name = event.user.name or event.user.email
+            user_name = f"{event.user.first_name or ''} {event.user.last_name or ''}".strip() or event.user.email
 
         items.append(ShippingEventResponse(
             id=event.id,
@@ -2790,7 +2790,7 @@ async def add_shipping_event(
     db.commit()
     db.refresh(event)
 
-    user_name = current_user.name or current_user.email
+    user_name = f"{current_user.first_name or ''} {current_user.last_name or ''}".strip() or current_user.email
 
     logger.info(f"Added shipping event '{request.event_type.value}' to order {order.order_number}")
 
