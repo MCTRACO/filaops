@@ -21,7 +21,7 @@ class VersionManager:
     """Manages FilaOps version information and update checking"""
 
     GITHUB_REPO = "Blb3D/filaops"
-    FALLBACK_VERSION = "1.6.0"
+    FALLBACK_VERSION = "2.0.1"  # Update this when releasing new versions
 
     # Server-side cache for GitHub API responses (to avoid rate limiting)
     _update_cache: Optional[Dict[str, Any]] = None
