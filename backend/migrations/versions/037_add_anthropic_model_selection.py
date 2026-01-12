@@ -21,15 +21,22 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add anthropic model column to company_settings."""
-    op.add_column(
-        'company_settings',
-        sa.Column(
-            'ai_anthropic_model',
-            sa.String(length=100),
-            nullable=True,
-            server_default='claude-sonnet-4-20250514'
+    # Check if column already exists (defensive - handles inconsistent migration states)
+    conn = op.get_bind()
+    result = conn.execute(sa.text("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'company_settings' AND column_name = 'ai_anthropic_model'
+    """))
+    if result.fetchone() is None:
+        op.add_column(
+            'company_settings',
+            sa.Column(
+                'ai_anthropic_model',
+                sa.String(length=100),
+                nullable=True,
+                server_default='claude-sonnet-4-20250514'
+            )
         )
-    )
 
 
 def downgrade() -> None:
