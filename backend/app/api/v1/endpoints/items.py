@@ -36,8 +36,6 @@ from app.schemas.item_demand import ItemDemandSummary
 from app.services.item_demand import get_item_demand_summary
 from app.core.uom_config import (
     DEFAULT_MATERIAL_UOM,
-    get_uom_config,
-    is_material,
     get_default_material_sku_prefix,
 )
 

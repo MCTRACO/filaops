@@ -10,7 +10,6 @@ from decimal import Decimal
 from app.models.product import Product
 from app.core.uom_config import (
     is_material as _is_material,
-    get_uom_config_for_product,
     get_inventory_value_for_product,
     DEFAULT_MATERIAL_UOM,
 )

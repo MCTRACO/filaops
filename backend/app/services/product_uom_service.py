@@ -13,8 +13,6 @@ from sqlalchemy.orm import Session
 from app.models.product import Product
 from app.models.item_category import ItemCategory
 from app.core.uom_config import (
-    DEFAULT_MATERIAL_UOM,
-    DEFAULT_UOM,
     get_uom_config,
     is_material,
     validate_material_uom,
