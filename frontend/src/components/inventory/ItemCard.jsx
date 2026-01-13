@@ -28,10 +28,10 @@ function QuantityBox({ label, value, highlight = false, muted = false, status })
   const colors = status ? getStatusColors(status) : null;
 
   return (
-    <div className="text-center">
-      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
+    <div className="text-center min-w-0 overflow-hidden">
+      <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide truncate">{label}</p>
       <p className={`
-        text-lg font-semibold
+        text-base sm:text-lg font-semibold truncate
         ${highlight && colors ? colors.text : ''}
         ${muted ? 'text-gray-600' : 'text-white'}
       `}>
@@ -247,18 +247,18 @@ export function ItemCard({
       onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between mb-3 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <StatusDot status={status} />
-          <div>
-            <h3 className="font-semibold text-white">{data.sku}</h3>
-            <p className="text-sm text-gray-400">{data.name}</p>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-white truncate">{data.sku}</h3>
+            <p className="text-sm text-gray-400 truncate">{data.name}</p>
           </div>
         </div>
       </div>
 
       {/* Quantity Grid */}
-      <div className="grid grid-cols-4 gap-2 mb-3">
+      <div className="grid grid-cols-4 gap-1 sm:gap-2 mb-3">
         <QuantityBox label="On Hand" value={data.quantities.on_hand} />
         <QuantityBox label="Allocated" value={data.quantities.allocated} />
         <QuantityBox
