@@ -40,6 +40,57 @@ def get_item_on_hand(db: Session, product_id: int) -> Decimal:
     return Decimal(str(result or 0))
 
 
+def get_allocated_quantity(db: Session, product_id: int) -> Decimal:
+    """
+    Get total allocated quantity for a product from active production orders.
+
+    Calculates allocation based on active work orders that consume this
+    product as a BOM component. This is the accurate allocation vs the
+    Inventory.allocated_quantity column which may be stale.
+    """
+    # Find all BOMs that use this product as a component
+    bom_lines_using_product = db.query(
+        BOMLine.bom_id,
+        BOMLine.quantity
+    ).filter(
+        BOMLine.component_id == product_id
+    ).subquery()
+
+    # Get the parent products from those BOMs
+    boms_using_product = db.query(
+        BOM.product_id,
+        bom_lines_using_product.c.quantity
+    ).join(
+        bom_lines_using_product,
+        BOM.id == bom_lines_using_product.c.bom_id
+    ).filter(
+        BOM.active == True  # noqa: E712
+    ).subquery()
+
+    # Active production order statuses
+    active_statuses = ['draft', 'released', 'scheduled', 'in_progress']
+
+    # Sum up allocation from all active production orders
+    result = db.query(
+        func.coalesce(
+            func.sum(
+                (ProductionOrder.quantity_ordered -
+                 func.coalesce(ProductionOrder.quantity_completed, 0) -
+                 func.coalesce(ProductionOrder.quantity_scrapped, 0)) *
+                boms_using_product.c.quantity
+            ),
+            0
+        )
+    ).select_from(ProductionOrder).join(
+        boms_using_product,
+        ProductionOrder.product_id == boms_using_product.c.product_id
+    ).filter(
+        ProductionOrder.status.in_(active_statuses)
+    ).scalar()
+
+    return Decimal(str(result or 0))
+
+
 def get_production_order_allocations(db: Session, product_id: int) -> List[AllocationDetail]:
     """
     Get all active production orders that consume this product.

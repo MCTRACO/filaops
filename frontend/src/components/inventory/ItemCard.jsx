@@ -301,30 +301,40 @@ export function ItemCard({
       </div>
 
       {/* Info Badges - Stocking Policy & On Order */}
-      <div className="mt-3 flex flex-wrap justify-center gap-2">
-        {/* Stocking Policy Badge */}
-        {data.stocking_policy === 'stocked' && (
-          <span className="inline-flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 px-2 py-1 rounded-full border border-purple-500/30">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-            Stocked
-            {data.reorder_point > 0 && (
-              <span className="text-purple-300">ROP: {data.reorder_point.toLocaleString()}</span>
-            )}
-          </span>
-        )}
+      {(() => {
+        const reorderPoint = parseFloat(data.reorder_point) || 0;
+        const incoming = data.quantities.incoming || 0;
+        const isStocked = data.stocking_policy === 'stocked' || reorderPoint > 0;
 
-        {/* On Order / Incoming Badge */}
-        {data.quantities.incoming > 0 && (
-          <span className="inline-flex items-center gap-1 text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded-full border border-blue-500/30">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            +{data.quantities.incoming.toLocaleString()} on order
-          </span>
-        )}
-      </div>
+        if (!isStocked && incoming <= 0) return null;
+
+        return (
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {/* Stocking Policy Badge - show if stocked or has reorder point */}
+            {isStocked && (
+              <span className="inline-flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 px-2 py-1 rounded-full border border-purple-500/30">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                Stocked
+                {reorderPoint > 0 && (
+                  <span className="text-purple-300 ml-1">ROP: {reorderPoint.toLocaleString()}</span>
+                )}
+              </span>
+            )}
+
+            {/* On Order / Incoming Badge */}
+            {incoming > 0 && (
+              <span className="inline-flex items-center gap-1 text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded-full border border-blue-500/30">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                +{incoming.toLocaleString()} on order
+              </span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Shortage Warning */}
       {data.shortage.is_short && (

@@ -33,7 +33,7 @@ from app.schemas.item import (
     MaterialItemCreate,
 )
 from app.schemas.item_demand import ItemDemandSummary
-from app.services.item_demand import get_item_demand_summary
+from app.services.item_demand import get_item_demand_summary, get_allocated_quantity
 from app.core.uom_config import (
     DEFAULT_MATERIAL_UOM,
     get_default_material_sku_prefix,
@@ -423,16 +423,17 @@ async def list_items(
     # Build response with inventory info
     result = []
     for item in items:
-        # Get inventory totals
+        # Get inventory on-hand totals
         inv = db.query(
             func.coalesce(func.sum(Inventory.on_hand_quantity), 0).label("on_hand"),
-            func.coalesce(func.sum(Inventory.allocated_quantity), 0).label("allocated"),
         ).filter(Inventory.product_id == item.id).first()
 
         # STAR SCHEMA: Inventory stores GRAMS for materials, native unit for others
         # No conversion needed - inventory is already in transaction unit
         on_hand = float(inv.on_hand) if inv else 0
-        allocated = float(inv.allocated) if inv else 0
+
+        # Calculate allocated from active production orders (not stale Inventory.allocated_quantity)
+        allocated = float(get_allocated_quantity(db, item.id))
         
         # Check if material for reorder point conversion
         is_material = item.material_type_id is not None
