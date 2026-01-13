@@ -656,7 +656,20 @@ export default function AdminItems() {
   }, [selectedCategory, filters.itemType, filters.activeOnly]);
 
   // Server-side search is now used, so filteredItems is just items
-  const filteredItems = items;
+  // For card view, sort by stock status: Shortage -> Out of Stock -> Low Stock -> In Stock
+  const getItemStockStatus = (item) => {
+    const available = parseFloat(item.available_qty || 0);
+    const onHand = parseFloat(item.on_hand_qty || 0);
+
+    if (available < 0) return 0;  // Shortage (critical)
+    if (available === 0) return 1; // Out of Stock (short)
+    if (onHand > 0 && available < onHand * 0.2) return 2; // Low Stock (tight)
+    return 3; // In Stock (healthy)
+  };
+
+  const filteredItems = viewMode === "cards"
+    ? [...items].sort((a, b) => getItemStockStatus(a) - getItemStockStatus(b))
+    : items;
 
   // Debounced search - trigger fetch when search changes
   useEffect(() => {
