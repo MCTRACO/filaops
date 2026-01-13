@@ -81,6 +81,8 @@ class ItemDemandSummary(BaseModel):
     item_id: int
     sku: str
     name: str
+    stocking_policy: str = Field("on_demand", description="'stocked' or 'on_demand'")
+    reorder_point: Optional[Decimal] = Field(None, description="Reorder point for stocked items")
 
     quantities: QuantitySummary
     allocations: List[AllocationDetail]

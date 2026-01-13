@@ -261,6 +261,8 @@ def get_item_demand_summary(db: Session, item_id: int) -> Optional[ItemDemandSum
         item_id=product.id,
         sku=product.sku,
         name=product.name,
+        stocking_policy=product.stocking_policy or "on_demand",
+        reorder_point=product.reorder_point,
         quantities=QuantitySummary(
             on_hand=on_hand,
             allocated=allocated,
