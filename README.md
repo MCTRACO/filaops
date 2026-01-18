@@ -1,3 +1,10 @@
+> [!CAUTION]
+> **Security Notice:** Malicious forks of FilaOps exist. Only download from this official repository: `github.com/Blb3D/filaops`
+> 
+> We will NEVER ask you to download zip files from raw.githubusercontent.com links. If you see this, it's malware.
+> 
+> Verify releases at: https://github.com/Blb3D/filaops/releases
+
 # FilaOps - 3D Print Farm ERP
 
 > The ERP that understands additive manufacturing—built by a print farm, for print farms.
