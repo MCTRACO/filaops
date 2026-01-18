@@ -1,0 +1,142 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create release artifacts
+        run: |
+          mkdir -p dist
+          
+          # Create source tarball (excluding dev files)
+          tar -czvf dist/filaops-${{ steps.version.outputs.VERSION }}-source.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='__pycache__' \
+            --exclude='.pytest_cache' \
+            --exclude='*.pyc' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='dist' \
+            --exclude='venv' \
+            --exclude='.venv' \
+            .
+          
+          # Create backend-only package
+          tar -czvf dist/filaops-${{ steps.version.outputs.VERSION }}-backend.tar.gz \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='.env' \
+            backend/
+
+          # Create frontend-only package (if exists)
+          if [ -d "frontend" ]; then
+            tar -czvf dist/filaops-${{ steps.version.outputs.VERSION }}-frontend.tar.gz \
+              --exclude='node_modules' \
+              frontend/
+          fi
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz > SHA256SUMS.txt
+          echo "=== SHA256SUMS.txt ===" 
+          cat SHA256SUMS.txt
+
+      - name: Import GPG key
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --sign --armor --detach-sign dist/SHA256SUMS.txt
+          mv dist/SHA256SUMS.txt.asc dist/SHA256SUMS.txt.sig
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat << 'EOF' > release_notes.md
+          ## FilaOps ${{ steps.version.outputs.VERSION }}
+          
+          ### Installation
+          
+          See the [installation guide](https://github.com/Blb3D/filaops#installation) for setup instructions.
+          
+          ### Verify Your Download
+          
+          All releases include SHA256 checksums. Verify your download:
+          
+          ```bash
+          # Linux/macOS
+          sha256sum -c SHA256SUMS.txt
+          
+          # Windows PowerShell
+          Get-FileHash filaops-${{ steps.version.outputs.VERSION }}-source.tar.gz -Algorithm SHA256
+          ```
+          
+          ### GPG Verification (Optional)
+          
+          ```bash
+          # Import public key (one-time)
+          curl -s https://raw.githubusercontent.com/Blb3D/filaops/main/PUBLIC-KEY.asc | gpg --import
+          
+          # Verify signature
+          gpg --verify SHA256SUMS.txt.sig SHA256SUMS.txt
+          ```
+          
+          ---
+          
+          ⚠️ **Security Notice:** Only download FilaOps from this official repository.
+          See [SECURITY.md](https://github.com/Blb3D/filaops/blob/main/SECURITY.md) for details.
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
+            dist/SHA256SUMS.txt.sig
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## Release ${{ steps.version.outputs.VERSION }} Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          ls -la dist/ >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Checksums" >> $GITHUB_STEP_SUMMARY
+          cat dist/SHA256SUMS.txt >> $GITHUB_STEP_SUMMARY
