@@ -1,9 +1,23 @@
 > [!CAUTION]
-> **Security Notice:** Malicious forks of FilaOps exist. Only download from this official repository: `github.com/Blb3D/filaops`
+> ## ⚠️ Security Alert: Malicious Fork Detected
 > 
-> We will NEVER ask you to download zip files from raw.githubusercontent.com links. If you see this, it's malware.
+> A malicious actor has been distributing malware through a fake FilaOps repository for **2+ months**.
 > 
-> Verify releases at: https://github.com/Blb3D/filaops/releases
+> ### ✅ Official Sources ONLY
+> - **Repository:** `github.com/Blb3D/filaops` (you're here)
+> - **Releases:** [github.com/Blb3D/filaops/releases](https://github.com/Blb3D/filaops/releases)
+> 
+> ### 🚫 Known Malicious
+> - `github.com/printertechn/filaops` — **DO NOT DOWNLOAD**
+> 
+> ### Red Flags
+> - Downloads from `raw.githubusercontent.com` zip links
+> - Any GitHub account other than `Blb3D`
+> - "Documentation" or "Support" links pointing to zip files
+> 
+> **If you downloaded from an unofficial source, delete it and scan your system immediately.**
+> 
+> [Full Security Details](SECURITY.md) | [Verify Downloads](SECURITY.md#verifying-releases) | [Report Suspicious Forks](https://github.com/Blb3D/filaops/issues/new)
 
 # FilaOps - 3D Print Farm ERP
 
