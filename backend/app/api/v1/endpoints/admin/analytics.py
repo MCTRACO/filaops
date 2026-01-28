@@ -4,7 +4,7 @@ Pro-tier analytics endpoints
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from decimal import Decimal
 
@@ -73,7 +73,7 @@ async def get_analytics_dashboard(
     
     Returns revenue, customer, product, and profit metrics
     """
-    end_date = datetime.utcnow()
+    end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=days)
     prev_start = start_date - timedelta(days=days)
     

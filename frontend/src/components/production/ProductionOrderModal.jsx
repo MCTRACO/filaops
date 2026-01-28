@@ -476,7 +476,7 @@ export default function ProductionOrderModal({
               <StatusBadge status={productionOrder.status} />
             </div>
             <p className="text-gray-400 mt-1">
-              {productionOrder.product?.name || productionOrder.item?.name || 'Unknown Product'}
+              {productionOrder.product_name || productionOrder.product?.name || 'Unknown Product'}
               <span className="text-gray-500"> × </span>
               <span className="text-white font-mono">
                 {productionOrder.quantity_ordered}
@@ -577,7 +577,7 @@ export default function ProductionOrderModal({
                 {allMaterials.slice(0, 5).map((mat, idx) => (
                   <div key={idx} className="flex items-center justify-between text-sm">
                     <span className="text-gray-300">
-                      {mat.item_name || mat.item_code || 'Unknown'}
+                      {mat.component_name || mat.component_sku || 'Unknown'}
                       <span className="text-gray-500 ml-2">
                         × {mat.quantity_required} {mat.unit || ''}
                       </span>

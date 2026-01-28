@@ -1,3 +1,1 @@
-"""
-Integration tests for FilaOps ERP
-"""
+# Integration tests for transaction flows

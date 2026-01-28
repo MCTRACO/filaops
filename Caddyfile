@@ -1,7 +1,10 @@
-filaops.local {
-    # API requests go to the backend (port 8000)
-    @api path /api/* /docs /openapi.json /health
-    reverse_proxy @api localhost:8000
+filaops.blb3d.local {
+    # Use internal CA for local development HTTPS
+    tls internal
+
+    # API and static file requests go to the backend (port 10000)
+    @api path /api/* /docs /openapi.json /health /static/*
+    reverse_proxy @api localhost:10000
 
     # Everything else goes to the frontend (port 5173)
     reverse_proxy localhost:5173

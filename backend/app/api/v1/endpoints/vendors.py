@@ -3,7 +3,7 @@ Vendors API Endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Annotated, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
@@ -161,8 +161,8 @@ async def create_vendor(
         rating=request.rating,
         notes=request.notes,
         is_active=request.is_active,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
 
     db.add(vendor)
@@ -196,7 +196,7 @@ async def update_vendor(
     for field, value in update_data.items():
         setattr(vendor, field, value)
 
-    vendor.updated_at = datetime.utcnow()
+    vendor.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(vendor)
 
@@ -296,7 +296,7 @@ async def delete_vendor(
     if po_count > 0:
         # Soft delete
         vendor.is_active = False
-        vendor.updated_at = datetime.utcnow()
+        vendor.updated_at = datetime.now(timezone.utc)
         db.commit()
         return {"message": f"Vendor {vendor.code} deactivated (has {po_count} POs)"}
     else:

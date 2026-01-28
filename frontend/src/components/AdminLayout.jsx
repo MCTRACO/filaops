@@ -4,9 +4,11 @@ import ProFeaturesAnnouncement from "./ProFeaturesAnnouncement";
 // import UpdateNotification from "./UpdateNotification"; // TODO: Re-enable once upgrade endpoint exists
 import SecurityBadge from "./SecurityBadge";
 import useActivityTokenRefresh from "../hooks/useActivityTokenRefresh";
+import { useFeatureFlags } from "../hooks/useFeatureFlags";
 import { getCurrentVersion, getCurrentVersionSync, formatVersion } from "../utils/version";
 import { API_URL } from "../config/api";
 import logoNavbar from "../assets/logo_navbar.png";
+import logoBLB3D from "../assets/logo_blb3d.svg";
 
 const DashboardIcon = () => (
   <svg
@@ -370,18 +372,8 @@ const navGroups = [
     items: [
       { path: "/admin/orders", label: "Orders", icon: OrdersIcon },
       { path: "/admin/quotes", label: "Quotes", icon: QuotesIcon },
-      {
-        path: "/admin/payments",
-        label: "Payments",
-        icon: PaymentsIcon,
-        adminOnly: true,
-      },
-      {
-        path: "/admin/customers",
-        label: "Customers",
-        icon: CustomersIcon,
-        adminOnly: true,
-      },
+      { path: "/admin/payments", label: "Payments", icon: PaymentsIcon, adminOnly: true },
+      { path: "/admin/customers", label: "Customers", icon: CustomersIcon, adminOnly: true },
     ],
   },
   {
@@ -404,6 +396,12 @@ const navGroups = [
       {
         path: "/admin/inventory/transactions",
         label: "Transactions",
+        icon: InventoryIcon,
+        adminOnly: true,
+      },
+      {
+        path: "/admin/inventory/cycle-count",
+        label: "Cycle Count",
         icon: InventoryIcon,
         adminOnly: true,
       },
@@ -488,8 +486,17 @@ const navGroups = [
 
 export default function AdminLayout() {
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Persist sidebar state in localStorage
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem('sidebarOpen');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Save sidebar state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', JSON.stringify(sidebarOpen));
+  }, [sidebarOpen]);
 
   // Auto-refresh tokens when user is active to prevent losing work
   useActivityTokenRefresh();
@@ -534,15 +541,20 @@ export default function AdminLayout() {
     return () => clearInterval(interval);
   }, []);
 
-  // Filter nav items based on user role
+  // Filter nav items based on user role and tier
   const isAdmin = user?.account_type === "admin";
+  const { isPro } = useFeatureFlags();
 
-  // Filter groups and items based on admin status
+  // Filter groups and items based on admin status and tier
   const filteredNavGroups = navGroups
     .filter((group) => !group.adminOnly || isAdmin)
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !item.adminOnly || isAdmin),
+      items: group.items.filter((item) => {
+        if (item.adminOnly && !isAdmin) return false;
+        if (item.proOnly && !isPro) return false;
+        return true;
+      }),
     }))
     .filter((group) => group.items.length > 0);
 
@@ -574,12 +586,20 @@ export default function AdminLayout() {
 
   return (
     <>
+      {/* Skip to content link for keyboard accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-gray-900"
+      >
+        Skip to main content
+      </a>
       <ProFeaturesAnnouncement />
-      <div className="min-h-screen flex bg-gray-950">
+      <div className="min-h-screen flex" style={{ backgroundColor: 'var(--bg-primary)' }}>
         {/* Mobile menu button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden fixed top-4 left-4 z-50 bg-gray-800 p-2 rounded-lg text-white hover:bg-gray-700"
+          className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg text-white transition-all"
+          style={{ backgroundColor: 'var(--bg-card)' }}
         >
           <MenuIcon />
         </button>
@@ -591,16 +611,22 @@ export default function AdminLayout() {
             onClick={() => setMobileMenuOpen(false)}
           >
             <aside
-              className="w-64 h-full bg-gray-900 border-r border-gray-800"
+              className="w-64 h-full"
+              style={{ backgroundColor: 'var(--bg-secondary)', borderRight: '1px solid var(--border-subtle)' }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-                <Link to="/admin" className="flex items-center gap-2">
-                  <img src={logoNavbar} alt="FilaOps" className="h-40" />
+              <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                <Link to="/admin" className="flex items-center gap-3">
+                  {/* Dual logos - BLB3D + FilaOps */}
+                  <div className="logo-container">
+                    <img src={logoBLB3D} alt="BLB3D" className="h-10 w-auto logo-glow" />
+                  </div>
+                  <img src={logoNavbar} alt="FilaOps" className="h-32" />
                 </Link>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white"
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ color: 'var(--text-secondary)' }}
                 >
                   <svg
                     className="w-6 h-6"
@@ -621,7 +647,7 @@ export default function AdminLayout() {
                 {filteredNavGroups.map((group, groupIndex) => (
                   <div key={groupIndex} className={group.label ? "mt-4" : ""}>
                     {group.label && (
-                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                         {group.label}
                       </div>
                     )}
@@ -635,8 +661,8 @@ export default function AdminLayout() {
                           className={({ isActive }) =>
                             `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                               isActive
-                                ? "bg-gradient-to-r from-cyan-600/20 to-blue-600/20 text-white border border-cyan-500/30"
-                                : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                                ? "nav-item-active"
+                                : "nav-item"
                             }`
                           }
                         >
@@ -656,24 +682,43 @@ export default function AdminLayout() {
         <aside
           className={`hidden md:flex ${
             sidebarOpen ? "w-64" : "w-20"
-          } bg-gray-900 border-r border-gray-800 transition-all duration-300 flex-col h-screen sticky top-0`}
+          } transition-all duration-300 flex-col h-screen sticky top-0`}
+          style={{ backgroundColor: 'var(--bg-secondary)', borderRight: '1px solid var(--border-subtle)' }}
         >
-          <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-            <Link to="/admin" className="flex items-center gap-2">
-              <img src={logoNavbar} alt="FilaOps" className="h-40" />
+          <div className="p-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+            <Link to="/admin" className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center w-full'}`}>
+              {/* Dual logos - BLB3D + FilaOps */}
+              <div className="logo-container">
+                <img src={logoBLB3D} alt="BLB3D" className="h-10 w-auto logo-glow" />
+              </div>
+              {sidebarOpen && <img src={logoNavbar} alt="FilaOps" className="h-32" />}
             </Link>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
-            >
-              <MenuIcon />
-            </button>
+            {sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-2 rounded-lg transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <MenuIcon />
+              </button>
+            )}
           </div>
+          {!sidebarOpen && (
+            <div className="p-2 flex justify-center" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-2 rounded-lg transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <MenuIcon />
+              </button>
+            </div>
+          )}
           <nav className="flex-1 p-4 overflow-y-auto">
             {filteredNavGroups.map((group, groupIndex) => (
               <div key={groupIndex} className={group.label ? "mt-4" : ""}>
                 {group.label && sidebarOpen && (
-                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                     {group.label}
                   </div>
                 )}
@@ -689,8 +734,8 @@ export default function AdminLayout() {
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
                           isActive
-                            ? "bg-gradient-to-r from-cyan-600/20 to-blue-600/20 text-white border border-cyan-500/30"
-                            : "text-gray-400 hover:bg-gray-800 hover:text-white"
+                            ? "nav-item-active"
+                            : "nav-item"
                         } ${!sidebarOpen ? "justify-center" : ""}`
                       }
                     >
@@ -705,13 +750,16 @@ export default function AdminLayout() {
         </aside>
         <div className="flex-1 flex flex-col">
           {/* TODO: Re-enable UpdateNotification once /api/v1/system/updates/upgrade endpoint is implemented */}
-          <header className="sticky top-0 z-30 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 px-6 py-4">
+          <header
+            className="sticky top-0 z-30 glass px-6 py-4"
+            style={{ borderBottom: '1px solid var(--border-subtle)' }}
+          >
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <h1 className="text-lg font-semibold text-white">
+                <h1 className="text-lg font-semibold font-display" style={{ color: 'var(--text-primary)' }}>
                   ERP
                 </h1>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs font-mono-data" style={{ color: 'var(--text-muted)' }}>
                   v{formatVersion(currentVersion)}
                 </span>
                 <SecurityBadge
@@ -721,15 +769,16 @@ export default function AdminLayout() {
               </div>
               <div className="flex items-center gap-4">
                 {user && (
-                  <span className="text-sm text-gray-400">
-                    <span className="text-white">
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    <span style={{ color: 'var(--text-primary)' }}>
                       {user.first_name} {user.last_name}
                     </span>
                   </span>
                 )}
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 text-sm text-gray-400 hover:text-red-400 transition-colors"
+                  className="flex items-center gap-2 text-sm transition-colors hover:text-red-400"
+                  style={{ color: 'var(--text-secondary)' }}
                 >
                   <LogoutIcon />
                   <span>Logout</span>
@@ -737,7 +786,7 @@ export default function AdminLayout() {
               </div>
             </div>
           </header>
-          <main className="flex-1 p-6 overflow-auto">
+          <main id="main-content" className="flex-1 p-6 overflow-auto grid-pattern" tabIndex="-1">
             <Outlet />
           </main>
         </div>

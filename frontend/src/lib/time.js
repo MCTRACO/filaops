@@ -81,14 +81,16 @@ export function makeCalendar(sched, snapMinutes = 15) {
   };
 }
 
+// Use browser locale instead of hardcoded 'en-US'
+const getUserLocale = () => navigator?.language || 'en-US';
+
 export const fmtTime = (ms) =>
-  new Date(ms).toLocaleTimeString("en-US", {
+  new Date(ms).toLocaleTimeString(getUserLocale(), {
     hour: "numeric",
     minute: "2-digit",
-    hour12: true,
   });
 export const fmtDate = (ms) =>
-  new Date(ms).toLocaleDateString("en-US", {
+  new Date(ms).toLocaleDateString(getUserLocale(), {
     month: "short",
     day: "numeric",
   });

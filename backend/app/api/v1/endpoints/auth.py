@@ -1,9 +1,9 @@
 """
-Authentication endpoints for customer portal
+Authentication endpoints for FilaOps Core
 
 Handles user registration, login, token refresh, and profile retrieval
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -19,16 +19,12 @@ from app.schemas.auth import (
     UserWithTokens,
     TokenResponse,
     RefreshTokenRequest,
-    PortalLogin,
-    PortalRegister,
-    PortalCustomerResponse,
     PasswordResetRequestCreate,
     PasswordResetRequestResponse,
     PasswordResetApprovalResponse,
     PasswordResetComplete,
     PasswordResetStatus,
 )
-from sqlalchemy import desc
 import secrets
 from app.core.config import settings
 from app.services.email_service import email_service
@@ -165,8 +161,8 @@ async def register_user(
     refresh_token_record = RefreshToken(
         user_id=new_user.id,
         token_hash=token_hash,
-        expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-        created_at=datetime.utcnow(),  # Explicitly set created_at
+        expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        created_at=datetime.now(timezone.utc),  # Explicitly set created_at
     )
     db.add(refresh_token_record)
     db.commit()
@@ -246,7 +242,7 @@ async def login_user(
             )
 
         # Update last login timestamp
-        user.last_login_at = datetime.utcnow()  # type: ignore[assignment]
+        user.last_login_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         db.commit()
         db.refresh(user)
 
@@ -256,7 +252,7 @@ async def login_user(
 
         # Store refresh token in database
         token_hash = hash_refresh_token(refresh_token)
-        expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
         
         # Check if token hash already exists (shouldn't happen, but handle it)
         existing_token = db.query(RefreshToken).filter(
@@ -266,18 +262,18 @@ async def login_user(
         if existing_token:
             # Revoke old token
             existing_token.revoked = True  # type: ignore[assignment]
-            existing_token.revoked_at = datetime.utcnow()  # type: ignore[assignment]
+            existing_token.revoked_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             db.commit()
             # Generate new token to avoid collision
             refresh_token = create_refresh_token(user.id)  # type: ignore[arg-type]
             token_hash = hash_refresh_token(refresh_token)
-            expires_at = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+            expires_at = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
         
         refresh_token_record = RefreshToken(
             user_id=user.id,
             token_hash=token_hash,
             expires_at=expires_at,
-            created_at=datetime.utcnow(),  # Explicitly set created_at
+            created_at=datetime.now(timezone.utc),  # Explicitly set created_at
         )
         db.add(refresh_token_record)
         db.commit()
@@ -352,7 +348,7 @@ async def refresh_access_token(
 
     # Revoke old refresh token
     stored_token.revoked = True  # type: ignore[assignment]
-    stored_token.revoked_at = datetime.utcnow()  # type: ignore[assignment]
+    stored_token.revoked_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     # Generate new tokens
     new_access_token = create_access_token(user.id)  # type: ignore[arg-type]
@@ -363,8 +359,8 @@ async def refresh_access_token(
     new_refresh_token_record = RefreshToken(
         user_id=user.id,
         token_hash=new_token_hash,
-        expires_at=datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
-        created_at=datetime.utcnow(),  # Explicitly set created_at
+        expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        created_at=datetime.now(timezone.utc),  # Explicitly set created_at
     )
     db.add(new_refresh_token_record)
     db.commit()
@@ -397,160 +393,6 @@ async def get_current_user_profile(
         User profile data
     """
     return current_user
-
-
-# ============================================================================
-# PORTAL ENDPOINTS: Simplified Auth for Customer Portal
-# ============================================================================
-
-def generate_customer_number(db: Session) -> str:
-    """Generate next customer number in format CUST-NNN"""
-    last_user = (
-        db.query(User)
-        .filter(User.customer_number.isnot(None))
-        .order_by(desc(User.customer_number))
-        .first()
-    )
-
-    if last_user and last_user.customer_number:  # type: ignore[truthy-function]
-        try:
-            last_num = int(last_user.customer_number.split("-")[1])  # type: ignore[union-attr]
-            next_num = last_num + 1
-        except (ValueError, IndexError):
-            next_num = 1
-    else:
-        next_num = 1
-
-    return f"CUST-{next_num:04d}"
-
-
-@router.post("/portal/register", response_model=PortalCustomerResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("3/minute")  # type: ignore
-async def portal_register(
-    request: Request,
-    user_data: PortalRegister,
-    db: Session = Depends(get_db)
-):
-    """
-    Register a new customer from the portal.
-
-    Simplified registration endpoint that:
-    - Creates customer account with auto-generated customer number
-    - Returns customer info for session storage
-    - No password complexity requirements (for MVP simplicity)
-    """
-    # Check if email already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered. Please login instead."
-        )
-
-    # Generate customer number
-    customer_number = generate_customer_number(db)
-
-    # Hash password
-    password_hashed = hash_password(user_data.password)
-
-    # Create new user
-    new_user = User(
-        email=user_data.email,
-        password_hash=password_hashed,
-        customer_number=customer_number,
-        first_name=user_data.first_name,
-        last_name=user_data.last_name,
-        company_name=user_data.company_name,
-        phone=user_data.phone,
-        status="active",
-        account_type="customer",
-        email_verified=False,
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    logger.info(
-        "New customer registered",
-        extra={
-            "customer_number": customer_number,
-            "email": user_data.email,
-            "customer_id": new_user.id
-        }
-    )
-
-    return new_user
-
-
-@router.post("/portal/login", response_model=PortalCustomerResponse)
-@limiter.limit("5/minute")  # type: ignore
-async def portal_login(
-    request: Request,
-    login_data: PortalLogin,
-    db: Session = Depends(get_db)
-):
-    """
-    Simple JSON login for the customer portal.
-
-    Returns customer info for session storage (no JWT complexity for MVP).
-    """
-    # Get user by email
-    user = db.query(User).filter(User.email == login_data.email).first()
-
-    # Verify user exists and password is correct
-    if not user or not verify_password(login_data.password, user.password_hash):  # type: ignore[arg-type]
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password"
-        )
-
-    # Check if user is active
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive"
-        )
-
-    # Update last login timestamp
-    user.last_login_at = datetime.utcnow()  # type: ignore[assignment]
-
-    # Generate customer number if missing (backfill old users)
-    if not user.customer_number:  # type: ignore[truthy-function]
-        user.customer_number = generate_customer_number(db)  # type: ignore[assignment]
-
-    db.commit()
-    db.refresh(user)
-
-    logger.info(
-        "Customer logged in",
-        extra={
-            "customer_number": user.customer_number,
-            "email": user.email,
-            "customer_id": user.id
-        }
-    )
-
-    return user
-
-
-@router.get("/portal/customer/{customer_id}", response_model=PortalCustomerResponse)
-async def get_portal_customer(
-    customer_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Get customer info by ID (for admin/portal use).
-    """
-    user = db.query(User).filter(User.id == customer_id).first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Customer not found"
-        )
-
-    return user
 
 
 # ============================================================================
@@ -590,7 +432,7 @@ async def request_password_reset(
     existing_request = db.query(PasswordResetRequest).filter(
         PasswordResetRequest.user_id == user.id,
         PasswordResetRequest.status == 'pending',
-        PasswordResetRequest.expires_at > datetime.utcnow()
+        PasswordResetRequest.expires_at > datetime.now(timezone.utc)
     ).first()
 
     if existing_request:
@@ -608,7 +450,7 @@ async def request_password_reset(
         token=reset_token,
         approval_token=approval_token,
         status='pending',
-        expires_at=datetime.utcnow() + timedelta(hours=24)
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
     )
     db.add(reset_request)
     db.commit()
@@ -647,8 +489,8 @@ async def request_password_reset(
     else:
         # Email not configured - auto-approve and return reset link directly
         reset_request.status = 'approved'  # type: ignore[assignment]
-        reset_request.approved_at = datetime.utcnow()  # type: ignore[assignment]
-        reset_request.expires_at = datetime.utcnow() + timedelta(hours=24)  # type: ignore[assignment] # 24 hours to use
+        reset_request.approved_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+        reset_request.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)  # type: ignore[assignment] # 24 hours to use
         db.commit()
         
         # Use relative URL - frontend will construct full URL
@@ -699,7 +541,7 @@ async def approve_password_reset(
             detail=f"Request has already been {reset_request.status}"
         )
 
-    if reset_request.expires_at < datetime.utcnow():  # type: ignore[operator]
+    if reset_request.expires_at < datetime.now(timezone.utc):  # type: ignore[operator]
         reset_request.status = 'expired'  # type: ignore[assignment]
         db.commit()
         raise HTTPException(
@@ -717,9 +559,9 @@ async def approve_password_reset(
 
     # Approve the request
     reset_request.status = 'approved'  # type: ignore[assignment]
-    reset_request.approved_at = datetime.utcnow()  # type: ignore[assignment]
+    reset_request.approved_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     # Extend expiry for 1 hour after approval for user to complete reset
-    reset_request.expires_at = datetime.utcnow() + timedelta(hours=1)  # type: ignore[assignment]
+    reset_request.expires_at = datetime.now(timezone.utc) + timedelta(hours=1)  # type: ignore[assignment]
     db.commit()
 
     # Send reset link to user
@@ -853,7 +695,7 @@ async def check_reset_status(
             can_reset=False
         )
 
-    if reset_request.expires_at < datetime.utcnow():  # type: ignore[operator]
+    if reset_request.expires_at < datetime.now(timezone.utc):  # type: ignore[operator]
         return PasswordResetStatus(
             status="expired",
             message="This reset link has expired",
@@ -901,7 +743,7 @@ async def complete_password_reset(
             detail=f"Cannot reset password. Request status: {reset_request.status}"
         )
 
-    if reset_request.expires_at < datetime.utcnow():  # type: ignore[operator]
+    if reset_request.expires_at < datetime.now(timezone.utc):  # type: ignore[operator]
         reset_request.status = 'expired'  # type: ignore[assignment]
         db.commit()
         raise HTTPException(
@@ -922,13 +764,13 @@ async def complete_password_reset(
 
     # Mark request as completed
     reset_request.status = 'completed'  # type: ignore[assignment]
-    reset_request.completed_at = datetime.utcnow()  # type: ignore[assignment]
+    reset_request.completed_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     # Revoke all existing refresh tokens for security
     db.query(RefreshToken).filter(
         RefreshToken.user_id == user.id,
         RefreshToken.revoked.is_(False)
-    ).update({"revoked": True, "revoked_at": datetime.utcnow()})
+    ).update({"revoked": True, "revoked_at": datetime.now(timezone.utc)})
 
     db.commit()
 

@@ -9,7 +9,7 @@ Handles the complete quote-to-order conversion workflow:
 
 This is the canonical conversion flow - all quote acceptance paths should use this.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 from dataclasses import dataclass
@@ -54,7 +54,7 @@ class ConversionResult:
 
 def generate_sales_order_number(db: Session) -> str:
     """Generate next sales order number in format SO-YYYY-NNN"""
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     last_order = (
         db.query(SalesOrder)
         .filter(SalesOrder.order_number.like(f"SO-{year}-%"))
@@ -73,7 +73,7 @@ def generate_sales_order_number(db: Session) -> str:
 
 def generate_production_order_code(db: Session) -> str:
     """Generate next production order code in format PO-YYYY-NNN"""
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     last_po = (
         db.query(ProductionOrder)
         .filter(ProductionOrder.code.like(f"PO-{year}-%"))
@@ -249,7 +249,7 @@ def convert_quote_to_order(
         # Update quote with conversion info
         quote.status = "converted"
         quote.sales_order_id = sales_order.id
-        quote.converted_at = datetime.utcnow()
+        quote.converted_at = datetime.now(timezone.utc)
         
         # Commit all changes
         db.commit()
@@ -342,7 +342,7 @@ def convert_quote_after_payment(
     if result.success and result.sales_order:
         result.sales_order.payment_method = payment_method
         result.sales_order.payment_transaction_id = payment_transaction_id
-        result.sales_order.paid_at = datetime.utcnow()
+        result.sales_order.paid_at = datetime.now(timezone.utc)
         db.commit()
     
     return result

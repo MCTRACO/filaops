@@ -40,8 +40,7 @@ class Customer(Base):
     # Account Status
     status = Column(String(20), nullable=False, default='active', index=True)  # active, inactive, suspended
 
-    # Price Level FK (for B2B pricing)
-    price_level_id = Column(Integer, ForeignKey('price_levels.id'), nullable=True)
+    # Note: price_level_id is available in FilaOps PRO for B2B pricing tiers
 
     # Billing Address
     billing_address_line1 = Column(String(255), nullable=True)
@@ -67,9 +66,15 @@ class Customer(Base):
     updated_at = Column(DateTime(timezone=False), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # Relationships
-    price_level = relationship("PriceLevel", back_populates="customers")
-    users = relationship("User", back_populates="customer")  # Portal users for this customer
-    customer_catalogs = relationship("CustomerCatalog", back_populates="customer", cascade="all, delete-orphan")
+    # Note: price_level and customer_catalogs relationships available in FilaOps PRO
+    users = relationship("User", back_populates="customer")  # Portal users for this customer (legacy single-customer)
+    
+    # Multi-user access (B2B portal)
+    user_access = relationship(
+        "UserCustomerAccess",
+        back_populates="customer",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Customer(id={self.id}, number='{self.customer_number}', company='{self.company_name}')>"

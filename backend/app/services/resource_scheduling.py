@@ -3,7 +3,7 @@ Resource scheduling service with conflict detection.
 
 Handles scheduling operations on resources and detecting time conflicts.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 from sqlalchemy.orm import Session
 
@@ -17,22 +17,30 @@ def get_resource_schedule(
     db: Session,
     resource_id: int,
     start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None,
+    is_printer: bool = False
 ) -> List[ProductionOrderOperation]:
     """
-    Get scheduled operations for a resource within date range.
+    Get scheduled operations for a resource or printer within date range.
 
     Args:
         db: Database session
-        resource_id: Resource to check
+        resource_id: Resource or printer ID to check
         start_date: Optional filter - operations ending after this time
         end_date: Optional filter - operations starting before this time
+        is_printer: True if checking a printer
 
     Returns:
-        List of operations scheduled on this resource
+        List of operations scheduled on this resource/printer
     """
+    # Choose the correct column based on resource type
+    if is_printer:
+        id_filter = ProductionOrderOperation.printer_id == resource_id
+    else:
+        id_filter = ProductionOrderOperation.resource_id == resource_id
+
     query = db.query(ProductionOrderOperation).filter(
-        ProductionOrderOperation.resource_id == resource_id,
+        id_filter,
         ProductionOrderOperation.status.notin_(TERMINAL_STATUSES),
         ProductionOrderOperation.scheduled_start.isnot(None),
         ProductionOrderOperation.scheduled_end.isnot(None)
@@ -51,28 +59,36 @@ def find_conflicts(
     resource_id: int,
     start_time: datetime,
     end_time: datetime,
-    exclude_operation_id: Optional[int] = None
+    exclude_operation_id: Optional[int] = None,
+    is_printer: bool = False
 ) -> List[ProductionOrderOperation]:
     """
     Find operations that conflict with proposed time range.
 
     Two operations conflict if:
-    - Same resource
+    - Same resource/printer
     - Time ranges overlap: (start1 < end2) AND (start2 < end1)
     - Neither in terminal status
 
     Args:
         db: Database session
-        resource_id: Resource to check
+        resource_id: Resource or printer ID to check
         start_time: Proposed start
         end_time: Proposed end
         exclude_operation_id: Operation to exclude (for rescheduling)
+        is_printer: True if checking printer conflicts (uses printer_id column)
 
     Returns:
         List of conflicting operations
     """
+    # Choose the correct column based on resource type
+    if is_printer:
+        id_filter = ProductionOrderOperation.printer_id == resource_id
+    else:
+        id_filter = ProductionOrderOperation.resource_id == resource_id
+
     query = db.query(ProductionOrderOperation).filter(
-        ProductionOrderOperation.resource_id == resource_id,
+        id_filter,
         ProductionOrderOperation.status.notin_(TERMINAL_STATUSES),
         ProductionOrderOperation.scheduled_start.isnot(None),
         ProductionOrderOperation.scheduled_end.isnot(None),
@@ -90,21 +106,29 @@ def find_conflicts(
 def find_running_operations(
     db: Session,
     resource_id: int,
-    exclude_operation_id: Optional[int] = None
+    exclude_operation_id: Optional[int] = None,
+    is_printer: bool = False
 ) -> List[ProductionOrderOperation]:
     """
-    Find operations currently running on a resource.
+    Find operations currently running on a resource or printer.
 
     Args:
         db: Database session
-        resource_id: Resource to check
+        resource_id: Resource or printer ID to check
         exclude_operation_id: Operation to exclude
+        is_printer: True if checking a printer
 
     Returns:
         List of running operations
     """
+    # Choose the correct column based on resource type
+    if is_printer:
+        id_filter = ProductionOrderOperation.printer_id == resource_id
+    else:
+        id_filter = ProductionOrderOperation.resource_id == resource_id
+
     query = db.query(ProductionOrderOperation).filter(
-        ProductionOrderOperation.resource_id == resource_id,
+        id_filter,
         ProductionOrderOperation.status == 'running'
     )
 
@@ -116,19 +140,21 @@ def find_running_operations(
 
 def check_resource_available_now(
     db: Session,
-    resource_id: int
+    resource_id: int,
+    is_printer: bool = False
 ) -> Tuple[bool, Optional[ProductionOrderOperation]]:
     """
-    Check if resource is available to start work now.
+    Check if resource or printer is available to start work now.
 
     Args:
         db: Database session
-        resource_id: Resource to check
+        resource_id: Resource or printer ID to check
+        is_printer: True if checking a printer
 
     Returns:
         Tuple of (is_available, blocking_operation)
     """
-    running = find_running_operations(db, resource_id)
+    running = find_running_operations(db, resource_id, is_printer=is_printer)
     if running:
         return False, running[0]
     return True, None
@@ -138,18 +164,20 @@ def find_next_available_slot(
     db: Session,
     resource_id: int,
     duration_minutes: int,
-    after: datetime = None
+    after: datetime = None,
+    is_printer: bool = False
 ) -> datetime:
     """
-    Find the next available time slot on a resource.
+    Find the next available time slot on a resource or printer.
 
     Looks at scheduled operations and finds the first gap of sufficient duration.
 
     Args:
         db: Database session
-        resource_id: Resource to check (already in stored format: negative for printers)
+        resource_id: Resource or printer ID to check
         duration_minutes: Required duration in minutes
         after: Start searching after this time (defaults to now)
+        is_printer: True if checking a printer
 
     Returns:
         datetime: Start time of next available slot
@@ -157,11 +185,17 @@ def find_next_available_slot(
     from datetime import timedelta
 
     if after is None:
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
+
+    # Choose the correct column based on resource type
+    if is_printer:
+        id_filter = ProductionOrderOperation.printer_id == resource_id
+    else:
+        id_filter = ProductionOrderOperation.resource_id == resource_id
 
     # Get all scheduled ops on this resource starting from 'after'
     scheduled_ops = db.query(ProductionOrderOperation).filter(
-        ProductionOrderOperation.resource_id == resource_id,
+        id_filter,
         ProductionOrderOperation.status.notin_(TERMINAL_STATUSES),
         ProductionOrderOperation.scheduled_end.isnot(None),
         ProductionOrderOperation.scheduled_end > after
@@ -222,21 +256,27 @@ def schedule_operation(
         - If success=True, operation was scheduled
         - If success=False, conflicts contains blocking operations
     """
-    # For printers, we store as negative ID to distinguish from resources
-    # This avoids ID collision between resources and printers tables
-    stored_resource_id = -resource_id if is_printer else resource_id
-
-    # Check for conflicts using the stored ID format
+    # Check for conflicts using the appropriate column
     conflicts = find_conflicts(
-        db, stored_resource_id, scheduled_start, scheduled_end,
-        exclude_operation_id=operation.id
+        db=db,
+        resource_id=resource_id,
+        start_time=scheduled_start,
+        end_time=scheduled_end,
+        exclude_operation_id=operation.id,
+        is_printer=is_printer
     )
 
     if conflicts:
         return False, conflicts
 
-    # Schedule the operation
-    operation.resource_id = stored_resource_id
+    # Schedule the operation - use proper foreign key columns
+    if is_printer:
+        operation.printer_id = resource_id
+        operation.resource_id = None  # Clear resource_id when using printer
+    else:
+        operation.resource_id = resource_id
+        operation.printer_id = None  # Clear printer_id when using resource
+
     operation.scheduled_start = scheduled_start
     operation.scheduled_end = scheduled_end
     operation.status = 'queued'  # Move from pending to queued

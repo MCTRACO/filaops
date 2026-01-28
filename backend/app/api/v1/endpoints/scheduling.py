@@ -6,7 +6,7 @@ Provides endpoints for:
 - Finding available time slots
 - Auto-scheduling production orders
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -391,7 +391,7 @@ async def auto_schedule_order(
     estimated_hours = order.estimated_time_minutes / 60 if order.estimated_time_minutes else 2.0
 
     # Determine search window
-    search_start = preferred_start if preferred_start else datetime.utcnow()
+    search_start = preferred_start if preferred_start else datetime.now(timezone.utc)
     search_start = search_start.replace(minute=0, second=0, microsecond=0)
     search_end = search_start + timedelta(days=7)  # Search 7 days ahead
 

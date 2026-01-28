@@ -8,7 +8,7 @@ This service ensures proper state machine flow and prevents invalid
 status transitions.
 """
 from typing import Optional, List, Dict, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.sales_order import SalesOrder
@@ -144,19 +144,19 @@ class OrderStatusService:
         
         old_status = so.status
         so.status = new_status
-        so.updated_at = datetime.utcnow()
+        so.updated_at = datetime.now(timezone.utc)
         
         # Handle status-specific updates
         if new_status == "confirmed":
-            so.confirmed_at = datetime.utcnow()
+            so.confirmed_at = datetime.now(timezone.utc)
         elif new_status == "shipped":
-            so.shipped_at = datetime.utcnow()
+            so.shipped_at = datetime.now(timezone.utc)
             so.fulfillment_status = "shipped"
         elif new_status == "delivered":
-            so.delivered_at = datetime.utcnow()
+            so.delivered_at = datetime.now(timezone.utc)
             so.fulfillment_status = "delivered"
         elif new_status == "cancelled":
-            so.cancelled_at = datetime.utcnow()
+            so.cancelled_at = datetime.now(timezone.utc)
         
         db.commit()
         db.refresh(so)
@@ -243,22 +243,22 @@ class OrderStatusService:
         
         old_status = wo.status
         wo.status = new_status
-        wo.updated_at = datetime.utcnow()
+        wo.updated_at = datetime.now(timezone.utc)
         
         # Handle status-specific timestamps
         if new_status == "in_progress" and not wo.actual_start:
-            wo.actual_start = datetime.utcnow()
+            wo.actual_start = datetime.now(timezone.utc)
         elif new_status == "completed" and not wo.actual_end:
-            wo.actual_end = datetime.utcnow()
+            wo.actual_end = datetime.now(timezone.utc)
             # Mark as pending QC if required
             if wo.qc_status == "not_required":
                 pass  # Auto-closable
             else:
                 wo.qc_status = "pending"
         elif new_status == "closed":
-            wo.completed_at = datetime.utcnow()
+            wo.completed_at = datetime.now(timezone.utc)
         elif new_status == "scrapped":
-            wo.scrapped_at = datetime.utcnow()
+            wo.scrapped_at = datetime.now(timezone.utc)
         
         db.commit()
         db.refresh(wo)

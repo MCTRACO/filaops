@@ -6,7 +6,7 @@ Freemium feature: Basic maintenance logging and scheduling.
 """
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
@@ -114,7 +114,7 @@ async def get_maintenance_due(
     - Overdue maintenance (next_due_at in the past)
     - Upcoming maintenance (next_due_at within next N days)
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     future_date = now + timedelta(days=days_ahead)
 
     # Get all active printers
@@ -238,7 +238,7 @@ async def create_maintenance_log(
         downtime_minutes=data.downtime_minutes,
         parts_used=data.parts_used,
         notes=data.notes,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
 
     db.add(log)

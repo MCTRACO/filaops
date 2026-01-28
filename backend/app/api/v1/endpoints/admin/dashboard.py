@@ -5,7 +5,7 @@ Central hub for admin operations - provides summary data and navigation context
 """
 from typing import Optional, List
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -96,7 +96,7 @@ async def get_dashboard(
 
     Admin only. This is the main hub for backoffice operations.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     thirty_days_ago = now - timedelta(days=30)
 
@@ -307,7 +307,7 @@ async def get_dashboard_summary(
     from sqlalchemy import func
     from decimal import Decimal
     
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     week_ago = now - timedelta(days=7)
     thirty_days_ago = now - timedelta(days=30)
 
@@ -1091,7 +1091,7 @@ async def get_profit_summary(
 
     Admin only. Freemium tier - basic profit view.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Calculate month boundaries
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

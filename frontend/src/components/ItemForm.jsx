@@ -4,7 +4,7 @@
  * Replaces the complex ItemWizard with a clean, focused form.
  * BOM and Routing are managed separately via dedicated editors.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { API_URL } from "../config/api";
 import {
   validateRequired,
@@ -46,6 +46,8 @@ export default function ItemForm({
   const [errors, setErrors] = useState({});
   const [categories, setCategories] = useState([]);
   const [uomClasses, setUomClasses] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     sku: editingItem?.sku || "",
@@ -59,6 +61,7 @@ export default function ItemForm({
     standard_cost: editingItem?.standard_cost || "",
     selling_price: editingItem?.selling_price || "",
     reorder_point: editingItem?.reorder_point || "",
+    image_url: editingItem?.image_url || "",
   });
 
   const fetchCategories = useCallback(async () => {
@@ -119,6 +122,7 @@ export default function ItemForm({
           standard_cost: editingItem.standard_cost || "",
           selling_price: editingItem.selling_price || "",
           reorder_point: editingItem.reorder_point || "",
+          image_url: editingItem.image_url || "",
         });
       } else {
         // Reset form for new item
@@ -134,6 +138,7 @@ export default function ItemForm({
           standard_cost: "",
           selling_price: "",
           reorder_point: "",
+          image_url: "",
         });
       }
       setError(null);
@@ -214,6 +219,7 @@ export default function ItemForm({
           ? parseFloat(formData.reorder_point)
           : null,
         category_id: formData.category_id || null,
+        image_url: formData.image_url || null,
       };
 
       const url = editingItem
@@ -388,6 +394,104 @@ export default function ItemForm({
                 rows="3"
                 placeholder="Item description"
               />
+            </div>
+
+            {/* Image URL / Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Product Image
+              </label>
+              <div className="flex gap-3 items-start">
+                <div className="flex-1">
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={formData.image_url}
+                      onChange={(e) =>
+                        setFormData({ ...formData, image_url: e.target.value })
+                      }
+                      className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                      placeholder="https://example.com/image.jpg"
+                    />
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        // Validate file size (5MB max)
+                        if (file.size > 5 * 1024 * 1024) {
+                          setError("Image must be less than 5MB");
+                          return;
+                        }
+
+                        setUploading(true);
+                        setError(null);
+
+                        try {
+                          const uploadData = new FormData();
+                          uploadData.append("file", file);
+
+                          const res = await fetch(
+                            `${API_URL}/api/v1/admin/uploads/product-image`,
+                            {
+                              method: "POST",
+                              headers: {
+                                Authorization: `Bearer ${token}`,
+                              },
+                              body: uploadData,
+                            }
+                          );
+
+                          if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.detail || "Upload failed");
+                          }
+
+                          const data = await res.json();
+                          // Use the API server URL for the image
+                          const imageUrl = `${API_URL}${data.url}`;
+                          setFormData({ ...formData, image_url: imageUrl });
+                        } catch (err) {
+                          setError(err.message);
+                        } finally {
+                          setUploading(false);
+                          // Reset file input
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-600 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {uploading ? "Uploading..." : "Upload"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Paste a URL or upload an image (JPG, PNG, WebP, GIF - max 5MB)
+                  </p>
+                </div>
+                {formData.image_url && (
+                  <div className="flex-shrink-0">
+                    <img
+                      src={formData.image_url}
+                      alt="Product preview"
+                      className="h-16 w-16 object-cover rounded border border-gray-600"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Classification */}

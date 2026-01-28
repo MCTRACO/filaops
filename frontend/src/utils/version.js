@@ -18,18 +18,18 @@ export async function getCurrentVersion() {
     return data.version;
   } catch (error) {
     console.error('Failed to get version from backend:', error);
-    // Fallback to package.json version
-    return "1.6.0";
+    // Fallback to hardcoded version (should match package.json)
+    return "2.0.1";
   }
 }
 
 /**
  * Get current version synchronously (uses fallback)
- * @returns {string} Current version (e.g., "1.6.0")
+ * @returns {string} Current version (e.g., "2.0.1")
  */
 export function getCurrentVersionSync() {
   // Synchronous fallback for components that need immediate value
-  return "1.6.0";
+  return "2.0.1";
 }
 
 /**

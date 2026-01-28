@@ -1,7 +1,7 @@
-"""Database models"""
+"""Database models - FilaOps Open Source Core"""
 from app.models.item_category import ItemCategory
 from app.models.product import Product
-from app.models.production_order import ProductionOrder, ProductionOrderOperation, ProductionOrderOperationMaterial
+from app.models.production_order import ProductionOrder, ProductionOrderOperation, ProductionOrderOperationMaterial, ScrapRecord
 from app.models.print_job import PrintJob
 from app.models.inventory import Inventory, InventoryTransaction, InventoryLocation
 from app.models.sales_order import SalesOrder, SalesOrderLine
@@ -29,10 +29,18 @@ from app.models.purchasing_event import PurchasingEvent
 from app.models.shipping_event import ShippingEvent
 from app.models.material_spool import MaterialSpool, ProductionOrderSpool
 from app.models.maintenance import MaintenanceLog
-from app.models.price_level import PriceLevel
 from app.models.customer import Customer
-from app.models.catalog import Catalog, CatalogProduct, CustomerCatalog
-# from app.models.license import License  # Disabled until ready for production
+from app.models.user_customer_access import UserCustomerAccess
+
+# Accounting (GL)
+from app.models.accounting import GLAccount, GLFiscalPeriod, GLJournalEntry, GLJournalEntryLine
+
+# PRO Features (not included in open source core):
+# - PriceLevel, Catalog, CatalogProduct, CustomerCatalog
+# - PortalAccessRequest
+# - EntityMember
+# - License
+# - ShopifyConfig, ShopifyWebhookLog, ShopifyProductMapping
 
 __all__ = [
     # Item management
@@ -74,12 +82,13 @@ __all__ = [
     "VendorItem",
     # Manufacturing Routes
     "WorkCenter",
-    "Machine", 
+    "Machine",
     "Resource",
     "Routing",
     "RoutingOperation",
     "RoutingOperationMaterial",
     "ProductionOrderOperationMaterial",
+    "ScrapRecord",
     # MRP
     "MRPRun",
     "PlannedOrder",
@@ -104,12 +113,12 @@ __all__ = [
     "ProductionOrderSpool",
     # Maintenance
     "MaintenanceLog",
-    # CRM / B2B
-    "PriceLevel",
+    # CRM (Core)
     "Customer",
-    "Catalog",
-    "CatalogProduct",
-    "CustomerCatalog",
-    # License (disabled until ready)
-    # "License",
+    "UserCustomerAccess",
+    # Accounting (GL)
+    "GLAccount",
+    "GLFiscalPeriod",
+    "GLJournalEntry",
+    "GLJournalEntryLine",
 ]

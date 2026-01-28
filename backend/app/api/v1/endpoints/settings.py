@@ -210,7 +210,7 @@ async def update_company_settings(
     for field, value in update_data.items():
         setattr(settings, field, value)
 
-    settings.updated_at = datetime.utcnow()
+    settings.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(settings)
 
@@ -253,7 +253,7 @@ async def upload_company_logo(
     settings.logo_data = content
     settings.logo_filename = file.filename
     settings.logo_mime_type = file.content_type
-    settings.updated_at = datetime.utcnow()
+    settings.updated_at = datetime.now(timezone.utc)
 
     db.commit()
 
@@ -299,7 +299,7 @@ async def delete_company_logo(
     settings.logo_data = None
     settings.logo_filename = None
     settings.logo_mime_type = None
-    settings.updated_at = datetime.utcnow()
+    settings.updated_at = datetime.now(timezone.utc)
 
     db.commit()
 
@@ -467,7 +467,7 @@ async def update_ai_settings(
             continue
         setattr(settings, field, value)
 
-    settings.updated_at = datetime.utcnow()
+    settings.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(settings)
 

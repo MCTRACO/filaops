@@ -3,7 +3,7 @@ Command Center service for dashboard data.
 
 Aggregates action items and summary statistics for the "What do I need to do NOW?" view.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict
 from collections import defaultdict
 from sqlalchemy import func
@@ -128,7 +128,7 @@ def _get_blocked_production_orders(db: Session) -> List[ActionItem]:
 def _get_overdue_sales_orders(db: Session) -> List[ActionItem]:
     """Get sales orders past their due date that haven't shipped."""
     items = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     overdue_orders = db.query(SalesOrder).filter(
         SalesOrder.status.in_(['confirmed', 'in_production', 'ready_to_ship']),
@@ -174,7 +174,7 @@ def _get_overdue_sales_orders(db: Session) -> List[ActionItem]:
 def _get_due_today_sales_orders(db: Session) -> List[ActionItem]:
     """Get sales orders due today that haven't shipped."""
     items = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 
@@ -215,7 +215,7 @@ def _get_due_today_sales_orders(db: Session) -> List[ActionItem]:
 def _get_overrunning_operations(db: Session) -> List[ActionItem]:
     """Get operations that have exceeded their estimated time by 2x."""
     items = []
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     running_ops = db.query(ProductionOrderOperation).filter(
         ProductionOrderOperation.status == 'running',
@@ -323,7 +323,7 @@ def _get_idle_resources_with_work(db: Session) -> List[ActionItem]:
 
 def get_today_summary(db: Session) -> TodaySummary:
     """Get aggregate statistics for today's operations."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
 

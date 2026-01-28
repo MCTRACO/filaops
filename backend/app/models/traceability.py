@@ -11,7 +11,7 @@ For recalls:
 - LOT level: "Recall all products using lot #PLA-2025-0042"
 - SERIAL level: "Recall serial numbers BLB-20251205-0001 through 0015"
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy import (
     Column, Integer, String, Numeric, DateTime, Date, ForeignKey,
@@ -107,7 +107,7 @@ class SerialNumber(Base):
         existing serials for that date in the calling code.
         """
         if date is None:
-            date = datetime.utcnow()
+            date = datetime.now(timezone.utc)
         date_str = date.strftime("%Y%m%d")
         return f"BLB-{date_str}-"  # Caller appends sequence
 
@@ -205,7 +205,7 @@ class MaterialLot(Base):
         existing lots for that material/year in the calling code.
         """
         if year is None:
-            year = datetime.utcnow().year
+            year = datetime.now(timezone.utc).year
         return f"{material_code}-{year}-"  # Caller appends sequence
 
 

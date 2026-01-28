@@ -12,7 +12,7 @@ import io
 import time
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
@@ -343,8 +343,8 @@ async def create_printer(
         connection_config=data.connection_config or {},
         capabilities=data.capabilities or {},
         status="offline",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
 
     db.add(printer)
@@ -382,7 +382,7 @@ async def update_printer(
             value = value.value if hasattr(value, "value") else value
         setattr(printer, field, value)
 
-    printer.updated_at = datetime.utcnow()
+    printer.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(printer)
 
@@ -431,8 +431,8 @@ async def update_printer_status(
         raise HTTPException(status_code=404, detail="Printer not found")
 
     printer.status = data.status.value
-    printer.last_seen = datetime.utcnow()
-    printer.updated_at = datetime.utcnow()
+    printer.last_seen = datetime.now(timezone.utc)
+    printer.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(printer)
 
@@ -731,8 +731,8 @@ async def import_printers_csv(
                 status="offline",
                 connection_config={},
                 capabilities={},
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
             )
 
             db.add(printer)

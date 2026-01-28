@@ -1,6 +1,112 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useEffect } from "react";
 import { API_URL } from "../../config/api";
+import { useFeatureFlags } from "../../hooks/useFeatureFlags";
+import { useToast } from "../../components/Toast";
+
+// =============================================================================
+// SHARED COMPONENTS
+// =============================================================================
+
+// Reusable error alert with retry button
+function ErrorAlert({ message, onRetry }) {
+  return (
+    <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 flex items-center gap-3">
+      <svg className="w-5 h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <div className="flex-1">
+        <p className="text-red-400 font-medium text-sm">{message}</p>
+        <p className="text-gray-500 text-xs mt-1">Check that the backend server is running.</p>
+      </div>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="px-3 py-1.5 bg-red-600/20 text-red-400 rounded-lg hover:bg-red-600/30 text-sm flex items-center gap-1.5"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Skeleton loading placeholder
+function Skeleton({ className = "", variant = "rect" }) {
+  const baseClass = "animate-pulse bg-gray-700/50 rounded";
+  if (variant === "text") {
+    return <div className={`${baseClass} h-4 ${className}`} />;
+  }
+  if (variant === "circle") {
+    return <div className={`${baseClass} rounded-full ${className}`} />;
+  }
+  return <div className={`${baseClass} ${className}`} />;
+}
+
+// Table skeleton for loading states
+function TableSkeleton({ rows = 5, cols = 3 }) {
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      <div className="p-4 border-b border-gray-800">
+        <Skeleton className="h-6 w-48" />
+      </div>
+      <div className="divide-y divide-gray-800">
+        {[...Array(rows)].map((_, i) => (
+          <div key={i} className="flex items-center gap-4 p-4">
+            {[...Array(cols)].map((_, j) => (
+              <Skeleton key={j} className={`h-4 ${j === 0 ? 'w-32' : 'w-20'}`} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Card skeleton for summary cards
+function CardSkeleton() {
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <Skeleton className="h-4 w-24 mb-2" />
+      <Skeleton className="h-8 w-32" />
+    </div>
+  );
+}
+
+// Help icon with tooltip for contextual help
+function HelpIcon({ label }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  return (
+    <div className="relative inline-block">
+      <svg
+        className="w-4 h-4 text-gray-500 hover:text-gray-400 cursor-help"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+      {showTooltip && (
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg text-xs text-gray-300 leading-relaxed">
+          {label}
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+            <div className="border-4 border-transparent border-t-gray-800" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Tab components
 function DashboardTab({ token }) {
@@ -1249,18 +1355,666 @@ function TaxCenterTab({ token }) {
   );
 }
 
+function GLReportsTab({ token }) {
+  const [activeReport, setActiveReport] = useState("trial-balance");
+  const [trialBalance, setTrialBalance] = useState(null);
+  const [inventoryVal, setInventoryVal] = useState(null);
+  const [ledger, setLedger] = useState(null);
+  const [selectedAccount, setSelectedAccount] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  const fetchTrialBalance = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/accounting/trial-balance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setTrialBalance(await res.json());
+        setLastUpdated(new Date());
+      } else {
+        setError(`Failed to load: ${res.status}`);
+      }
+    } catch (err) {
+      setError(`Network error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchInventoryValuation = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/accounting/inventory-valuation`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setInventoryVal(await res.json());
+        setLastUpdated(new Date());
+      } else {
+        setError(`Failed to load: ${res.status}`);
+      }
+    } catch (err) {
+      setError(`Network error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchLedger = async (accountCode) => {
+    if (!accountCode) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/accounting/ledger/${accountCode}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setLedger(await res.json());
+        setLastUpdated(new Date());
+      } else {
+        setError(`Failed to load: ${res.status}`);
+      }
+    } catch (err) {
+      setError(`Network error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    if (activeReport === "trial-balance") fetchTrialBalance();
+    else if (activeReport === "inventory") fetchInventoryValuation();
+    else if (activeReport === "ledger" && selectedAccount) fetchLedger(selectedAccount);
+  };
+
+  const formatLastUpdated = (date) => {
+    if (!date) return "";
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  useEffect(() => {
+    if (activeReport === "trial-balance") fetchTrialBalance();
+    if (activeReport === "inventory") fetchInventoryValuation();
+  }, [activeReport]);
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount || 0);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Report Selector with Refresh */}
+      <div className="flex items-center justify-between gap-2 bg-gray-900 border border-gray-800 rounded-xl p-2">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveReport("trial-balance")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+              activeReport === "trial-balance"
+                ? "bg-blue-600 text-white"
+                : "text-gray-400 hover:bg-gray-800"
+            }`}
+          >
+            Trial Balance
+          </button>
+          <button
+            onClick={() => setActiveReport("inventory")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+              activeReport === "inventory"
+                ? "bg-blue-600 text-white"
+                : "text-gray-400 hover:bg-gray-800"
+            }`}
+          >
+            Inventory Valuation
+          </button>
+          <button
+            onClick={() => setActiveReport("ledger")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${
+              activeReport === "ledger"
+                ? "bg-blue-600 text-white"
+                : "text-gray-400 hover:bg-gray-800"
+            }`}
+          >
+            Transaction Ledger
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-xs text-gray-500">
+              Updated {formatLastUpdated(lastUpdated)}
+            </span>
+          )}
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh data"
+          >
+            <svg
+              className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Loading skeleton based on active report */}
+      {loading && activeReport === "trial-balance" && <TableSkeleton rows={8} cols={3} />}
+      {loading && activeReport === "inventory" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+          <TableSkeleton rows={4} cols={5} />
+        </div>
+      )}
+      {loading && activeReport === "ledger" && <TableSkeleton rows={10} cols={6} />}
+
+      {/* Error display with retry */}
+      {error && (
+        <ErrorAlert
+          message={error}
+          onRetry={() => {
+            if (activeReport === "trial-balance") fetchTrialBalance();
+            else if (activeReport === "inventory") fetchInventoryValuation();
+            else if (activeReport === "ledger" && selectedAccount) fetchLedger(selectedAccount);
+          }}
+        />
+      )}
+
+      {/* Trial Balance */}
+      {activeReport === "trial-balance" && trialBalance && !loading && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-white">Trial Balance</h3>
+                <HelpIcon label="Shows all GL account balances. Debits should equal credits. Click any account to view its transaction ledger." />
+              </div>
+              <p className="text-sm text-gray-400">As of {trialBalance.as_of_date}</p>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+              trialBalance.is_balanced
+                ? "bg-green-500/20 text-green-400"
+                : "bg-red-500/20 text-red-400"
+            }`}>
+              {trialBalance.is_balanced ? "Balanced" : "Out of Balance"}
+            </div>
+          </div>
+          <table className="w-full">
+            <thead className="bg-gray-800/50">
+              <tr>
+                <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Account</th>
+                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Debit</th>
+                <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trialBalance.accounts?.map((acct) => (
+                <tr key={acct.account_code} className="border-t border-gray-800 hover:bg-gray-800/50 cursor-pointer"
+                    onClick={() => { setSelectedAccount(acct.account_code); setActiveReport("ledger"); fetchLedger(acct.account_code); }}>
+                  <td className="py-3 px-4">
+                    <span className="text-gray-500 mr-2">{acct.account_code}</span>
+                    <span className="text-white">{acct.account_name}</span>
+                  </td>
+                  <td className="py-3 px-4 text-right text-white">
+                    {acct.debit_balance > 0 ? formatCurrency(acct.debit_balance) : "-"}
+                  </td>
+                  <td className="py-3 px-4 text-right text-white">
+                    {acct.credit_balance > 0 ? formatCurrency(acct.credit_balance) : "-"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-gray-800/50 font-semibold">
+              <tr>
+                <td className="py-3 px-4 text-white">Total</td>
+                <td className="py-3 px-4 text-right text-white">{formatCurrency(trialBalance.total_debits)}</td>
+                <td className="py-3 px-4 text-right text-white">{formatCurrency(trialBalance.total_credits)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {/* Inventory Valuation */}
+      {activeReport === "inventory" && inventoryVal && !loading && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-white">Inventory Valuation</h3>
+            <HelpIcon label="Compares physical inventory value to GL balances. Variances indicate missing journal entries or manual adjustments that weren't recorded." />
+          </div>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="text-gray-400 text-sm mb-1">Inventory Value</div>
+              <div className="text-2xl font-bold text-white">{formatCurrency(inventoryVal.total_inventory_value)}</div>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+              <div className="text-gray-400 text-sm mb-1">GL Balance</div>
+              <div className="text-2xl font-bold text-white">{formatCurrency(inventoryVal.total_gl_balance)}</div>
+            </div>
+            <div className={`bg-gray-900 border rounded-xl p-5 ${
+              inventoryVal.is_reconciled ? "border-green-500/50" : "border-red-500/50"
+            }`}>
+              <div className="text-gray-400 text-sm mb-1">Variance</div>
+              <div className={`text-2xl font-bold ${
+                inventoryVal.is_reconciled ? "text-green-400" : "text-red-400"
+              }`}>
+                {formatCurrency(inventoryVal.total_variance)}
+              </div>
+              <div className="text-xs mt-1">
+                {inventoryVal.is_reconciled ? "Reconciled" : "Needs Review"}
+              </div>
+            </div>
+          </div>
+
+          {/* Category Breakdown */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div className="p-4 border-b border-gray-800">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-white">By Category</h3>
+                <HelpIcon label="Breakdown by inventory type: Raw Materials (1200), WIP (1210), Finished Goods (1220), Packaging (1230)." />
+              </div>
+            </div>
+            <table className="w-full">
+              <thead className="bg-gray-800/50">
+                <tr>
+                  <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Category</th>
+                  <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Items</th>
+                  <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Inventory</th>
+                  <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">GL Balance</th>
+                  <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Variance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryVal.categories?.map((cat) => (
+                  <tr key={cat.gl_account_code} className="border-t border-gray-800">
+                    <td className="py-3 px-4">
+                      <span className="text-white">{cat.category}</span>
+                      <span className="text-gray-500 text-sm ml-2">({cat.gl_account_code})</span>
+                    </td>
+                    <td className="py-3 px-4 text-right text-gray-400">{cat.item_count}</td>
+                    <td className="py-3 px-4 text-right text-white">{formatCurrency(cat.inventory_value)}</td>
+                    <td className="py-3 px-4 text-right text-white">{formatCurrency(cat.gl_balance)}</td>
+                    <td className={`py-3 px-4 text-right font-medium ${
+                      Math.abs(cat.variance) < 0.01 ? "text-green-400" : "text-red-400"
+                    }`}>
+                      {formatCurrency(cat.variance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Ledger */}
+      {activeReport === "ledger" && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-white">Transaction Ledger</h3>
+            <HelpIcon label="Detailed transaction history for a specific GL account. Shows all journal entries affecting the account with running balance." />
+          </div>
+          {/* Account Selector */}
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-xs text-gray-400 mb-1">Account Code</label>
+                <input
+                  type="text"
+                  value={selectedAccount}
+                  onChange={(e) => setSelectedAccount(e.target.value)}
+                  placeholder="e.g., 1200"
+                  className="w-full bg-gray-800 border border-gray-700 text-white rounded px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                onClick={() => fetchLedger(selectedAccount)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                Load Ledger
+              </button>
+            </div>
+          </div>
+
+          {/* Ledger Table */}
+          {ledger && (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+              <div className="p-4 border-b border-gray-800">
+                <h3 className="text-lg font-semibold text-white">
+                  {ledger.account_code} - {ledger.account_name}
+                </h3>
+                <p className="text-sm text-gray-400">
+                  {ledger.transaction_count} transactions |
+                  Opening: {formatCurrency(ledger.opening_balance)} |
+                  Closing: {formatCurrency(ledger.closing_balance)}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-800/50">
+                    <tr>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Date</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Entry</th>
+                      <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Description</th>
+                      <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Debit</th>
+                      <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Credit</th>
+                      <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ledger.transactions?.map((txn, idx) => (
+                      <tr key={idx} className="border-t border-gray-800 hover:bg-gray-800/50">
+                        <td className="py-3 px-4 text-gray-400 text-sm">{txn.entry_date}</td>
+                        <td className="py-3 px-4 text-white font-mono text-sm">{txn.entry_number}</td>
+                        <td className="py-3 px-4 text-gray-300 text-sm">{txn.description}</td>
+                        <td className="py-3 px-4 text-right text-white">
+                          {txn.debit > 0 ? formatCurrency(txn.debit) : "-"}
+                        </td>
+                        <td className="py-3 px-4 text-right text-white">
+                          {txn.credit > 0 ? formatCurrency(txn.credit) : "-"}
+                        </td>
+                        <td className="py-3 px-4 text-right text-blue-400 font-medium">
+                          {formatCurrency(txn.running_balance)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PeriodsTab({ token }) {
+  const [periods, setPeriods] = useState([]);
+  const [currentPeriod, setCurrentPeriod] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const toast = useToast();
+
+  useEffect(() => {
+    fetchPeriods();
+  }, []);
+
+  const fetchPeriods = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/accounting/periods`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPeriods(data.periods || []);
+        setCurrentPeriod(data.current_period);
+        setLastUpdated(new Date());
+      } else {
+        setError(`Failed to load periods: ${res.status}`);
+      }
+    } catch (err) {
+      setError(`Network error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatLastUpdated = (date) => {
+    if (!date) return "";
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const closePeriod = async (periodId) => {
+    if (!confirm("Are you sure you want to close this period? No further entries can be made.")) return;
+    setActionLoading(periodId);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/accounting/periods/${periodId}/close`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ confirm: true }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        toast.success(result.message || "Period closed successfully");
+        fetchPeriods();
+      } else {
+        const data = await res.json();
+        toast.error(data.detail || "Failed to close period");
+      }
+    } catch (err) {
+      toast.error(`Error closing period: ${err.message}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const reopenPeriod = async (periodId) => {
+    if (!confirm("Are you sure? This will allow modifications to historical data.")) return;
+    setActionLoading(periodId);
+    try {
+      const res = await fetch(`${API_URL}/api/v1/accounting/periods/${periodId}/reopen`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const result = await res.json();
+        toast.warning(result.message || "Period reopened - historical data can now be modified");
+        fetchPeriods();
+      } else {
+        const data = await res.json();
+        toast.error(data.detail || "Failed to reopen period");
+      }
+    } catch (err) {
+      toast.error(`Error reopening period: ${err.message}`);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount || 0);
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        {/* Skeleton for current period */}
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+          <div className="flex items-center gap-2">
+            <Skeleton variant="circle" className="w-3 h-3" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+        </div>
+        {/* Skeleton for periods table */}
+        <TableSkeleton rows={6} cols={7} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {error && <ErrorAlert message={error} onRetry={fetchPeriods} />}
+
+      {/* Current Period Highlight */}
+      {currentPeriod && (
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+            <span className="text-blue-400 font-medium">Current Period:</span>
+            <span className="text-white">{currentPeriod.year}-{String(currentPeriod.period).padStart(2, '0')}</span>
+            <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+              currentPeriod.status === "open"
+                ? "bg-green-500/20 text-green-400"
+                : "bg-gray-500/20 text-gray-400"
+            }`}>
+              {currentPeriod.status}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Periods Table */}
+      <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-white">Fiscal Periods</h3>
+            <HelpIcon label="Manage accounting periods. Closing a period prevents entries from being backdated. Reopen with caution - allows modifications to historical data." />
+          </div>
+          <div className="flex items-center gap-3">
+            {lastUpdated && (
+              <span className="text-xs text-gray-500">
+                Updated {formatLastUpdated(lastUpdated)}
+              </span>
+            )}
+            <button
+              onClick={fetchPeriods}
+              disabled={loading}
+              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Refresh data"
+            >
+              <svg
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <table className="w-full">
+          <thead className="bg-gray-800/50">
+            <tr>
+              <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Period</th>
+              <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Date Range</th>
+              <th className="text-center py-3 px-4 text-xs font-medium text-gray-400 uppercase">Status</th>
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Entries</th>
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Total DR</th>
+              <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Total CR</th>
+              <th className="text-center py-3 px-4 text-xs font-medium text-gray-400 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {periods.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-8 text-center text-gray-500">
+                  No fiscal periods found
+                </td>
+              </tr>
+            ) : (
+              periods.map((period) => (
+                <tr key={period.id} className="border-t border-gray-800">
+                  <td className="py-3 px-4 text-white font-medium">
+                    {period.year}-{String(period.period).padStart(2, '0')}
+                  </td>
+                  <td className="py-3 px-4 text-gray-400 text-sm">
+                    {period.start_date} to {period.end_date}
+                  </td>
+                  <td className="py-3 px-4 text-center">
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      period.status === "open"
+                        ? "bg-green-500/20 text-green-400"
+                        : "bg-gray-500/20 text-gray-400"
+                    }`}>
+                      {period.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-right text-gray-400">{period.journal_entry_count}</td>
+                  <td className="py-3 px-4 text-right text-white">{formatCurrency(period.total_debits)}</td>
+                  <td className="py-3 px-4 text-right text-white">{formatCurrency(period.total_credits)}</td>
+                  <td className="py-3 px-4 text-center">
+                    {period.status === "open" ? (
+                      <button
+                        onClick={() => closePeriod(period.id)}
+                        disabled={actionLoading === period.id}
+                        className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm disabled:opacity-50"
+                      >
+                        {actionLoading === period.id ? "..." : "Close"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => reopenPeriod(period.id)}
+                        disabled={actionLoading === period.id}
+                        className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm disabled:opacity-50"
+                      >
+                        {actionLoading === period.id ? "..." : "Reopen"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // Main component
 export default function AdminAccounting() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const token = localStorage.getItem("adminToken");
+  const { isPro, isEnterprise, loading: tierLoading } = useFeatureFlags();
 
   const tabs = [
-    { id: "dashboard", label: "Dashboard", icon: "chart-bar" },
-    { id: "sales", label: "Sales Journal", icon: "receipt" },
-    { id: "payments", label: "Payments", icon: "credit-card" },
-    { id: "cogs", label: "COGS & Materials", icon: "cube" },
-    { id: "tax", label: "Tax Center", icon: "calculator" },
+    { id: "dashboard", label: "Dashboard", icon: "chart-bar", tier: "community" },
+    { id: "sales", label: "Sales Journal", icon: "receipt", tier: "community" },
+    { id: "payments", label: "Payments", icon: "credit-card", tier: "community" },
+    { id: "cogs", label: "COGS & Materials", icon: "cube", tier: "community" },
+    { id: "tax", label: "Tax Center", icon: "calculator", tier: "community" },
+    { id: "glreports", label: "GL Reports", icon: "document-report", tier: "pro" },
+    { id: "periods", label: "Periods", icon: "calendar", tier: "pro" },
   ];
+
+  // Check if user can access a tab based on their tier
+  const canAccessTab = (tier) => {
+    if (tier === "community") return true;
+    if (tier === "pro") return isPro || isEnterprise;
+    if (tier === "enterprise") return isEnterprise;
+    return false;
+  };
 
   const getTabIcon = (icon) => {
     switch (icon) {
@@ -1344,6 +2098,38 @@ export default function AdminAccounting() {
             />
           </svg>
         );
+      case "document-report":
+        return (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+        );
+      case "calendar":
+        return (
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+        );
       default:
         return null;
     }
@@ -1361,20 +2147,32 @@ export default function AdminAccounting() {
 
       {/* Tab Navigation */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-1 flex flex-wrap gap-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? "bg-blue-600 text-white"
-                : "text-gray-400 hover:text-white hover:bg-gray-800"
-            }`}
-          >
-            {getTabIcon(tab.icon)}
-            {tab.label}
-          </button>
-        ))}
+        {tabs.map((tab) => {
+          const accessible = canAccessTab(tab.tier);
+          return (
+            <button
+              key={tab.id}
+              onClick={() => accessible && setActiveTab(tab.id)}
+              disabled={!accessible}
+              title={!accessible ? `Requires ${tab.tier === "pro" ? "Pro" : "Enterprise"} tier` : ""}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === tab.id
+                  ? "bg-blue-600 text-white"
+                  : accessible
+                    ? "text-gray-400 hover:text-white hover:bg-gray-800"
+                    : "text-gray-600 cursor-not-allowed"
+              }`}
+            >
+              {getTabIcon(tab.icon)}
+              {tab.label}
+              {!accessible && (
+                <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab Content */}
@@ -1383,6 +2181,8 @@ export default function AdminAccounting() {
       {activeTab === "payments" && <PaymentsTab token={token} />}
       {activeTab === "cogs" && <COGSTab token={token} />}
       {activeTab === "tax" && <TaxCenterTab token={token} />}
+      {activeTab === "glreports" && <GLReportsTab token={token} />}
+      {activeTab === "periods" && <PeriodsTab token={token} />}
     </div>
   );
 }

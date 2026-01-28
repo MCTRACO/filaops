@@ -5,7 +5,7 @@ CRUD operations for work centers and resources (machines).
 """
 from fastapi import APIRouter, HTTPException, Depends, status
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
 
@@ -163,7 +163,7 @@ async def update_work_center(
             value = value.value
         setattr(work_center, field, value)
 
-    work_center.updated_at = datetime.utcnow()
+    work_center.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(work_center)
 
@@ -184,7 +184,7 @@ async def delete_work_center(
         raise HTTPException(status_code=404, detail="Work center not found")
 
     work_center.is_active = False
-    work_center.updated_at = datetime.utcnow()
+    work_center.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     logger.info(f"Deactivated work center: {work_center.code}")
@@ -297,7 +297,7 @@ async def update_resource(
             value = value.value
         setattr(resource, field, value)
 
-    resource.updated_at = datetime.utcnow()
+    resource.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(resource)
 
@@ -342,7 +342,7 @@ async def update_resource_status(
 
     old_status = resource.status
     resource.status = new_status.value
-    resource.updated_at = datetime.utcnow()
+    resource.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     logger.info(f"Resource {resource.code} status: {old_status} -> {new_status.value}")
@@ -525,7 +525,7 @@ async def sync_bambu_printers(
                 changed = True
 
             if changed:
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = datetime.now(timezone.utc)
                 updated.append(printer_info["name"])
             else:
                 skipped.append(printer_info["name"])
@@ -553,7 +553,7 @@ async def sync_bambu_printers(
     new_capacity = Decimal(str(active_printers * 20))  # 20 hrs per printer
     if fdm_pool.capacity_hours_per_day != new_capacity:
         fdm_pool.capacity_hours_per_day = new_capacity
-        fdm_pool.updated_at = datetime.utcnow()
+        fdm_pool.updated_at = datetime.now(timezone.utc)
         db.commit()
 
     logger.info(f"Bambu sync: created={created}, updated={updated}, skipped={skipped}")

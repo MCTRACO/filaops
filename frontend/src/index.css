@@ -1,6 +1,286 @@
 @import "tailwindcss";
 
-/* Toast slide-in animation */
+/* =============================================================================
+   BLB3D / FILAOPS ERP - NEO-INDUSTRIAL DESIGN SYSTEM
+   Colors extracted from BLB3D logo:
+   - Primary Blue: #026DF8
+   - Accent Orange: #EE7A08
+   - Background: #0F0F1E
+   ============================================================================= */
+
+/* =============================================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================================= */
+
+:root {
+  /* Background hierarchy - from logo #0F0F1E */
+  --bg-primary: #0F0F1E;
+  --bg-secondary: #161628;
+  --bg-card: #1C1C32;
+  --bg-elevated: #242440;
+
+  /* Brand Colors - from BLB3D logo */
+  --primary: #026DF8;
+  --primary-light: #0088FF;
+  --accent: #EE7A08;
+  --accent-light: #FF9933;
+
+  /* Status Colors */
+  --success: #00c853;
+  --warning: #EE7A08;
+  --error: #ef4444;
+  --info: #026DF8;
+
+  /* Text */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1a1;
+  --text-muted: #666666;
+
+  /* Borders */
+  --border-subtle: #2a2a3a;
+  --border-active: #3a3a4a;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+}
+
+/* =============================================================================
+   BASE STYLES
+   ============================================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: rgba(2, 109, 248, 0.3);
+  color: var(--text-primary);
+}
+
+/* Better focus styles */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* =============================================================================
+   TYPOGRAPHY UTILITIES
+   ============================================================================= */
+
+/* Monospace for data/prices/codes */
+.font-mono-data {
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* Display font for headings */
+.font-display {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* =============================================================================
+   COMPONENT UTILITIES
+   ============================================================================= */
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(28, 28, 50, 0.8);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Primary glow effect */
+.glow {
+  box-shadow: 0 0 20px -5px rgba(2, 109, 248, 0.4);
+}
+
+/* Accent (orange) glow */
+.glow-accent {
+  box-shadow: 0 0 20px -5px rgba(238, 122, 8, 0.4);
+}
+
+/* Subtle card hover lift */
+.card-hover {
+  transition: all var(--transition-base);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 40px -10px rgba(2, 109, 248, 0.15),
+    0 0 0 1px var(--border-subtle);
+}
+
+/* =============================================================================
+   LOGO ENHANCEMENT STYLES
+   ============================================================================= */
+
+/* Logo container with orange accent glow on hover */
+.logo-container {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(28, 28, 50, 0.5);
+  border: 1px solid var(--border-subtle);
+  transition: all var(--transition-base);
+}
+
+.logo-container:hover {
+  border-color: rgba(238, 122, 8, 0.5);
+  box-shadow: 0 0 20px -5px rgba(238, 122, 8, 0.5);
+}
+
+/* Orange glow for logo image */
+.logo-glow {
+  transition: all var(--transition-base);
+  filter: drop-shadow(0 0 0 transparent);
+}
+
+.logo-glow:hover,
+.logo-container:hover .logo-glow {
+  filter: drop-shadow(0 0 10px rgba(238, 122, 8, 0.4));
+}
+
+/* Subtle breathing glow animation */
+@keyframes logo-breathe {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px rgba(238, 122, 8, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(238, 122, 8, 0.5));
+  }
+}
+
+.logo-breathe {
+  animation: logo-breathe 3s ease-in-out infinite;
+}
+
+/* =============================================================================
+   BACKGROUND PATTERNS
+   ============================================================================= */
+
+/* Grid pattern for backgrounds */
+.grid-pattern {
+  background-image:
+    linear-gradient(rgba(2, 109, 248, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(2, 109, 248, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Industrial noise texture overlay */
+.noise-overlay {
+  position: relative;
+}
+
+.noise-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* =============================================================================
+   STATUS BADGES
+   ============================================================================= */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge-pending {
+  background: rgba(234, 179, 8, 0.1);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
+.status-badge-processing {
+  background: rgba(2, 109, 248, 0.1);
+  color: #026DF8;
+  border: 1px solid rgba(2, 109, 248, 0.2);
+}
+
+.status-badge-printing {
+  background: rgba(2, 109, 248, 0.1);
+  color: #0088FF;
+  border: 1px solid rgba(2, 109, 248, 0.2);
+}
+
+.status-badge-shipped {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.status-badge-delivered,
+.status-badge-success {
+  background: rgba(0, 200, 83, 0.1);
+  color: #00c853;
+  border: 1px solid rgba(0, 200, 83, 0.2);
+}
+
+.status-badge-error,
+.status-badge-cancelled {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.status-badge-maintenance {
+  background: rgba(238, 122, 8, 0.1);
+  color: #EE7A08;
+  border: 1px solid rgba(238, 122, 8, 0.2);
+}
+
+/* =============================================================================
+   SCROLLBAR STYLES
+   ============================================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* =============================================================================
+   ANIMATION KEYFRAMES
+   ============================================================================= */
+
 @keyframes slide-in {
   from {
     transform: translateX(100%);
@@ -12,6 +292,153 @@
   }
 }
 
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px -5px rgba(2, 109, 248, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px -5px rgba(2, 109, 248, 0.5);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(
+    90deg,
+    var(--bg-card) 0%,
+    var(--border-subtle) 50%,
+    var(--bg-card) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* =============================================================================
+   NAVIGATION ACTIVE STATE (NEO-INDUSTRIAL)
+   ============================================================================= */
+
+/* Replace cyan/blue gradient with primary/accent */
+.nav-item-active {
+  background: linear-gradient(90deg, rgba(2, 109, 248, 0.2), rgba(238, 122, 8, 0.1));
+  border: 1px solid rgba(2, 109, 248, 0.3);
+  color: white;
+}
+
+.nav-item-active:hover {
+  border-color: rgba(238, 122, 8, 0.5);
+}
+
+/* Nav item base state */
+.nav-item {
+  color: var(--text-secondary);
+  transition: all var(--transition-base);
+}
+
+.nav-item:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+/* Focus indicators for nav items - enhanced visibility */
+.nav-item:focus-visible {
+  outline: none;
+  background: var(--bg-card);
+  box-shadow: 0 0 0 2px var(--primary), 0 0 0 4px rgba(2, 109, 248, 0.3);
+}
+
+.nav-item-active:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 4px rgba(238, 122, 8, 0.3);
+}
+
+/* =============================================================================
+   BUTTON ENHANCEMENTS
+   ============================================================================= */
+
+/* Primary button with glow on hover */
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all var(--transition-base);
+}
+
+.btn-primary:hover {
+  background: var(--primary-light);
+  box-shadow: 0 0 20px -5px rgba(2, 109, 248, 0.5);
+}
+
+/* Accent button */
+.btn-accent {
+  background: var(--accent);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all var(--transition-base);
+}
+
+.btn-accent:hover {
+  background: var(--accent-light);
+  box-shadow: 0 0 20px -5px rgba(238, 122, 8, 0.5);
+}
+
+/* Ghost button */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all var(--transition-base);
+}
+
+.btn-ghost:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
 }

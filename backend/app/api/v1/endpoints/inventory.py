@@ -4,7 +4,7 @@ Inventory API Endpoints
 Handles inventory transactions, negative inventory approvals, and reporting.
 """
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -67,13 +67,13 @@ async def approve_negative_inventory(
     transaction.requires_approval = False
     transaction.approval_reason = approval_reason
     transaction.approved_by = current_user.email if current_user else "system"
-    transaction.approved_at = datetime.utcnow()
+    transaction.approved_at = datetime.now(timezone.utc)
     transaction.transaction_type = "negative_adjustment"
     
     # Now apply the inventory change (check original type to determine if it's a consumption)
     if original_type in ["issue", "consumption", "shipment", "scrap"]:
         inventory.on_hand_quantity = Decimal(str(inventory.on_hand_quantity)) - transaction.quantity
-        inventory.updated_at = datetime.utcnow()
+        inventory.updated_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(transaction)
@@ -351,19 +351,24 @@ async def adjust_inventory_quantity(
     
     # Update inventory directly to the new quantity (in transaction unit: GRAMS for materials)
     inventory.on_hand_quantity = float(new_qty_transaction_unit)
-    inventory.updated_at = datetime.utcnow()
+    inventory.updated_at = datetime.now(timezone.utc)
     
     # Get cost per unit for accounting
-    # For materials: Cost is per-KG, so keep it as-is (even though transaction qty is in grams)
-    # For others: Cost is per product_unit
-    from app.services.inventory_service import get_effective_cost
+    # Use cost per inventory unit ($/gram for materials, $/unit for others)
+    # This matches the transaction quantity unit for correct total_cost calculation
+    from app.services.inventory_service import get_effective_cost_per_inventory_unit
     transaction_cost_per_unit = None
     if cost_per_unit is not None:
         transaction_cost_per_unit = Decimal(str(cost_per_unit))
     else:
-        # Use product's effective cost for accounting
-        transaction_cost_per_unit = get_effective_cost(product)
-    
+        # Use product's effective cost per inventory unit
+        transaction_cost_per_unit = get_effective_cost_per_inventory_unit(product)
+
+    # Calculate total_cost for UI display
+    total_cost = None
+    if transaction_cost_per_unit is not None:
+        total_cost = float(abs_adjustment_qty) * float(transaction_cost_per_unit)
+
     # Create inventory transaction record for audit trail
     # STAR SCHEMA: Store quantity in transaction unit (GRAMS for materials)
     transaction = InventoryTransaction(
@@ -373,10 +378,11 @@ async def adjust_inventory_quantity(
         quantity=float(abs_adjustment_qty),  # GRAMS for materials, product_unit for others
         reference_type="manual_adjustment",
         reference_id=0,  # No specific reference document
-        cost_per_unit=transaction_cost_per_unit,  # Cost per product_unit (KG for materials)
+        cost_per_unit=transaction_cost_per_unit,  # Cost per inventory unit ($/g for materials)
+        total_cost=total_cost,  # Pre-calculated for UI display
         notes=transaction_notes,
         created_by=current_user.email if current_user else "system",
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         requires_approval=False,
     )
     db.add(transaction)

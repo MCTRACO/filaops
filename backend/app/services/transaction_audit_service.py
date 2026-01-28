@@ -12,7 +12,7 @@ Expected Transaction Flow (per ACCOUNTING_ARCHITECTURE.md):
 """
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
@@ -90,7 +90,7 @@ class TransactionAuditService:
             order_ids: Audit specific order IDs only
         """
         result = AuditResult(
-            audit_timestamp=datetime.utcnow(),
+            audit_timestamp=datetime.now(timezone.utc),
             total_orders_checked=0,
             orders_with_gaps=0,
             total_gaps=0,

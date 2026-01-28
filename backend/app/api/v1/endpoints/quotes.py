@@ -4,7 +4,7 @@ Quote Management Endpoints - Community Edition
 Manual quote creation and management for small businesses.
 Supports creating quotes, updating status, and converting to sales orders.
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from decimal import Decimal
 
@@ -168,7 +168,7 @@ class QuoteStatsResponse(BaseModel):
 
 def generate_quote_number(db: Session) -> str:
     """Generate next quote number in format Q-YYYY-NNN"""
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
 
     # Get the highest quote number for this year
     last_quote = db.query(Quote).filter(
@@ -226,7 +226,7 @@ async def get_quote_stats(
     db: Session = Depends(get_db),
 ):
     """Get quote statistics for dashboard"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     total = db.query(Quote).count()
     pending = db.query(Quote).filter(Quote.status == "pending").count()
@@ -281,7 +281,7 @@ async def create_quote(
 ):
     """Create a new manual quote"""
     quote_number = generate_quote_number(db)
-    expires_at = datetime.utcnow() + timedelta(days=request.valid_days)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=request.valid_days)
 
     # Calculate subtotal
     subtotal = request.unit_price * request.quantity
@@ -441,7 +441,7 @@ async def update_quote(
             else:
                 quote.total_price = subtotal
 
-    quote.updated_at = datetime.utcnow()
+    quote.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(quote)
 
@@ -482,7 +482,7 @@ async def update_quote_status(
     quote.status = request.status
 
     if request.status == "approved":
-        quote.approved_at = datetime.utcnow()
+        quote.approved_at = datetime.now(timezone.utc)
         quote.approved_by = current_user.id
         quote.approval_method = "manual"
 
@@ -492,7 +492,7 @@ async def update_quote_status(
     if request.admin_notes:
         quote.admin_notes = request.admin_notes
 
-    quote.updated_at = datetime.utcnow()
+    quote.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(quote)
 
@@ -528,14 +528,14 @@ async def convert_quote_to_order(
         )
 
     # Check if expired
-    if quote.expires_at < datetime.utcnow():
+    if quote.expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Quote has expired"
         )
 
     # Generate order number - with collision check
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     max_attempts = 100  # Prevent infinite loop
     
     # Find the highest existing sequence number for this year
@@ -646,8 +646,8 @@ async def convert_quote_to_order(
     # Update quote
     quote.status = "converted"
     quote.sales_order_id = sales_order.id
-    quote.converted_at = datetime.utcnow()
-    quote.updated_at = datetime.utcnow()
+    quote.converted_at = datetime.now(timezone.utc)
+    quote.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(sales_order)
@@ -726,7 +726,7 @@ async def upload_quote_image(
     quote.image_data = content
     quote.image_filename = file.filename
     quote.image_mime_type = file.content_type
-    quote.updated_at = datetime.utcnow()
+    quote.updated_at = datetime.now(timezone.utc)
 
     db.commit()
 
@@ -780,7 +780,7 @@ async def delete_quote_image(
     quote.image_data = None
     quote.image_filename = None
     quote.image_mime_type = None
-    quote.updated_at = datetime.utcnow()
+    quote.updated_at = datetime.now(timezone.utc)
 
     db.commit()
 

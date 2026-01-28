@@ -7,6 +7,11 @@ const ChevronIcon = () => (
   </svg>
 );
 
+// Skeleton pulse component for loading state
+const SkeletonPulse = ({ className = "" }) => (
+  <div className={`animate-pulse bg-gray-700/50 rounded ${className}`} />
+);
+
 /**
  * Reusable StatCard component for displaying metrics across admin pages.
  *
@@ -80,6 +85,7 @@ export default function StatCard({
   to,
   onClick,
   active = false,
+  loading = false,
 }) {
   // Wrapper component - Link if `to` prop provided, div otherwise
   const Wrapper = to ? Link : "div";
@@ -91,26 +97,36 @@ export default function StatCard({
   if (variant === "simple") {
     const baseClasses = "bg-gray-900 border rounded-xl p-4";
     const borderClasses = active ? "border-blue-500/50 bg-blue-500/10" : "border-gray-800";
-    const hoverClasses = isClickable ? "hover:border-gray-700 hover:bg-gray-800/50 transition-all cursor-pointer" : "";
+    const hoverClasses = isClickable && !loading ? "hover:border-gray-700 hover:bg-gray-800/50 transition-all cursor-pointer" : "";
 
     return (
       <Wrapper {...wrapperProps}>
         <div
           className={`${baseClasses} ${borderClasses} ${hoverClasses}`}
-          onClick={onClick}
-          role={onClick ? "button" : undefined}
-          tabIndex={onClick ? 0 : undefined}
-          onKeyDown={onClick ? (e) => e.key === 'Enter' && onClick() : undefined}
+          onClick={loading ? undefined : onClick}
+          role={onClick && !loading ? "button" : undefined}
+          tabIndex={onClick && !loading ? 0 : undefined}
+          onKeyDown={onClick && !loading ? (e) => e.key === 'Enter' && onClick() : undefined}
         >
           <div className="flex items-start justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">{title}</p>
-              <p className={`text-2xl font-bold ${colorClasses.simple[color] || colorClasses.simple.white}`}>
-                {value}
-              </p>
-              {subtitle && <p className="text-gray-500 text-xs mt-1">{subtitle}</p>}
+            <div className="flex-1">
+              {loading ? (
+                <>
+                  <SkeletonPulse className="h-4 w-20 mb-2" />
+                  <SkeletonPulse className="h-8 w-16" />
+                  {subtitle && <SkeletonPulse className="h-3 w-24 mt-2" />}
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-400 text-sm">{title}</p>
+                  <p className={`text-2xl font-bold ${colorClasses.simple[color] || colorClasses.simple.white}`}>
+                    {value}
+                  </p>
+                  {subtitle && <p className="text-gray-500 text-xs mt-1">{subtitle}</p>}
+                </>
+              )}
             </div>
-            {isClickable && (
+            {isClickable && !loading && (
               <div className="text-gray-600">
                 <ChevronIcon />
               </div>
@@ -123,20 +139,30 @@ export default function StatCard({
 
   // Gradient variant (default)
   const baseClasses = `bg-gradient-to-br ${colorClasses.gradient[color] || colorClasses.gradient.white} border rounded-xl p-6`;
-  const hoverClasses = to ? "hover:scale-[1.02] hover:shadow-lg transition-all cursor-pointer" : "";
+  const hoverClasses = to && !loading ? "hover:scale-[1.02] hover:shadow-lg transition-all cursor-pointer" : "";
 
   return (
     <Wrapper {...wrapperProps}>
       <div className={`${baseClasses} ${hoverClasses}`}>
         <div className="flex items-start justify-between">
-          <div>
-            <p className="text-gray-400 text-sm font-medium">{title}</p>
-            <p className="text-3xl font-bold text-white mt-1">{value}</p>
-            {subtitle && <p className="text-gray-500 text-xs mt-1">{subtitle}</p>}
+          <div className="flex-1">
+            {loading ? (
+              <>
+                <SkeletonPulse className="h-4 w-24 mb-2" />
+                <SkeletonPulse className="h-9 w-20 mt-1" />
+                {subtitle && <SkeletonPulse className="h-3 w-28 mt-2" />}
+              </>
+            ) : (
+              <>
+                <p className="text-gray-400 text-sm font-medium">{title}</p>
+                <p className="text-3xl font-bold text-white mt-1">{value}</p>
+                {subtitle && <p className="text-gray-500 text-xs mt-1">{subtitle}</p>}
+              </>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {icon && <div className="text-gray-500">{icon}</div>}
-            {to && (
+            {icon && !loading && <div className="text-gray-500">{icon}</div>}
+            {to && !loading && (
               <div className="text-gray-600">
                 <ChevronIcon />
               </div>

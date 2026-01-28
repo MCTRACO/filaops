@@ -9,13 +9,15 @@ try:
 except ImportError:
     SENTRY_AVAILABLE = False
 
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import SQLAlchemyError
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.limiter import apply_rate_limiting
 from app.api.v1 import router as api_v1_router
@@ -185,7 +187,7 @@ app.add_middleware(
     allow_origins=getattr(settings, 'ALLOWED_ORIGINS', ["*"]),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With", "X-API-Key"],
 )
 
 
@@ -201,7 +203,7 @@ async def filaops_exception_handler(request: Request, exc: FilaOpsException):
     )
     # Add timestamp to error response for consistency
     error_dict = exc.to_dict()
-    error_dict["timestamp"] = datetime.utcnow().isoformat() + "Z"
+    error_dict["timestamp"] = datetime.now(timezone.utc).isoformat() + "Z"
     return JSONResponse(status_code=exc.status_code, content=error_dict)
 
 
@@ -218,7 +220,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "error": "VALIDATION_ERROR",
             "message": "Request validation failed",
             "details": {"errors": errors},
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
         },
     )
 
@@ -231,7 +233,7 @@ async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
         content={
             "error": "DATABASE_ERROR",
             "message": "A database error occurred. Please try again.",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
         },
     )
 
@@ -244,13 +246,20 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={
             "error": "INTERNAL_ERROR",
             "message": "An unexpected error occurred. Please try again later.",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
         },
     )
 
 
 # Include API routes
 app.include_router(api_v1_router, prefix="/api/v1")
+
+# Static file serving for uploaded images
+# Creates directory if it doesn't exist
+STATIC_DIR = Path(__file__).parent.parent / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+(STATIC_DIR / "uploads" / "products").mkdir(parents=True, exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 @app.get("/")

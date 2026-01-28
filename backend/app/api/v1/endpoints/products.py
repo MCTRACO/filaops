@@ -71,6 +71,7 @@ class ProductCreate(BaseModel):
     selling_price: Optional[float] = None
     is_raw_material: bool = False
     active: bool = True
+    image_url: Optional[str] = None  # Product image URL
 
 
 class ProductUpdate(BaseModel):
@@ -84,6 +85,7 @@ class ProductUpdate(BaseModel):
     selling_price: Optional[float] = None
     is_raw_material: Optional[bool] = None
     active: Optional[bool] = None
+    image_url: Optional[str] = None  # Product image URL
 
 
 class ProductResponse(BaseModel):
@@ -101,6 +103,7 @@ class ProductResponse(BaseModel):
     has_bom: bool
     active: bool
     woocommerce_product_id: Optional[int] = None
+    image_url: Optional[str] = None  # Product image URL
     created_at: datetime
 
     class Config:
@@ -247,6 +250,7 @@ async def create_product(
             selling_price=request.selling_price,
             is_raw_material=request.is_raw_material,
             active=request.active,
+            image_url=request.image_url,
         )
 
         db.add(product)

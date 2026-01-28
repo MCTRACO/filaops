@@ -15,9 +15,9 @@ from decimal import Decimal
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Calculate path to .env in project root (4 levels up from this file)
-# backend/app/core/settings.py -> <repo>/.env
-_ENV_FILE = Path(__file__).resolve().parent.parent.parent.parent / ".env"
+# Calculate path to .env in backend folder (3 levels up from this file)
+# backend/app/core/settings.py -> backend/.env
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     # Application Settings
     # ===================
     PROJECT_NAME: str = "FilaOps"
-    VERSION: str = "1.0.0"
+    VERSION: str = "3.0.0"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = Field(default=False, description="Enable debug mode")
     ENVIRONMENT: str = Field(default="development", description="Deployment environment")
@@ -80,6 +80,12 @@ class Settings(BaseSettings):
         default=30, description="JWT token expiration in minutes"
     )
     API_KEY: Optional[str] = Field(default=None, description="API key for integrations")
+
+    # ===================
+    # Portal Integration
+    # ===================
+    PORTAL_API_KEY: Optional[str] = Field(default=None, description="API key for portal authentication")
+    PORTAL_URL: str = Field(default="http://localhost:3000", description="Portal frontend URL")
 
     @field_validator("SECRET_KEY")
     @classmethod

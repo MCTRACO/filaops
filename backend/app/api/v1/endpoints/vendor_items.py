@@ -8,7 +8,7 @@ Manage vendor SKU mappings for invoice parsing memory:
 """
 from typing import Optional, List
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
@@ -135,7 +135,7 @@ async def create_vendor_item(
         default_unit_cost=str(request.default_unit_cost) if request.default_unit_cost else None,
         default_purchase_unit=request.default_purchase_unit,
         notes=request.notes,
-        last_seen_at=datetime.utcnow(),
+        last_seen_at=datetime.now(timezone.utc),
         times_ordered=0,
     )
 
@@ -376,7 +376,7 @@ async def bulk_update_last_seen(
     Request body: [{"vendor_id": 1, "vendor_sku": "ABC123"}, ...]
     """
     updated_count = 0
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     for item_data in items:
         vendor_id = item_data.get("vendor_id")

@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from . import (
     bom, dashboard, fulfillment, audit, accounting, traceability,
     customers, inventory_transactions, analytics, export, data_import, orders,
-    users, uom, locations, system
+    users, uom, locations, system, uploads
 )
 
 router = APIRouter()
@@ -55,3 +55,6 @@ router.include_router(locations.router)
 
 # System Management (updates, maintenance)
 router.include_router(system.router)
+
+# File Uploads (product images, etc.)
+router.include_router(uploads.router, prefix="/uploads", tags=["uploads"])

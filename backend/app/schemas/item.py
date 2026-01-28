@@ -217,6 +217,9 @@ class ItemUpdate(BaseModel):
     track_lots: Optional[bool] = None
     track_serials: Optional[bool] = None
 
+    # Image
+    image_url: Optional[str] = Field(None, max_length=500, description="Product image URL")
+
     # Material link
     material_type_id: Optional[int] = None
     color_id: Optional[int] = None

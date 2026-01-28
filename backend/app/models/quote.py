@@ -3,7 +3,7 @@ SQLAlchemy models for customer quotes and uploaded files
 
 Handles quote requests, file uploads, and approval workflow
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Numeric, BigInteger, Boolean,
     DateTime, Date, ForeignKey, LargeBinary, func
@@ -129,7 +129,7 @@ class Quote(Base):
     @property
     def is_expired(self) -> bool:
         """Check if quote has expired"""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     @property
     def has_image(self) -> bool:
@@ -175,7 +175,7 @@ class Quote(Base):
             Quote number like 'Q-2024-001'
         """
         if year is None:
-            year = datetime.utcnow().year
+            year = datetime.now(timezone.utc).year
 
         # This will be implemented in the endpoint to query the database
         # for the last quote number of the year

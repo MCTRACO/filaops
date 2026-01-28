@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 import logging
 
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 def generate_payment_number(db: Session) -> str:
     """Generate next payment number: PAY-YYYY-NNNN"""
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     prefix = f"PAY-{year}-"
 
     last_payment = db.query(Payment).filter(
@@ -72,7 +72,7 @@ def update_order_payment_status(db: Session, order: SalesOrder):
     elif total_paid >= order_total:
         order.payment_status = "paid"
         if not order.paid_at:
-            order.paid_at = datetime.utcnow()
+            order.paid_at = datetime.now(timezone.utc)
     else:
         order.payment_status = "partial"
 
@@ -129,7 +129,7 @@ async def record_payment(
         payment_method=payment_data.payment_method,
         payment_type="payment",
         status="completed",
-        payment_date=payment_data.payment_date or datetime.utcnow(),
+        payment_date=payment_data.payment_date or datetime.now(timezone.utc),
         transaction_id=payment_data.transaction_id,
         check_number=payment_data.check_number,
         notes=payment_data.notes,
@@ -189,7 +189,7 @@ async def record_refund(
         payment_method=refund_data.payment_method,
         payment_type="refund",
         status="completed",
-        payment_date=refund_data.payment_date or datetime.utcnow(),
+        payment_date=refund_data.payment_date or datetime.now(timezone.utc),
         transaction_id=refund_data.transaction_id,
         notes=refund_data.notes,
     )
@@ -296,7 +296,7 @@ async def get_payment_dashboard(
     """
     Get payment dashboard statistics.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = today_start - timedelta(days=now.weekday())
     month_start = today_start.replace(day=1)

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { API_URL } from "../../config/api";
 import logoFull from "../../assets/logo_full.png";
+import logoBLB3D from "../../assets/logo_blb3d.svg";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -108,37 +109,50 @@ export default function AdminLogin() {
 
   if (checkingSetup) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center grid-pattern" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div style={{ color: 'var(--text-primary)' }}>Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950 px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 grid-pattern" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <div className="w-full max-w-md">
-        {/* Logo */}
+        {/* Dual Logos - BLB3D + FilaOps */}
         <div className="text-center mb-8">
-          <Link to="/">
-            <img 
-              src={logoFull} 
-              alt="FilaOps" 
-              className="w-full max-w-md mx-auto mb-8 drop-shadow-[0_0_35px_rgba(0,212,255,0.5)]"
-            />
+          <Link to="/" className="inline-block">
+            <div className="flex flex-col items-center gap-4">
+              {/* BLB3D Logo with breathing glow */}
+              <div className="logo-container">
+                <img
+                  src={logoBLB3D}
+                  alt="BLB3D"
+                  className="h-16 w-auto logo-breathe"
+                />
+              </div>
+              {/* FilaOps Logo */}
+              <img
+                src={logoFull}
+                alt="FilaOps"
+                className="w-full max-w-xs mx-auto"
+                style={{ filter: 'drop-shadow(0 0 25px rgba(2, 109, 248, 0.4))' }}
+              />
+            </div>
           </Link>
-          <h1 className="text-2xl text-white mt-4">Staff Login</h1>
-          <p className="text-gray-400 mt-2">Sign in to access FilaOps</p>
+          <h1 className="text-2xl mt-6 font-display" style={{ color: 'var(--text-primary)' }}>Staff Login</h1>
+          <p className="mt-2" style={{ color: 'var(--text-secondary)' }}>Sign in to access FilaOps ERP</p>
         </div>
 
         {/* API Connection Error */}
         {apiError && (
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
+          <div className="rounded-xl p-4 mb-6" style={{ backgroundColor: 'rgba(238, 122, 8, 0.1)', border: '1px solid rgba(238, 122, 8, 0.3)' }}>
             <div className="flex items-start gap-3">
               <svg
-                className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0"
+                className="w-5 h-5 mt-0.5 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                style={{ color: 'var(--accent)' }}
               >
                 <path
                   strokeLinecap="round"
@@ -148,20 +162,20 @@ export default function AdminLogin() {
                 />
               </svg>
               <div>
-                <h3 className="text-yellow-400 font-medium">
+                <h3 className="font-medium" style={{ color: 'var(--accent)' }}>
                   Connection Issue
                 </h3>
-                <p className="text-yellow-200/70 text-sm mt-1">{apiError}</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{apiError}</p>
               </div>
             </div>
           </div>
         )}
 
         {/* Login Form */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8">
+        <div className="rounded-xl p-8" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400 text-sm">
+              <div className="rounded-lg p-4 text-sm" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#ef4444' }}>
                 {error}
               </div>
             )}
@@ -169,7 +183,8 @@ export default function AdminLogin() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-gray-300 mb-2"
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'var(--text-secondary)' }}
               >
                 Email Address
               </label>
@@ -182,7 +197,13 @@ export default function AdminLogin() {
                 }
                 required
                 autoComplete="email"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 transition-all"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-primary)',
+                  '--tw-ring-color': 'var(--primary)'
+                }}
                 placeholder="admin@example.com"
               />
             </div>
@@ -190,7 +211,8 @@ export default function AdminLogin() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-300 mb-2"
+                className="block text-sm font-medium mb-2"
+                style={{ color: 'var(--text-secondary)' }}
               >
                 Password
               </label>
@@ -203,7 +225,13 @@ export default function AdminLogin() {
                 }
                 required
                 autoComplete="current-password"
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full rounded-lg px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 transition-all"
+                style={{
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-primary)',
+                  '--tw-ring-color': 'var(--primary)'
+                }}
                 placeholder="Enter your password"
               />
             </div>
@@ -211,7 +239,12 @@ export default function AdminLogin() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white py-3 rounded-lg font-medium hover:from-cyan-400 hover:to-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: 'linear-gradient(90deg, var(--primary), var(--primary-light))',
+                color: 'white',
+                boxShadow: loading ? 'none' : '0 0 20px -5px rgba(2, 109, 248, 0.5)'
+              }}
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -244,7 +277,8 @@ export default function AdminLogin() {
             <div className="text-center">
               <Link
                 to="/forgot-password"
-                className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                className="text-sm transition-colors"
+                style={{ color: 'var(--primary)' }}
               >
                 Forgot your password?
               </Link>
@@ -256,7 +290,8 @@ export default function AdminLogin() {
         <div className="text-center mt-6">
           <Link
             to="/"
-            className="text-gray-400 hover:text-white text-sm transition-colors"
+            className="text-sm transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
           ></Link>
         </div>
       </div>

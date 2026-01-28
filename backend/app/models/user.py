@@ -71,6 +71,14 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     quotes = relationship("Quote", back_populates="user", foreign_keys="[Quote.user_id]", cascade="all, delete-orphan")
     sales_orders = relationship("SalesOrder", back_populates="user", foreign_keys="[SalesOrder.user_id]", cascade="all, delete-orphan")
+    
+    # Multi-customer access (B2B portal)
+    customer_access = relationship(
+        "UserCustomerAccess",
+        back_populates="user",
+        foreign_keys="[UserCustomerAccess.user_id]",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', status='{self.status}')>"
@@ -129,9 +137,9 @@ class RefreshToken(Base):
     @property
     def is_valid(self) -> bool:
         """Check if refresh token is still valid (not revoked and not expired)"""
-        from datetime import datetime
+        from datetime import datetime, timezone
         # Using naive datetime (no timezone) for PostgreSQL TIMESTAMP compatibility
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return not self.revoked and self.expires_at > now
 
 
@@ -180,13 +188,13 @@ class PasswordResetRequest(Base):
     @property
     def is_valid(self) -> bool:
         """Check if reset request can be used"""
-        from datetime import datetime
-        now = datetime.utcnow()
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
         return self.status == 'approved' and self.expires_at > now
 
     @property
     def is_pending(self) -> bool:
         """Check if waiting for admin approval"""
-        from datetime import datetime
-        now = datetime.utcnow()
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
         return self.status == 'pending' and self.expires_at > now

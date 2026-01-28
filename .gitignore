@@ -1,19 +1,41 @@
+# =============================================================================
+# BLB3D Production - Git Ignore
+# =============================================================================
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+.env.backup
+.env.production
+backend/.env.production
+*.env
+secrets/
+credentials/
+
+# Claude Code local settings (may contain secrets)
+.claude/settings.local.json
+
+# Windows artifacts
+nul
+*.lnk
+
+# Sync files
+.last-sync
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-# lib/  # Commented out - was ignoring frontend/src/lib/
+lib/
 lib64/
 parts/
 sdist/
@@ -22,377 +44,90 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.ruff_cache/
 
-# FastAPI
-.env
-.env.local
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
 
-# Node
+# Node.js / Frontend
 node_modules/
-/dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
 
-# IDEs
-.vscode/
+# Build outputs
+dist/
+dist-ssr/
+*.local
+frontend/dist/
+
+# IDE & Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
-*.code-workspace
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
 
+# Logs
+logs/
+*.log
+
 # Database
 *.db
-*.sqlite
 *.sqlite3
 
-# Logs
-*.log
-logs/
-
-# Uploads
-uploads/
+# Uploads (user content)
+uploads/*
+!uploads/.gitkeep
 
 # Testing
-.coverage
-htmlcov/
-.pytest_cache/
-.tox/
-.nox/
-coverage.xml
-*.cover
-*.py,cover
-nosetests.xml
-tests/e2e/screenshots/
-tests/e2e/test-results/
-tests/e2e/videos/
-tests/e2e/.auth/
-tests/__pycache__/
-playwright-report/
-playwright/.cache/
-test-results/
-
-# Frontend E2E (Playwright)
-frontend/e2e/test-results/
-frontend/e2e/screenshots/
-frontend/e2e/.auth/
-frontend/playwright-report/
-frontend/test-results/
-frontend/.auth/
-
-# Jest / Vitest (frontend testing)
-coverage/
+/playwright-report/
+/test-results/
+/coverage/
 .nyc_output/
-jest.config.local.js
-vitest.config.local.ts
 
-# Cypress
-cypress/videos/
-cypress/screenshots/
-cypress/downloads/
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 
-# Backup files
+# Temporary files
+*.tmp
+*.temp
 *.bak
 
-# Strategic/Internal Documentation
-docs/PROJECT_REVIEW_2024.md
-docs/MEDICAL_DEVICE_COMPLIANCE_GAP_ANALYSIS.md
-docs/TECHNICAL_REVIEW_2024.md
-docs/BLB3D ERP System - Deep Technical Review.md
+# Alembic
+alembic/versions/__pycache__/
 
-# Data migration - entire folder (contains business data, invoices, PDFs)
-data_migration/
+# Binaries
+*.exe
 
-# Test artifacts
-tests/e2e/screenshots/
-tests/e2e/test-results/
-tests/e2e/reports/
-backend/htmlcov/
+# Output/log files
+*_output.txt
+migration_output.txt
+tables_output.txt
 
-# Business data - DO NOT COMMIT
-*.csv
-!data_migration/README.md
-*.xlsx
-*.xls
-*.mrp
-# Specific data files
-Square_*.csv
-Squarespace_*.csv
-TikTok_*.csv
-amazon_*.csv
-*_orders*.csv
-*_transactions*.csv
+# Working documents
+**/ACTIVE_WORK.md
 
-# SQL Server
-*.mdf
-*.ldf
-
-# Sensitive configs
-secrets.json
-credentials.json
-config.local.py
-
-# Temporary/test files
-temp/
-_ul/
-nul
-*.3mf
-*.stl
-test-output.txt
-CURRENT_SESSION.md
-
-# One-off scripts in root (migrations in backend/ are tracked)
-/audit_*.py
-/check_*.py
-/cleanup_*.py
-/fix_*.py
-/test_*.py
-!backend/app/tests/
-
-# Backend debug/diagnostic scripts (one-off, not part of codebase)
-backend/scripts/
-# But keep security_audit.py - it's used by the security endpoint
-!backend/scripts/security_audit.py
-
-# Caddy binary (downloaded by auto-setup)
-caddy.exe
-
-# AI assistant instructions (local context only)
-.ai-instructions/
-
-# Temporary JSON files
-accept.json
-convert_order.json
-register.json
-register_response.json
-cli_config_fixed.json
-
-# Generated PDFs (regenerate from source)
-*.pdf
-
-# SOP Documents (local review before publishing)
-docs/sop/
-
-# Batch files (local only)
-*.bat
-
-# PowerShell scripts (local convenience)
-*.ps1
-!start-backend.ps1
-!start-frontend.ps1
-!start-all.ps1
-!install.ps1
-!install-frontend.ps1
-!installer/scripts/*.ps1
-
-# Temp/generated HTML files (specific paths only)
-frontend/dist/**/*.html
-backend/htmlcov/**/*.html
-playwright-report/**/*.html
-test-results/**/*.html
-frontend/playwright-report/**/*.html
-frontend/test-results/**/*.html
-*.temp.html
-*.tmp.html
-
-# ===========================================
-# SECURITY - Prevent accidental secret commits
-# ===========================================
-
-# API keys and tokens
-*.pem
-*.key
-*.crt
-*_rsa
-*_dsa
-*_ecdsa
-*_ed25519
-service-account*.json
-google-credentials*.json
-
-# Environment files (all variants)
-.env.*
-!.env.example
-*.env
-local.settings.json
-
-# ML models and proprietary data
-*.pkl
-*.joblib
-*.h5
-*.pt
-*.pth
-*.onnx
-*.model
-
-# Business data backups
-backup/
-*_backup_*.json
-*_export_*.csv
-customer_*.csv
-order_*.csv
-
-# Deployment configs with secrets
-# docker-compose.override.yml (Docker no longer used)
-# docker-compose.local.yml (Docker no longer used)
-*.secrets.yml
-*.secrets.yaml
-
-# IDE with potential secrets in workspace
-.claude/
-!.claude/settings.json
-
-# Handoff docs (may contain sensitive context)
-HANDOFF*.md
-*_HANDOFF*.md
-!SESSION_HANDOFF.md
-BLB3D_*.md
-**/BLB3D*.md
-**/BLB3D*.pdf
-CURRENT_SESSION.md
-
-# Internal planning docs (keep architecture, remove internal refs)
-*_REFERENCE*.md
-!API_REFERENCE.md
-create-github-issues.ps1
-
-# Strategic planning docs (Pro/Enterprise) - move to private repo later
-ROADMAP.md
-ACCOUNTING_ARCHITECTURE.md
-IMMEDIATE_ACTION_PLAN.md
-IMMEDIATE_ACTION_ITEMS_COMPLETE.md
-PHASE4_PLAN.md
-PHASE5B_MRP_PLAN.md
-docs/SAAS_TIERING_PLAN.md
-
-# Testing guides (internal)
-docs/VM_TESTING_GUIDE.md
-
-# Internal development plans and refactoring
-MRP_REFACTOR_PLAN.md
-*_REFACTOR*.md
-
-# Internal bug tracking and status
-docs/BUG_FIX_STATUS.md
-*_BUG*.md
-*_STATUS*.md
-
-# Draft content
-docs/DRAFT_DISCUSSION_POST.md
-*_DRAFT*.md
-
-# Pro/Enterprise feature implementation (internal)
-LICENSE_ACTIVATION_GUIDE.md
-TIER_SETUP.md
-*_ACTIVATION*.md
-
-# Business logic and pricing (internal)
-docs/PRINTER_COST_CALCULATOR.md
-
-# Debug and fix documentation (internal)
-*_DEBUG.md
-*_FIX.md
-*_FIX_COMPLETE.md
-DEBUG_*.md
-NETWORK_FIX.md
-ORDER_DETAIL_DEBUG.md
-
-# Internal documentation audit
-docs/DOCUMENTATION_AUDIT.md
-
-# Architecture docs (may reveal too much detail)
-SYSTEM_ARCHITECTURE.md
-ARCHITECTURE.md
-DATABASE_ARCHITECTURE.md
-INTEGRATION_ARCHITECTURE.md
-*_ARCHITECTURE.md
-
-# Workflow and design docs (may be too detailed)
-docs/UI_WORKFLOWS.md
-PRO_RELEASE_Q2_2026.md
-CORE_RELEASE_PLAN.md
-ENTERPRISE_RELEASE_PLAN.md
-docs/MANUFACTURING_ROUTES.md
-
-# Project status and progress (internal tracking)
-PROJECT_STATUS.md
-PROGRESS_SUMMARY*.md
-*_PROGRESS*.md
-*_STATUS*.md
-RELEASE_PROGRESS.md
-
-# Release checklist (internal)
-OPEN_SOURCE_RELEASE_CHECKLIST.md
-
-# Integration and implementation docs (may reveal details)
-INTEGRATION_*.md
-IMPLEMENTATION_PLAN.md
-*_QUICKSTART.md
-
-# Testing and development docs (internal)
-TESTING*.md
-TEST_*.md
-*_TEST*.md
-TESTING_STRATEGY.md
-
-# Session and handoff docs (internal context)
-SESSION_HANDOFF.md
-AI_CONTEXT.md
-# Note: CLAUDE.md is tracked - contains dev/prod environment safeguards
-
-# Phase and sprint planning (internal)
-PHASE_*.md
-SPRINT_PLAN.md
-*_PLAN.md
-!INSTALL.md
-
-# Numbering and standards (internal)
-NUMBERING_STANDARDS.md
-*_STANDARDS*.md
-
-# Issues and bug tracking (internal)
-ISSUES.md
-blb3d-erp-bugfixes.md
-
-# Manufacturing flow (may be too detailed)
-MANUFACTURING_FLOW.md
-
-# Diagrams (may contain internal architecture)
-DIAGRAMS.md
-
-# Core product scope (internal planning)
-CORE_PRODUCT_SCOPE.md
-
-# Authorization and recommendations (internal)
-AUTHORIZATION_RECOMMENDATION.md
-
-# Security doc (may reveal vulnerabilities)
-SECURITY.md
-
-# ERP/MRP review (internal analysis)
-ERP_MRP_REVIEW.md
-
-# Backend setup docs (may contain sensitive info)
-backend/GCS_SETUP.md
-
-# Internal metrics tracking (private business data)
-docs/metrics/
-
-# Robot Army - Internal Testing Framework (DO NOT COMMIT)
-# Keep this internal until ready for separate open-source release
-agents/
-
-# Marketing materials (internal promotional content)
-marketing/
-
-# Internal team briefings and planning
-TEAM_BRIEFING.md
-MARCHING_ORDERS.md
-
-.fake
-uploads/
+# Screenshots/images
+*.png

@@ -4,7 +4,7 @@ Pydantic schemas for customer quote system
 Request and response models for quote creation, file uploads, and workflow
 """
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator
 
@@ -148,7 +148,7 @@ class QuoteResponse(BaseModel):
     @property
     def is_expired(self) -> bool:
         """Check if quote has expired"""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     @property
     def file_size_mb(self) -> float:
@@ -179,7 +179,7 @@ class QuoteListResponse(BaseModel):
     @property
     def is_expired(self) -> bool:
         """Check if quote has expired"""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
 
 class QuoteUpdateStatus(BaseModel):

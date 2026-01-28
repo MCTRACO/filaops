@@ -3,7 +3,8 @@ Sales Order Management Endpoints
 
 Handles converting quotes to sales orders and order lifecycle management
 """
-from datetime import datetime
+import math
+from datetime import datetime, timezone
 from typing import List, Optional
 from decimal import Decimal
 
@@ -17,8 +18,8 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.quote import Quote
 from app.models.sales_order import SalesOrder, SalesOrderLine
-from app.models.production_order import ProductionOrder, ProductionOrderOperation
-from app.models.manufacturing import RoutingOperation
+from app.models.production_order import ProductionOrder, ProductionOrderOperation, ProductionOrderOperationMaterial
+from app.models.manufacturing import RoutingOperation, RoutingOperationMaterial
 from app.models.product import Product
 from app.models.bom import BOM, BOMLine
 from app.models.inventory import Inventory
@@ -73,10 +74,11 @@ router = APIRouter(prefix="/sales-orders", tags=["Sales Orders"])
 
 def _copy_routing_to_operations(db: Session, order: ProductionOrder, routing_id: int) -> List[ProductionOrderOperation]:
     """
-    Copy routing operations to production order operations.
-    
+    Copy routing operations AND their materials to production order operations.
+
     This creates the individual operation records that track progress through
-    the manufacturing process (Print, Finishing, QC, Pack, etc.).
+    the manufacturing process (Print, Finishing, QC, Pack, etc.), along with
+    the material requirements for each operation.
     """
     routing_ops = (
         db.query(RoutingOperation)
@@ -100,6 +102,33 @@ def _copy_routing_to_operations(db: Session, order: ProductionOrder, routing_id:
             status="pending",
         )
         db.add(op)
+        db.flush()  # Get op.id for material records
+
+        # Copy materials from routing operation to production order operation
+        for rom in rop.materials:
+            if rom.is_cost_only:
+                continue  # Skip cost-only materials (no inventory consumption)
+
+            # Use built-in method that handles quantity_per and scrap_factor
+            qty_required = rom.calculate_required_quantity(int(order.quantity_ordered))
+
+            # Round up for discrete units (can't ship 0.792 boxes)
+            unit_upper = (rom.unit or "").upper()
+            if unit_upper in ("EA", "EACH", "PCS", "UNIT", "BOX", "BOXES"):
+                qty_required = math.ceil(qty_required)
+
+            mat = ProductionOrderOperationMaterial(
+                production_order_operation_id=op.id,
+                component_id=rom.component_id,
+                routing_operation_material_id=rom.id,
+                quantity_required=Decimal(str(qty_required)),
+                unit=rom.unit,
+                quantity_allocated=Decimal("0"),
+                quantity_consumed=Decimal("0"),
+                status="pending",
+            )
+            db.add(mat)
+
         operations.append(op)
 
     return operations
@@ -118,7 +147,7 @@ def _create_production_orders_for_so(order: SalesOrder, db: Session, created_by:
     from sqlalchemy import desc as sql_desc
 
     created_orders = []
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
 
     def get_next_po_code():
         """
@@ -448,7 +477,7 @@ async def create_sales_order(
     # ========================================================================
     # GENERATE: Order number with row locking to prevent duplicates
     # ========================================================================
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     # Use with_for_update() for row-level locking to prevent race conditions
     last_order = (
         db.query(SalesOrder)
@@ -674,7 +703,7 @@ async def convert_quote_to_sales_order(
         )
 
     # Generate sales order number with row locking to prevent duplicates
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     last_order = (
         db.query(SalesOrder)
         .filter(SalesOrder.order_number.like(f"SO-{year}-%"))
@@ -730,7 +759,7 @@ async def convert_quote_to_sales_order(
 
     # Update quote to mark as converted
     quote.sales_order_id = sales_order.id
-    quote.converted_at = datetime.utcnow()
+    quote.converted_at = datetime.now(timezone.utc)
 
     # =========================================================================
     # Create Production Order
@@ -1655,7 +1684,7 @@ async def update_order_status(
 
     # Set timestamps based on status
     if update.status == "confirmed" and old_status == "pending":
-        order.confirmed_at = datetime.utcnow()
+        order.confirmed_at = datetime.now(timezone.utc)
 
         # Auto-create production orders for confirmed orders
         # Check if production orders already exist
@@ -1686,13 +1715,13 @@ async def update_order_status(
                     )
 
     if update.status == "shipped":
-        order.shipped_at = datetime.utcnow()
+        order.shipped_at = datetime.now(timezone.utc)
 
     if update.status == "delivered":
-        order.delivered_at = datetime.utcnow()
+        order.delivered_at = datetime.now(timezone.utc)
 
     if update.status == "completed":
-        order.actual_completion_date = datetime.utcnow()
+        order.actual_completion_date = datetime.now(timezone.utc)
 
     # Update notes
     if update.internal_notes:
@@ -1765,7 +1794,7 @@ async def update_payment_info(
         order.payment_transaction_id = update.payment_transaction_id
 
     if update.payment_status == "paid":
-        order.paid_at = datetime.utcnow()
+        order.paid_at = datetime.now(timezone.utc)
 
     # Record payment event
     if old_payment_status != update.payment_status:
@@ -1903,7 +1932,7 @@ async def update_shipping_address(
         order.shipping_country = update.shipping_country
         address_changed = True
 
-    order.updated_at = datetime.utcnow()
+    order.updated_at = datetime.now(timezone.utc)
 
     # Record address change event
     if address_changed:
@@ -1980,7 +2009,7 @@ async def cancel_sales_order(
     # Cancel order
     old_status = order.status
     order.status = "cancelled"
-    order.cancelled_at = datetime.utcnow()
+    order.cancelled_at = datetime.now(timezone.utc)
     order.cancellation_reason = cancel_request.cancellation_reason
 
     # Record cancellation event
@@ -2120,7 +2149,7 @@ async def ship_order(
     if request.tracking_number:
         tracking_number = request.tracking_number
     else:
-        date_part = datetime.utcnow().strftime("%Y%m%d")
+        date_part = datetime.now(timezone.utc).strftime("%Y%m%d")
         random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
         carrier_prefix = request.carrier[:3].upper() if request.carrier else "SHP"
         tracking_number = f"{carrier_prefix}{date_part}{order_id:04d}{random_part}"
@@ -2128,9 +2157,9 @@ async def ship_order(
     # Update order
     order.tracking_number = tracking_number
     order.carrier = request.carrier
-    order.shipped_at = datetime.utcnow()
+    order.shipped_at = datetime.now(timezone.utc)
     order.status = "shipped"
-    order.updated_at = datetime.utcnow()
+    order.updated_at = datetime.now(timezone.utc)
 
     # Process inventory transactions:
     # 1. Consume packaging materials (shipping stage BOM items)
@@ -2262,7 +2291,7 @@ async def generate_production_orders(
         }
 
     created_orders = []
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
 
     # Helper to generate next PO code
     def get_next_po_code():
@@ -2422,10 +2451,14 @@ async def generate_production_orders(
 
     db.commit()
 
-    # Update order status to confirmed if pending
+    # Update order status when production orders are created
+    # Transition: pending → confirmed → in_production (since WOs now exist)
     if order.status == "pending":
-        order.status = "confirmed"
-        order.confirmed_at = datetime.utcnow()
+        order.status = "in_production"
+        order.confirmed_at = datetime.now(timezone.utc)
+        db.commit()
+    elif order.status == "confirmed":
+        order.status = "in_production"
         db.commit()
 
     return {

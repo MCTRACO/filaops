@@ -8,7 +8,7 @@ CRUD operations for routings and routing operations.
 # SQLAlchemy Column types resolve to actual values at runtime
 from fastapi import APIRouter, HTTPException, Depends, Query, status
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
@@ -432,7 +432,7 @@ async def apply_template_to_product(
         routing = existing
         routing.name = f"{template.name} - {product.sku}"  # type: ignore[assignment]
         routing.notes = f"Applied from template {template.code}"  # type: ignore[assignment]
-        routing.updated_at = datetime.utcnow()  # type: ignore[assignment]
+        routing.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         message = f"Updated routing for {product.sku}"
     else:
         # Create new routing for this product
@@ -615,7 +615,7 @@ async def update_routing(
     for field, value in update_data.items():
         setattr(routing, field, value)
 
-    routing.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    routing.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     db.commit()
     db.refresh(routing)
 
@@ -636,7 +636,7 @@ async def delete_routing(
         raise HTTPException(status_code=404, detail="Routing not found")
 
     routing.is_active = False  # type: ignore[assignment]
-    routing.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    routing.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     db.commit()
 
     logger.info(f"Deactivated routing: {routing.code}")
@@ -750,7 +750,7 @@ async def update_routing_operation(
             value = value.value
         setattr(operation, field, value)
 
-    operation.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    operation.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     # Recalculate routing totals
     _recalculate_routing_totals(operation.routing, db)
@@ -778,7 +778,7 @@ async def delete_routing_operation(
         raise HTTPException(status_code=404, detail="Operation not found")
 
     operation.is_active = False  # type: ignore[assignment]
-    operation.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    operation.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     # Recalculate routing totals
     _recalculate_routing_totals(operation.routing, db)
@@ -876,7 +876,7 @@ async def update_operation_material(
             value = value.value
         setattr(material, field, value)
 
-    material.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    material.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     db.commit()
     db.refresh(material)
 
@@ -978,7 +978,7 @@ def _recalculate_routing_totals(routing: Routing, db: Session):
     routing.total_setup_time_minutes = total_setup  # type: ignore[assignment]
     routing.total_run_time_minutes = total_run  # type: ignore[assignment]
     routing.total_cost = total_cost  # type: ignore[assignment]
-    routing.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    routing.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
 
 def _build_routing_response(routing: Routing, db: Session) -> RoutingResponse:

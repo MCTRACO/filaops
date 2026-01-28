@@ -4,7 +4,7 @@ File Storage Service for Quote Files
 Handles local filesystem storage with Google Cloud Storage backup
 """
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Tuple
 from uuid import uuid4
@@ -98,7 +98,7 @@ class FileStorageService:
         stored_filename = f"{uuid4().hex}{file_ext}"
 
         # Organize by year/month for better filesystem performance
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         year_month_dir = self.upload_dir / str(now.year) / f"{now.month:02d}"
         year_month_dir.mkdir(parents=True, exist_ok=True)
 

@@ -5,8 +5,9 @@ Manufacturing Orders (MOs) for tracking production of finished goods.
 Supports creation from sales orders, manual entry, and MRP planning.
 """
 import logging
+import math
 from typing import Annotated, List, Optional, Dict, Any
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -28,7 +29,8 @@ from app.models import (
 )
 from app.models.bom import BOMLine
 from app.models.inventory import Inventory
-from app.models.manufacturing import Routing, RoutingOperation, Resource
+from app.models.manufacturing import Routing, RoutingOperation, RoutingOperationMaterial, Resource
+from app.models.production_order import ProductionOrderOperationMaterial
 from app.models.work_center import WorkCenter
 from app.models.material_spool import MaterialSpool, ProductionOrderSpool
 from app.services.inventory_service import process_production_completion, reserve_production_materials, release_production_reservations
@@ -54,6 +56,12 @@ from app.schemas.production_order import (
     ScrapReasonsResponse,
     QCInspectionRequest,
     QCInspectionResponse,
+    OperationMaterialResponse,
+    # Operation-level scrap schemas
+    OperationScrapRequest,
+    OperationScrapResponse,
+    ScrapCascadeResponse,
+    ScrapCascadeMaterial,
 )
 from app.core.status_config import (
     ProductionOrderStatus,
@@ -77,7 +85,7 @@ router = APIRouter()
 
 def generate_production_order_code(db: Session) -> str:
     """Generate sequential production order code: PO-YYYY-NNN"""
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     last = (
         db.query(ProductionOrder)
         .filter(ProductionOrder.code.like(f"PO-{year}-%"))
@@ -114,6 +122,25 @@ def build_production_order_response(order: ProductionOrder, db: Session) -> Prod
             wc = db.query(WorkCenter).filter(WorkCenter.id == op.work_center_id).first()
             res = db.query(Resource).filter(Resource.id == op.resource_id).first() if op.resource_id else None
 
+            # Build materials list for this operation
+            materials_response = []
+            for mat in op.materials:
+                # Get component info (Product)
+                component = db.query(Product).filter(Product.id == mat.component_id).first()
+                materials_response.append(
+                    OperationMaterialResponse(
+                        id=mat.id,
+                        component_id=mat.component_id,
+                        component_sku=component.sku if component else None,
+                        component_name=component.name if component else None,
+                        quantity_required=mat.quantity_required,
+                        quantity_allocated=mat.quantity_allocated or Decimal(0),
+                        quantity_consumed=mat.quantity_consumed or Decimal(0),
+                        unit=mat.unit,
+                        status=mat.status or "pending",
+                    )
+                )
+
             operations_response.append(
                 ProductionOrderOperationResponse(
                     id=op.id,  # type: ignore[arg-type]
@@ -146,10 +173,28 @@ def build_production_order_response(order: ProductionOrder, db: Session) -> Prod
                     is_complete=op.status == "complete",  # type: ignore[arg-type]
                     is_running=op.status == "running",  # type: ignore[arg-type]
                     efficiency_percent=None,
+                    materials=materials_response,
                     created_at=op.created_at,  # type: ignore[arg-type]
                     updated_at=op.updated_at,  # type: ignore[arg-type]
                 )
             )
+
+    # Lineage: Get original order if this is a remake
+    original_order = None
+    remake_reason = None
+    if order.remake_of_id:
+        original_order = db.query(ProductionOrder).filter(ProductionOrder.id == order.remake_of_id).first()
+        # Try to get scrap reason from notes or scrap records
+        if order.notes and "remake" in order.notes.lower():
+            remake_reason = order.notes
+        else:
+            # Look for scrap record on original order
+            from app.models.production_order import ScrapRecord
+            scrap_record = db.query(ScrapRecord).filter(
+                ScrapRecord.production_order_id == order.remake_of_id
+            ).order_by(ScrapRecord.created_at.desc()).first()
+            if scrap_record:
+                remake_reason = scrap_record.reason_code
 
     return ProductionOrderResponse(
         id=order.id,  # type: ignore[arg-type]
@@ -187,6 +232,9 @@ def build_production_order_response(order: ProductionOrder, db: Session) -> Prod
         actual_total_cost=order.actual_total_cost,  # type: ignore[arg-type]
         assigned_to=order.assigned_to,  # type: ignore[arg-type]
         notes=order.notes,  # type: ignore[arg-type]
+        remake_of_id=order.remake_of_id,  # type: ignore[arg-type]
+        remake_of_code=original_order.code if original_order else None,  # type: ignore[arg-type]
+        remake_reason=remake_reason,  # type: ignore[arg-type]
         operations=operations_response,
         created_at=order.created_at,  # type: ignore[arg-type]
         updated_at=order.updated_at,  # type: ignore[arg-type]
@@ -197,7 +245,7 @@ def build_production_order_response(order: ProductionOrder, db: Session) -> Prod
 
 
 def copy_routing_to_operations(db: Session, order: ProductionOrder, routing_id: int) -> List[ProductionOrderOperation]:
-    """Copy routing operations to production order operations"""
+    """Copy routing operations AND their materials to production order operations"""
     routing_ops = (
         db.query(RoutingOperation)
         .filter(RoutingOperation.routing_id == routing_id)
@@ -220,6 +268,33 @@ def copy_routing_to_operations(db: Session, order: ProductionOrder, routing_id: 
             status="pending",
         )
         db.add(op)
+        db.flush()  # Get op.id for material records
+
+        # Copy materials from routing operation to production order operation
+        for rom in rop.materials:
+            if rom.is_cost_only:
+                continue  # Skip cost-only materials (no inventory consumption)
+
+            # Use built-in method that handles quantity_per and scrap_factor
+            qty_required = rom.calculate_required_quantity(int(order.quantity_ordered))
+
+            # Round up for discrete units (can't ship 0.792 boxes)
+            unit_upper = (rom.unit or "").upper()
+            if unit_upper in ("EA", "EACH", "PCS", "UNIT", "BOX", "BOXES"):
+                qty_required = math.ceil(qty_required)
+
+            mat = ProductionOrderOperationMaterial(
+                production_order_operation_id=op.id,
+                component_id=rom.component_id,
+                routing_operation_material_id=rom.id,
+                quantity_required=Decimal(str(qty_required)),
+                unit=rom.unit,
+                quantity_allocated=Decimal("0"),
+                quantity_consumed=Decimal("0"),
+                status="pending",
+            )
+            db.add(mat)
+
         operations.append(op)
 
     return operations
@@ -506,7 +581,7 @@ async def update_scrap_reason(
     for field, value in update_dict.items():
         setattr(reason, field, value)
 
-    reason.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    reason.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     db.commit()
     db.refresh(reason)
 
@@ -532,7 +607,7 @@ async def delete_scrap_reason(
 
     # Soft delete - just mark inactive
     reason.active = False  # type: ignore[assignment]
-    reason.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    reason.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     db.commit()
 
     return {"message": f"Scrap reason '{reason.code}' has been deactivated"}
@@ -929,7 +1004,7 @@ async def update_production_order(
         if hasattr(order, field):
             setattr(order, field, value)
 
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     db.commit()
     db.refresh(order)
 
@@ -986,7 +1061,7 @@ async def schedule_production_order(
     order.scheduled_end = request.scheduled_end  # type: ignore[assignment]
     if request.notes:
         order.notes = (order.notes or "") + f"\n[Scheduled: {request.notes}]"  # type: ignore[assignment]
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     # If resource_id provided, assign to first operation
     if request.resource_id:
@@ -1004,7 +1079,7 @@ async def schedule_production_order(
         )
         if first_op:
             first_op.resource_id = request.resource_id  # type: ignore[assignment]
-            first_op.updated_at = datetime.utcnow()  # type: ignore[assignment]
+            first_op.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     db.commit()
     db.refresh(order)
@@ -1052,8 +1127,8 @@ async def release_production_order(
             operations_created = len(created_ops)
 
     order.status = "released"  # type: ignore[assignment]
-    order.released_at = datetime.utcnow()  # type: ignore[assignment]
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    order.released_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     # Queue the first operation
     first_op = db.query(ProductionOrderOperation).filter(
@@ -1095,8 +1170,8 @@ async def start_production_order(
 
     order.status = "in_progress"  # type: ignore[assignment]
     if not order.actual_start:  # type: ignore[truthy-function]
-        order.actual_start = datetime.utcnow()  # type: ignore[assignment]
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+        order.actual_start = datetime.now(timezone.utc)  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     db.commit()
     db.refresh(order)
@@ -1169,7 +1244,7 @@ async def complete_production_order(
                        f"Use force_close_short=true to close anyway, or scrap the remaining units first."
             )
         # If force_close_short=True, add note and proceed
-        close_short_note = f"\n[{datetime.utcnow().strftime('%Y-%m-%d %H:%M')}] CLOSED SHORT: {shortfall} units unaccounted (neither completed nor scrapped)"
+        close_short_note = f"\n[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] CLOSED SHORT: {shortfall} units unaccounted (neither completed nor scrapped)"
         order.notes = (order.notes or "") + close_short_note  # type: ignore[assignment]
 
     # Apply quantities
@@ -1179,9 +1254,9 @@ async def complete_production_order(
 
     order.status = "complete"  # type: ignore[assignment]
     order.qc_status = "pending"  # type: ignore[assignment] # Trigger QC workflow
-    order.actual_end = datetime.utcnow()  # type: ignore[assignment]
-    order.completed_at = datetime.utcnow()  # type: ignore[assignment]
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    order.actual_end = datetime.now(timezone.utc)  # type: ignore[assignment]
+    order.completed_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     if order.actual_start:  # type: ignore[truthy-function]
         delta = order.actual_end - order.actual_start  # type: ignore[operator]
@@ -1198,7 +1273,7 @@ async def complete_production_order(
         from app.models.traceability import SerialNumber
 
         qty_to_serial = int(order.quantity_completed or order.quantity_ordered)  # type: ignore[arg-type]
-        today = datetime.utcnow()
+        today = datetime.now(timezone.utc)
         date_str = today.strftime("%Y%m%d")
         prefix = f"BLB-{date_str}-"
 
@@ -1340,7 +1415,7 @@ async def cancel_production_order(
     order.status = "cancelled"  # type: ignore[assignment]
     if notes:
         order.notes = (order.notes or "") + f"\n[Cancelled: {notes}]"  # type: ignore[assignment]
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     db.commit()
     db.refresh(order)
@@ -1369,7 +1444,7 @@ async def hold_production_order(
     order.status = "on_hold"  # type: ignore[assignment]
     if notes:
         order.notes = (order.notes or "") + f"\n[On Hold: {notes}]"  # type: ignore[assignment]
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     db.commit()
     db.refresh(order)
@@ -1431,8 +1506,8 @@ async def perform_qc_inspection(
     order.qc_status = request.result.value  # type: ignore[assignment]
     order.qc_notes = request.notes  # type: ignore[assignment]
     order.qc_inspected_by = current_user.email if current_user else None  # type: ignore[assignment]
-    order.qc_inspected_at = datetime.utcnow()  # type: ignore[assignment]
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    order.qc_inspected_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     sales_order_updated = False
     sales_order_status = None
@@ -1455,7 +1530,7 @@ async def perform_qc_inspection(
             # Only advance if ALL production orders have passed QC
             if passed_count == total_count and total_count > 0:
                 sales_order.status = "ready_to_ship"  # type: ignore[assignment]
-                sales_order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+                sales_order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
                 sales_order_updated = True
                 sales_order_status = "ready_to_ship"
                 logger.info(
@@ -1561,7 +1636,7 @@ async def split_production_order(
             assigned_to=order.assigned_to,
             notes=f"Split from {order.code} (part {idx + 1} of {len(request.splits)})",
             created_by=current_user.email,
-            released_at=datetime.utcnow(),
+            released_at=datetime.now(timezone.utc),
         )
         db.add(child)
         db.flush()  # Get the child ID
@@ -1598,8 +1673,8 @@ async def split_production_order(
 
     # Update parent order status to indicate it was split
     order.status = "split"  # type: ignore[assignment]
-    order.notes = (order.notes or "") + f"\n[Split into {len(request.splits)} orders on {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}]"  # type: ignore[assignment]
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    order.notes = (order.notes or "") + f"\n[Split into {len(request.splits)} orders on {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}]"  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     db.commit()
 
@@ -1676,7 +1751,7 @@ async def update_operation(
                 value = value.value if hasattr(value, "value") else value
             setattr(op, field, value)
 
-    op.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    op.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     db.commit()
     db.refresh(op)
 
@@ -1920,7 +1995,7 @@ async def scrap_production_order(
     if is_full_scrap:  # type: ignore[truthy-function]
         # Full scrap - mark order as scrapped
         order.status = "scrapped"  # type: ignore[assignment]
-        order.scrapped_at = datetime.utcnow()  # type: ignore[assignment]
+        order.scrapped_at = datetime.now(timezone.utc)  # type: ignore[assignment]
     # else: order stays in_progress so remaining can be completed
 
     order.scrap_reason = scrap_reason  # type: ignore[assignment]
@@ -1928,8 +2003,8 @@ async def scrap_production_order(
     scrap_note = f"Scrapped {qty_to_scrap} units: {scrap_reason}"
     if notes:
         scrap_note += f" - {notes}"
-    order.notes = (order.notes or "") + f"\n[{datetime.utcnow().strftime('%Y-%m-%d %H:%M')}] {scrap_note}"  # type: ignore[assignment]
-    order.updated_at = datetime.utcnow()  # type: ignore[assignment]
+    order.notes = (order.notes or "") + f"\n[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}] {scrap_note}"  # type: ignore[assignment]
+    order.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     # Create scrap inventory transactions for consumed materials
     # (Material was consumed but no finished goods produced)
@@ -2151,4 +2226,147 @@ async def get_order_cost_breakdown(
         },
         "order_breakdown": breakdown,
     }
+
+
+# ============================================================================
+# Operation-Level Scrap Endpoints
+# ============================================================================
+
+@router.get(
+    "/{order_id}/operations/{operation_id}/scrap-cascade",
+    response_model=ScrapCascadeResponse,
+    tags=["Operation Scrap"],
+)
+async def get_scrap_cascade(
+    order_id: int,
+    operation_id: int,
+    quantity: int = Query(..., ge=1, description="Number of units being scrapped"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ScrapCascadeResponse:
+    """
+    Calculate cascading material consumption for scrap at a given operation.
+
+    This is a READ-ONLY preview that shows what materials would be scrapped
+    if you scrap N units at this operation. Use this to show the user
+    the cost impact before they confirm the scrap.
+
+    **Cascade Logic:**
+    When scrapping at operation N, we account for materials consumed at
+    operations 1, 2, ..., N because those materials were already used
+    to produce the parts that are now being scrapped.
+
+    **Returns:**
+    - List of materials with quantities and costs
+    - Total scrap cost
+    - Number of operations affected
+    """
+    from app.services.scrap_service import calculate_scrap_cascade, ScrapError
+
+    try:
+        result = calculate_scrap_cascade(
+            db=db,
+            po_id=order_id,
+            op_id=operation_id,
+            quantity=quantity,
+        )
+
+        # Convert to response model
+        materials = [
+            ScrapCascadeMaterial(**mat)
+            for mat in result["materials_consumed"]
+        ]
+
+        return ScrapCascadeResponse(
+            production_order_id=result["production_order_id"],
+            production_order_code=result["production_order_code"],
+            operation_id=result["operation_id"],
+            operation_name=result["operation_name"],
+            quantity_scrapped=result["quantity_scrapped"],
+            materials_consumed=materials,
+            total_cost=result["total_cost"],
+            operations_affected=result["operations_affected"],
+        )
+
+    except ScrapError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Error calculating scrap cascade: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post(
+    "/{order_id}/operations/{operation_id}/scrap",
+    response_model=OperationScrapResponse,
+    tags=["Operation Scrap"],
+)
+async def scrap_at_operation(
+    order_id: int,
+    operation_id: int,
+    request: OperationScrapRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> OperationScrapResponse:
+    """
+    Scrap units at a specific operation with cascading material accounting.
+
+    This will:
+    1. **Validate** the scrap reason and quantity
+    2. **Create ScrapRecords** for all consumed materials (current + prior ops)
+    3. **Create GL journal entry**: DR Scrap Expense (5020), CR WIP (1210)
+    4. **Update** operation and PO scrap quantities
+    5. **Auto-skip** downstream operations if no good pieces remain
+    6. **Optionally create** a replacement production order
+
+    **Cascade Logic:**
+    When scrapping at operation N, materials from operations 1 through N
+    are recorded as scrap costs because those materials were consumed
+    to produce the parts that are now being scrapped.
+
+    **Example:**
+    If scrapping 2 units at QC (operation 4) after Assembly (operation 3):
+    - Materials from Printing (op 1): 2 × filament qty
+    - Materials from Assembly (op 3): 2 × hardware qty
+    - All recorded with proper GL entries
+
+    **Replacement Order:**
+    If `create_replacement=true`, a new production order is created:
+    - Same product, BOM, routing as original
+    - Links to same sales order (if MTO)
+    - `remake_of_id` points to original PO
+    - Starts in 'draft' status
+    """
+    from app.services.scrap_service import process_operation_scrap, ScrapError
+
+    try:
+        result = process_operation_scrap(
+            db=db,
+            po_id=order_id,
+            op_id=operation_id,
+            quantity_scrapped=request.quantity_scrapped,
+            scrap_reason_code=request.scrap_reason_code,
+            notes=request.notes,
+            create_replacement=request.create_replacement,
+            user_id=current_user.id,
+        )
+
+        db.commit()
+
+        return OperationScrapResponse(
+            success=result["success"],
+            scrap_records_created=result["scrap_records_created"],
+            operations_affected=result["operations_affected"],
+            total_scrap_cost=result["total_scrap_cost"],
+            journal_entry_number=result["journal_entry_number"],
+            downstream_ops_skipped=result["downstream_ops_skipped"],
+            replacement_order=result["replacement_order"],
+        )
+
+    except ScrapError as e:
+        db.rollback()
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error processing operation scrap: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 

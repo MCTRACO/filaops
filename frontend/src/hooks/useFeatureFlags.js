@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import { API_URL } from '../config/api';
 
 export const useFeatureFlags = () => {
-  const [tier, setTier] = useState('open');
+  const [tier, setTier] = useState('enterprise');  // was 'open'
   const [features, setFeatures] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTier = async () => {
       try {
-        const token = localStorage.getItem('access_token');
+        // Check both possible token locations (regular auth and admin panel)
+        const token = localStorage.getItem('access_token') || localStorage.getItem('adminToken');
         if (!token) {
-          setTier('open');
+          // No token - keep the default tier (enterprise for dev/testing)
           setLoading(false);
           return;
         }
@@ -26,17 +27,15 @@ export const useFeatureFlags = () => {
           const data = await response.json();
           setTier(data.tier);
           setFeatures(data.features || []);
-        } else {
-          setTier('open');
         }
+        // If API fails, keep the default tier instead of downgrading
       } catch {
-        // Tier fetch failure - default to 'open' tier
-        setTier('open');
+        // Tier fetch failure - keep the default tier instead of downgrading
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchTier();
   }, []);
 

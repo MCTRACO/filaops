@@ -58,6 +58,8 @@ function OperationsChain({ operations }) {
             <span
               className={`${config.color} cursor-default`}
               title={tooltip}
+              role="img"
+              aria-label={`${op.operation_code || `Op ${op.sequence}`}: ${config.title}`}
             >
               {config.icon}
             </span>
@@ -319,7 +321,7 @@ export default function ProductionQueueList({
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative">
       {/* Filters */}
       <div className="p-4 border-b border-gray-800 flex gap-4">
         <div className="flex-1">
@@ -395,10 +397,13 @@ export default function ProductionQueueList({
         </table>
       </div>
 
-      {/* Loading operations indicator */}
+      {/* Loading operations overlay - shows on top of table */}
       {loadingOps && (
-        <div className="px-4 py-2 text-center text-gray-500 text-sm border-t border-gray-800">
-          Loading operation details...
+        <div className="absolute inset-0 bg-gray-900/80 flex items-center justify-center z-10 rounded-xl">
+          <div className="flex items-center gap-3 px-4 py-3 bg-gray-800 rounded-lg border border-gray-700 shadow-lg">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
+            <span className="text-gray-300 text-sm font-medium">Loading operation details...</span>
+          </div>
         </div>
       )}
 

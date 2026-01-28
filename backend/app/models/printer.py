@@ -1,7 +1,7 @@
 """
 Printer model - Brand-agnostic printer management
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
@@ -84,7 +84,7 @@ class Printer(Base):
         """Check if printer was seen recently (within 5 minutes)"""
         if not self.last_seen:
             return False
-        return (datetime.utcnow() - self.last_seen).total_seconds() < 300
+        return (datetime.now(timezone.utc) - self.last_seen).total_seconds() < 300
 
     @property
     def has_ams(self) -> bool:

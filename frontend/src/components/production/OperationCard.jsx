@@ -192,7 +192,7 @@ export default function OperationCard({
                 <div className="text-xs text-gray-500">
                   Materials:{' '}
                   {operation.materials
-                    .map((m) => `${m.item_name || m.item_code} (${m.quantity_required})`)
+                    .map((m) => `${m.component_name || m.component_sku || 'Unknown'} (${m.quantity_required})`)
                     .join(', ')}
                 </div>
               )}

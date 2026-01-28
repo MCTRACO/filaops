@@ -13,7 +13,7 @@ import re
 from typing import Tuple, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from app.models import Product, Quote, BOM, BOMLine
@@ -222,14 +222,14 @@ def generate_custom_product_sku(quote: Quote, db: Session) -> str:
     Returns:
         Generated SKU string
     """
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     sku = f"PRD-CUS-{year}-{quote.id:03d}"
 
     # Ensure uniqueness (should be guaranteed, but check anyway)
     existing = db.query(Product).filter(Product.sku == sku).first()
     if existing:
         # Fallback: append timestamp
-        timestamp = int(datetime.utcnow().timestamp())
+        timestamp = int(datetime.now(timezone.utc).timestamp())
         sku = f"PRD-CUS-{year}-{quote.id:03d}-{timestamp}"
 
     return sku

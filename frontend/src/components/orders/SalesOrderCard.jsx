@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { formatCurrency } from '../../lib/number';
+import { formatDate } from '../../lib/dateFormat';
 
 // Status badge styles per fulfillment state
 const STATUS_STYLES = {
@@ -31,23 +32,6 @@ function getProgressColor(percent) {
   if (percent >= 50) return 'bg-yellow-500';
   if (percent > 0) return 'bg-orange-500';
   return 'bg-red-500';
-}
-
-/**
- * Format date for display (e.g., "Jan 15, 2025")
- */
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  } catch {
-    return dateStr;
-  }
 }
 
 /**
@@ -133,7 +117,7 @@ export default function SalesOrderCard({ order, onViewDetails, onShip }) {
       <div className="flex justify-between items-center pt-3 border-t border-gray-700">
         <button
           onClick={() => onViewDetails(order.id)}
-          className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          className="text-sm text-blue-400 hover:text-blue-300 font-medium"
         >
           View Details
         </button>

@@ -10,7 +10,7 @@ Handles multi-file document storage for purchase orders:
 import os
 import uuid
 import mimetypes
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, Query
 from fastapi.responses import FileResponse
@@ -44,7 +44,7 @@ def _ensure_upload_dir():
 def _get_safe_filename(original_filename: str, po_number: str) -> str:
     """Generate a safe, unique filename"""
     ext = os.path.splitext(original_filename)[1] or ".pdf"
-    timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
     unique_id = str(uuid.uuid4())[:8]
     return f"{po_number}_{timestamp}_{unique_id}{ext}"
 
@@ -163,7 +163,7 @@ async def upload_document(
         google_drive_id=google_drive_id,
         notes=notes,
         uploaded_by=current_user.email,
-        uploaded_at=datetime.utcnow(),
+        uploaded_at=datetime.now(timezone.utc),
     )
     
     db.add(doc)
@@ -297,7 +297,7 @@ async def update_document(
     if request.notes is not None:
         doc.notes = request.notes
     
-    doc.updated_at = datetime.utcnow()
+    doc.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(doc)
     

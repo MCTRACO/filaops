@@ -7,7 +7,7 @@ Supports tiered traceability for B2B compliance:
 - SERIAL: Individual part tracking
 - FULL: LOT + SERIAL + Certificate of Conformance
 """
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 from decimal import Decimal
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -156,7 +156,7 @@ async def update_traceability_profile(
     for field, value in update_data.items():
         setattr(profile, field, value)
 
-    profile.updated_at = datetime.utcnow()
+    profile.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(profile)
 
@@ -353,7 +353,7 @@ async def update_material_lot(
     for field, value in update_data.items():
         setattr(lot, field, value)
 
-    lot.updated_at = datetime.utcnow()
+    lot.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(lot)
 
@@ -391,7 +391,7 @@ async def generate_lot_number(
     current_user: User = Depends(get_current_user),
 ):
     """Generate the next lot number for a material."""
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     prefix = f"{material_code}-{year}-"
 
     # Find highest existing sequence for this prefix
@@ -501,7 +501,7 @@ async def create_serial_numbers(
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Generate serial numbers
-    today = datetime.utcnow()
+    today = datetime.now(timezone.utc)
     date_str = today.strftime("%Y%m%d")
     prefix = f"BLB-{date_str}-"
 
@@ -558,11 +558,11 @@ async def update_serial_number(
     if 'status' in update_data:
         new_status = update_data['status']
         if new_status == 'sold' and not serial.sold_at:
-            serial.sold_at = datetime.utcnow()
+            serial.sold_at = datetime.now(timezone.utc)
         elif new_status == 'shipped' and not serial.shipped_at:
-            serial.shipped_at = datetime.utcnow()
+            serial.shipped_at = datetime.now(timezone.utc)
         elif new_status == 'returned' and not serial.returned_at:
-            serial.returned_at = datetime.utcnow()
+            serial.returned_at = datetime.now(timezone.utc)
 
     for field, value in update_data.items():
         setattr(serial, field, value)
@@ -610,7 +610,7 @@ async def record_lot_consumption(
     if lot.quantity_remaining <= 0:
         lot.status = 'depleted'
 
-    lot.updated_at = datetime.utcnow()
+    lot.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(consumption)

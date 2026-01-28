@@ -14,7 +14,7 @@ These are views into the business data, formatted for accounting purposes.
 """
 from typing import Optional, Dict, Any
 from decimal import Decimal
-from datetime import datetime, timedelta, date
+from datetime import datetime, timezone, timedelta, date
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
@@ -157,7 +157,7 @@ async def get_inventory_by_account(
     accounts["1310"]["items"] = wip_items
 
     return {
-        "as_of": datetime.utcnow().isoformat(),
+        "as_of": datetime.now(timezone.utc).isoformat(),
         "accounts": list(accounts.values()),
         "summary": {
             "raw_materials": float(accounts["1300"]["total_value"]),
@@ -187,7 +187,7 @@ async def get_transactions_as_journal(
     - receipt (finished goods): DR Finished Goods (1320), CR WIP (1310)
     - scrap: DR COGS (5100), CR WIP (1310)
     """
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     query = db.query(InventoryTransaction).filter(
         InventoryTransaction.created_at >= cutoff
@@ -409,7 +409,7 @@ async def get_cogs_summary(
 
     Shows total cost of goods sold broken down by category.
     """
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Get shipped orders in period
     shipped_orders = db.query(SalesOrder).filter(
@@ -536,7 +536,7 @@ async def get_accounting_dashboard(
     - COGS summary
     - Gross profit margins
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     month_start = today_start.replace(day=1)
 
@@ -719,7 +719,7 @@ async def get_sales_journal(
     - Payment status
     """
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
     if not start_date:
         start_date = end_date - timedelta(days=30)
 
@@ -816,7 +816,7 @@ async def export_sales_journal_csv(
     - Shipping Income (credit shipping)
     """
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
     if not start_date:
         start_date = end_date - timedelta(days=30)
 
@@ -937,7 +937,7 @@ async def get_tax_summary(
     - Tax collected by rate
     - Tax collected by period
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Determine period start
@@ -1066,7 +1066,7 @@ async def export_tax_summary_csv(
     Export tax summary as CSV for filing.
     """
     # Get the tax summary data
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
     if period == "month":
@@ -1147,7 +1147,7 @@ async def get_payments_journal(
     Get payments journal - all payment transactions for the period.
     """
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
     if not start_date:
         start_date = end_date - timedelta(days=30)
 
@@ -1220,7 +1220,7 @@ async def export_payments_journal_csv(
     Export payments journal as CSV.
     """
     if not end_date:
-        end_date = datetime.utcnow()
+        end_date = datetime.now(timezone.utc)
     if not start_date:
         start_date = end_date - timedelta(days=30)
 

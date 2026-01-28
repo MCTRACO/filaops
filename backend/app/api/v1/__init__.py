@@ -1,9 +1,10 @@
 """
-API v1 Router - FilaOps Open Source
+API v1 Router - FilaOps Open Source Core
 """
 import os
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
+    accounting,
     scheduling,
     auth,
     sales_orders,
@@ -18,14 +19,11 @@ from app.api.v1.endpoints import (
     po_documents,
     low_stock,
     vendor_items,
-    invoice_import,
     exports,
-    amazon_import,
     work_centers,
     resources,
     routings,
     mrp,
-    features,
     setup,
     quotes,
     settings,
@@ -37,7 +35,6 @@ from app.api.v1.endpoints import (
     maintenance,
     command_center,
     security,
-    # license,  # Disabled until ready for production
 )
 from app.api.v1.endpoints.admin import router as admin_router
 
@@ -139,12 +136,7 @@ router.include_router(
     tags=["purchase-orders"]
 )
 
-# Invoice Import (parse invoices to create POs)
-router.include_router(
-    invoice_import.router,
-    prefix="/purchase-orders",
-    tags=["purchase-orders"]
-)
+# Invoice Import (AI-powered invoice parsing) - PRO feature
 
 # Exports (QuickBooks, etc.)
 router.include_router(
@@ -153,12 +145,7 @@ router.include_router(
     tags=["exports"]
 )
 
-# Amazon Import
-router.include_router(
-    amazon_import.router,
-    prefix="/import/amazon",
-    tags=["import"]
-)
+# Amazon Import is a PRO feature
 
 # Work Centers
 router.include_router(
@@ -181,11 +168,12 @@ router.include_router(
     tags=["manufacturing"]
 )
 
+# B2B Portal API is a PRO feature
+
 # MRP (Material Requirements Planning)
 router.include_router(mrp.router)
 
-# Features (tier information)
-router.include_router(features.router)
+# Features/Licensing is a PRO feature
 
 # Scheduling and Capacity Management
 router.include_router(
@@ -199,6 +187,13 @@ router.include_router(settings.router)
 
 # Payments
 router.include_router(payments.router)
+
+# GL Accounting (Trial Balance, Inventory Valuation)
+router.include_router(
+    accounting.router,
+    prefix="/accounting",
+    tags=["accounting"]
+)
 
 # Printers
 router.include_router(

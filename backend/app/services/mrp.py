@@ -8,7 +8,7 @@ Core MRP calculation logic:
 """
 from typing import List, Dict, Optional, Tuple
 from decimal import Decimal
-from datetime import datetime, date, timedelta
+from datetime import datetime, timezone, date, timedelta
 from dataclasses import dataclass, field
 from collections import defaultdict
 
@@ -175,7 +175,7 @@ class MRPService:
         """
         # Create MRP run record
         mrp_run = MRPRun(
-            run_date=datetime.utcnow(),
+            run_date=datetime.now(timezone.utc),
             planning_horizon_days=planning_horizon_days,
             status="running",
             created_by=user_id
@@ -336,7 +336,7 @@ class MRPService:
             mrp_run.components_analyzed = result.components_analyzed
             mrp_run.shortages_found = result.shortages_found
             mrp_run.planned_orders_created = result.planned_orders_created
-            mrp_run.completed_at = datetime.utcnow()
+            mrp_run.completed_at = datetime.now(timezone.utc)
 
             self.db.commit()
 
@@ -788,7 +788,7 @@ class MRPService:
                 mrp_run_id=mrp_run_id,
                 status="planned",
                 created_by=user_id,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
             self.db.add(planned_order)
             planned_orders.append(planned_order)
@@ -1056,7 +1056,7 @@ class MRPService:
             raise ValueError(f"Can only firm orders with status 'planned', got '{order.status}'")
 
         order.status = "firmed"
-        order.firmed_at = datetime.utcnow()
+        order.firmed_at = datetime.now(timezone.utc)
         if notes:
             order.notes = (order.notes or "") + f"\nFirmed: {notes}"
 
@@ -1095,7 +1095,7 @@ class MRPService:
             order.converted_to_mo_id = created_order_id
 
         order.status = "released"
-        order.released_at = datetime.utcnow()
+        order.released_at = datetime.now(timezone.utc)
         if notes:
             order.notes = (order.notes or "") + f"\nReleased: {notes}"
 
@@ -1110,7 +1110,7 @@ class MRPService:
     ) -> int:
         """Create a purchase order from a planned order"""
         # Generate PO number
-        year = datetime.utcnow().year
+        year = datetime.now(timezone.utc).year
         last_po = self.db.query(PurchaseOrder).filter(
             PurchaseOrder.po_number.like(f"PO-{year}-%")
         ).order_by(PurchaseOrder.po_number.desc()).first()
@@ -1165,7 +1165,7 @@ class MRPService:
     ) -> int:
         """Create a production order from a planned order"""
         # Generate PO code (Production Order)
-        year = datetime.utcnow().year
+        year = datetime.now(timezone.utc).year
         last_po = self.db.query(ProductionOrder).filter(
             ProductionOrder.code.like(f"PO-{year}-%")
         ).order_by(ProductionOrder.code.desc()).first()

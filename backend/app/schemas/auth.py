@@ -129,6 +129,34 @@ class PortalCustomerResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CustomerAccessInfo(BaseModel):
+    """Customer info for multi-customer portal access"""
+    id: int
+    customer_number: Optional[str] = None
+    company_name: Optional[str] = None
+    # Location info (for multi-location orgs)
+    first_name: Optional[str] = None  # Contact name
+    last_name: Optional[str] = None
+    # B2B info (price_level available in PRO)
+    payment_terms: Optional[str] = None  # e.g., "net30"
+    credit_limit: Optional[float] = None
+    # User's role for this customer
+    role: str = "member"  # admin, member, viewer
+    is_default: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class MultiCustomerLoginResponse(BaseModel):
+    """Login response with all customers the user can access"""
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: PortalCustomerResponse
+    customers: list[CustomerAccessInfo]
+    default_customer_id: Optional[int] = None
+
+
 # ============================================================================
 # PASSWORD RESET SCHEMAS
 # ============================================================================

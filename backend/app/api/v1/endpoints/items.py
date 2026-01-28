@@ -3,7 +3,7 @@ Items API Endpoints - Unified item management for products, components, supplies
 """
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
 import csv
@@ -283,7 +283,7 @@ async def update_category(
             value = value.upper()
         setattr(category, field, value)
 
-    category.updated_at = datetime.utcnow()
+    category.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(category)
 
@@ -342,7 +342,7 @@ async def delete_category(
         )
 
     category.is_active = False
-    category.updated_at = datetime.utcnow()
+    category.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     logger.info(f"Deleted (deactivated) category: {category.code}")
@@ -1130,7 +1130,7 @@ async def update_item(
                         if success:
                             inv.allocated_quantity = converted_allocated
                     
-                    inv.updated_at = datetime.utcnow()
+                    inv.updated_at = datetime.now(timezone.utc)
                 
                 logger.info(
                     f"Converted {len(inventory_records)} inventory records for {item.sku} "
@@ -1154,7 +1154,7 @@ async def update_item(
             field = "active"
         setattr(item, field, value)
 
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(item)
 
@@ -1200,7 +1200,7 @@ async def delete_item(
         )
 
     item.active = False
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     logger.info(f"Deleted (deactivated) item: {item.sku}")
@@ -1531,7 +1531,7 @@ async def import_items_csv(
                 if upc:
                     existing.upc = upc
                 
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = datetime.now(timezone.utc)
 
                 # Validate UOM configuration for updated items
                 is_valid, warning_msg = validate_product_uoms(db, existing)
@@ -1761,7 +1761,7 @@ async def bulk_update_items(
                     raise ValueError(f"Invalid procurement_type: {proc_type_value}")
             if request.is_active is not None:
                 item.active = request.is_active
-            item.updated_at = datetime.utcnow()
+            item.updated_at = datetime.now(timezone.utc)
             updated += 1
         except Exception as e:
             errors.append({"item_id": item_id, "error": str(e)})
@@ -1825,7 +1825,7 @@ def _recalculate_bom_cost(bom: BOM, db: Session) -> Decimal:
 
     # Update the BOM total_cost
     bom.total_cost = total
-    bom.updated_at = datetime.utcnow()
+    bom.updated_at = datetime.now(timezone.utc)
 
     return total
 
@@ -1948,7 +1948,7 @@ async def recost_all_items(
         # Update standard cost
         old_cost = float(item.standard_cost) if item.standard_cost else 0
         item.standard_cost = cost_data["total_cost"]
-        item.updated_at = datetime.utcnow()
+        item.updated_at = datetime.now(timezone.utc)
         updated += 1
 
         results.append({
@@ -1993,7 +1993,7 @@ async def recost_item(
 
     old_cost = float(item.standard_cost) if item.standard_cost else 0
     item.standard_cost = cost_data["total_cost"]
-    item.updated_at = datetime.utcnow()
+    item.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(item)
 

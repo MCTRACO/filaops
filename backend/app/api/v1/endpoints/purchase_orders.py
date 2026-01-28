@@ -4,7 +4,7 @@ Purchase Orders API Endpoints
 import os
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
 from typing import Annotated, Optional
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 from decimal import Decimal
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
@@ -14,6 +14,7 @@ from app.logging_config import get_logger
 from app.services.google_drive import get_drive_service
 from app.services.uom_service import convert_quantity_safe, get_conversion_factor
 from app.services.inventory_helpers import is_material
+from app.services.transaction_service import TransactionService, ReceiptItem
 from app.models.vendor import Vendor
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderLine
 from app.models.product import Product
@@ -50,7 +51,7 @@ logger = get_logger(__name__)
 
 def _generate_po_number(db: Session) -> str:
     """Generate next PO number (PO-2025-001, PO-2025-002, etc.)"""
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     pattern = f"PO-{year}-%"
     last = db.query(PurchaseOrder).filter(
         PurchaseOrder.po_number.like(pattern)
@@ -230,8 +231,8 @@ async def create_purchase_order(
         document_url=request.document_url,
         notes=request.notes,
         created_by=current_user.email,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
 
     db.add(po)
@@ -254,8 +255,8 @@ async def create_purchase_order(
             unit_cost=line_data.unit_cost,
             line_total=line_data.quantity_ordered * line_data.unit_cost,
             notes=line_data.notes,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         db.add(line)
         po.lines.append(line)
@@ -311,7 +312,7 @@ async def update_purchase_order(
     if any(f in update_data for f in ["tax_amount", "shipping_cost"]):
         _calculate_totals(po)
 
-    po.updated_at = datetime.utcnow()
+    po.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(po)
 
@@ -355,15 +356,15 @@ async def add_po_line(
         unit_cost=request.unit_cost,
         line_total=request.quantity_ordered * request.unit_cost,
         notes=request.notes,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
     db.add(line)
 
     # Recalculate totals
     po.lines.append(line)
     _calculate_totals(po)
-    po.updated_at = datetime.utcnow()
+    po.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(po)
@@ -419,11 +420,11 @@ async def update_po_line(
 
     # Recalculate line total
     line.line_total = line.quantity_ordered * line.unit_cost
-    line.updated_at = datetime.utcnow()
+    line.updated_at = datetime.now(timezone.utc)
 
     # Recalculate PO totals
     _calculate_totals(po)
-    po.updated_at = datetime.utcnow()
+    po.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(po)
@@ -462,7 +463,7 @@ async def delete_po_line(
 
     # Recalculate totals
     _calculate_totals(po)
-    po.updated_at = datetime.utcnow()
+    po.updated_at = datetime.now(timezone.utc)
 
     db.commit()
     return {"message": "Line deleted"}
@@ -529,7 +530,7 @@ async def update_po_status(
         po.received_date = date.today()
 
     po.status = new_status
-    po.updated_at = datetime.utcnow()
+    po.updated_at = datetime.now(timezone.utc)
 
     # Record status change event
     status_titles = {
@@ -628,6 +629,9 @@ async def receive_purchase_order(
     total_received = Decimal("0")
     lines_received = 0
 
+    # Collect items for TransactionService (processed after loop)
+    receipt_items_for_service = []
+
     for item in request.lines:
         if item.line_id not in line_map:
             raise HTTPException(status_code=404, detail=f"Line {item.line_id} not found on this PO")
@@ -643,7 +647,7 @@ async def receive_purchase_order(
 
         # Update line
         line.quantity_received = line.quantity_received + item.quantity_received
-        line.updated_at = datetime.utcnow()
+        line.updated_at = datetime.now(timezone.utc)
         total_received += item.quantity_received
         lines_received += 1
 
@@ -850,57 +854,16 @@ async def receive_purchase_order(
                         f"cost not normalized. This may cause incorrect COGS calculations!"
                     )
         # For non-materials, transaction_quantity = quantity_for_inventory (already in product_unit)
-        
-        # Update inventory (store in transaction unit: GRAMS for materials)
-        inventory = db.query(Inventory).filter(
-            Inventory.product_id == line.product_id,
-            Inventory.location_id == location_id
-        ).first()
 
-        if inventory:
-            # Convert both to Decimal for calculation, then back to float for storage
-            current_qty = Decimal(str(inventory.on_hand_quantity or 0))
-            new_qty = current_qty + transaction_quantity
-            inventory.on_hand_quantity = float(new_qty)  # type: ignore[assignment]
-            inventory.updated_at = datetime.utcnow()
-        else:
-            inventory = Inventory(
-                product_id=line.product_id,
-                location_id=location_id,
-                on_hand_quantity=float(transaction_quantity),  # type: ignore[arg-type]
-                allocated_quantity=Decimal("0"),
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            )
-            db.add(inventory)
-
-        # Create inventory transaction
-        # STAR SCHEMA: Store in transaction unit (GRAMS for materials, native for others)
-        # Cost per unit: For materials, cost is $/G (matches quantity unit of grams)
-        # SINGLE SOURCE OF TRUTH: total_cost and unit are pre-calculated and stored
-        # See docs/AI_DIRECTIVE_UOM_COSTS.md - UI must display these directly, NO client-side math
+        # Collect for TransactionService batch processing
         transaction_unit = 'G' if is_mat else product_unit
-        transaction_total_cost = transaction_quantity * cost_per_unit_for_inventory
-        
-        txn = InventoryTransaction(
+        receipt_items_for_service.append(ReceiptItem(
             product_id=line.product_id,
-            location_id=location_id,
-            transaction_type="receipt",
-            reference_type="purchase_order",
-            reference_id=po.id,
-            quantity=float(transaction_quantity),  # GRAMS for materials, product_unit for others
-            unit=transaction_unit,  # STORED unit - UI displays this directly
-            transaction_date=actual_received_date,  # User-entered date (when actually received)
+            quantity=transaction_quantity,
+            unit_cost=cost_per_unit_for_inventory,
+            unit=transaction_unit,
             lot_number=item.lot_number,
-            cost_per_unit=cost_per_unit_for_inventory,  # Cost per unit ($/G for materials, $/product_unit for others)
-            total_cost=transaction_total_cost,  # PRE-CALCULATED - UI displays this directly
-            notes=item.notes or f"Received from PO {po.po_number}",
-            created_at=datetime.utcnow(),  # System timestamp (when entered)
-            created_by=current_user.email,
-        )
-        db.add(txn)
-        db.flush()
-        transaction_ids.append(txn.id)
+        ))
 
         # Update product average cost using proper weighted average
         # Formula: (old_qty × old_cost + new_qty × new_cost) / (old_qty + new_qty)
@@ -929,8 +892,8 @@ async def receive_purchase_order(
                 product.average_cost = float(new_cost)
 
             product.last_cost = float(cost_per_unit_for_inventory)
-            product.last_cost_date = datetime.utcnow()
-            product.updated_at = datetime.utcnow()
+            product.last_cost_date = datetime.now(timezone.utc)
+            product.updated_at = datetime.now(timezone.utc)
 
         # ============================================================================
         # MaterialLot Creation (for traceability)
@@ -938,7 +901,7 @@ async def receive_purchase_order(
         # Create MaterialLot for supply/component/material items to enable traceability
         if product.item_type in ('supply', 'component', 'material') or product.material_type_id:
             from sqlalchemy import extract
-            year = datetime.utcnow().year
+            year = datetime.now(timezone.utc).year
 
             # Count existing lots for this product this year to generate sequence
             existing_count = db.query(MaterialLot).filter(
@@ -1049,8 +1012,8 @@ async def receive_purchase_order(
                     notes=spool_data.notes,
                     received_date=datetime.combine(actual_received_date, datetime.min.time()),  # Use user-entered date
                     created_by=current_user.email,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
                 )
                 db.add(spool)
                 db.flush()  # Get spool ID
@@ -1063,6 +1026,19 @@ async def receive_purchase_order(
                     f"(lot: {spool.supplier_lot_number or 'N/A'})"
                 )
 
+    # =========================================================================
+    # PO RECEIPT via TransactionService (atomic + GL entries)
+    # Accounting: DR 1200 Raw Materials, CR 2000 Accounts Payable
+    # =========================================================================
+    if receipt_items_for_service:
+        txn_service = TransactionService(db)
+        inv_txns, journal_entry = txn_service.receive_purchase_order(
+            purchase_order_id=po.id,
+            items=receipt_items_for_service,
+            user_id=current_user.id if current_user else None,
+        )
+        transaction_ids = [txn.id for txn in inv_txns]
+
     # Check if fully received
     all_received = all(
         line.quantity_received >= line.quantity_ordered
@@ -1073,7 +1049,7 @@ async def receive_purchase_order(
         po.status = "received"
         po.received_date = actual_received_date  # Use user-entered date
 
-    po.updated_at = datetime.utcnow()
+    po.updated_at = datetime.now(timezone.utc)
 
     # Record receipt event
     event_type = "receipt" if all_received else "partial_receipt"
@@ -1168,7 +1144,7 @@ async def upload_po_document(
 
     # Generate filename with PO number
     ext = os.path.splitext(file.filename or "document")[1] or ".pdf"
-    safe_filename = f"{po.po_number}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext}"
+    safe_filename = f"{po.po_number}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}{ext}"
 
     # Try Google Drive first
     drive_service = get_drive_service()
@@ -1183,7 +1159,7 @@ async def upload_po_document(
         if success:
             # Save URL to PO
             po.document_url = result
-            po.updated_at = datetime.utcnow()
+            po.updated_at = datetime.now(timezone.utc)
             db.commit()
 
             return {
@@ -1206,7 +1182,7 @@ async def upload_po_document(
     # For local files, we'll store a relative path
     # The frontend can construct the full URL or a download endpoint can serve it
     po.document_url = f"/uploads/purchase_orders/{safe_filename}"
-    po.updated_at = datetime.utcnow()
+    po.updated_at = datetime.now(timezone.utc)
     db.commit()
 
     logger.info(f"Saved PO document locally: {local_path}")
